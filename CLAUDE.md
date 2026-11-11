@@ -129,7 +129,8 @@ version, dates the notes, commits, tags `vX.Y.Z` and pushes. The tag push
 triggers `.github/workflows/release.yml`, which runs CI, builds wheel, sdist and
 the Windows zip, and creates a draft GitHub Release. `win_package_check.py`
 checks the draft's zip on real Windows, from WSL, and the draft is published
-only after it passes.
+only after it passes. A published release is immutable (repository setting):
+its files and tag cannot change, so a defect found later ships as a new version.
 
 The Windows zip carries the Python named by `DEFAULT_PYTHON` in
 `build_windows_package.py`, checked against python.org's SHA-256, and the

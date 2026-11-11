@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Changed
+- Releases after 0.9.10 are immutable once published: their files and their
+  tag cannot change. A defect found in a published package goes out as a new
+  version.
+- The release workflow names `softprops/action-gh-release` by commit, the one
+  v3.0.4 has, rather than by its `v3` tag, which its owner can move.
+
 ## [0.9.10] - 2026-11-11
 
 ### Changed

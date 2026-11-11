@@ -61,8 +61,10 @@ jobs:
 
       # A draft, seen only by the repository's collaborators. It is published
       # once tools/win_package_check.py has passed on its Windows package.
+      # The one action from outside GitHub, in the one job that can write, so
+      # it is named by commit: its owner can move a tag such as v3.
       - name: Create a draft GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           body_path: release_notes.md
           files: dist/*

@@ -237,6 +237,17 @@ class TestReleaseWorkflow:
     def test_the_version_is_named_in_one_place(self):
         assert "--python-version" not in self.WORKFLOW
 
+    def test_actions_from_outside_github_are_named_by_commit(self):
+        """A tag can be moved to other code; a commit cannot."""
+        workflows = (REPO / ".github" / "workflows").glob("*.yml")
+        uses = [m.group(1) for path in workflows
+                for m in re.finditer(r"uses:\s*(\S+)", path.read_text())]
+        outside = [u for u in uses
+                   if not u.startswith(("./", "actions/", "github/"))]
+        assert outside, "the release action is expected here"
+        for action in outside:
+            assert re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", action), action
+
 
 def _load_check():
     spec = importlib.util.spec_from_file_location(

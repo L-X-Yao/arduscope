@@ -199,6 +199,8 @@ so a rebuild waits for it. Anything else that flies should take it too.
 4. Run `python3 tools/win_package_check.py --release vX.Y.Z` on the draft's
    package. Linux will delete an open file, so only this finds a leaked handle.
 5. When it passes, publish the draft: `gh release edit vX.Y.Z --draft=false`.
+   A published release is immutable, a repository setting: its files and its
+   tag cannot change, so a defect found after that goes out as a new version.
 
 The Windows package carries the Python named by `DEFAULT_PYTHON` in
 `build_windows_package.py`, and the libraries pinned with their hashes in
