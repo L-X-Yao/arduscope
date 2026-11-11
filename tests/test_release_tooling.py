@@ -237,6 +237,15 @@ class TestReleaseWorkflow:
     def test_the_version_is_named_in_one_place(self):
         assert "--python-version" not in self.WORKFLOW
 
+    def test_only_the_build_job_can_write(self):
+        """A job without a permissions block of its own takes the
+        workflow's, or else the repository default: CodeQL flagged ci."""
+        head, jobs = self.WORKFLOW.split("\njobs:", 1)
+        assert re.search(r"^permissions:\n  contents: read$", head, re.M)
+        ci_job, build_job = jobs.split("\n  build:", 1)
+        assert "write" not in ci_job
+        assert re.search(r"^      contents: write$", build_job, re.M)
+
     def test_actions_from_outside_github_are_named_by_commit(self):
         """A tag can be moved to other code; a commit cannot."""
         workflows = (REPO / ".github" / "workflows").glob("*.yml")

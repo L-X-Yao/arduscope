@@ -15,6 +15,9 @@ releases are not published.
   version.
 - The release workflow names `softprops/action-gh-release` by commit, the one
   v3.0.4 has, rather than by its `v3` tag, which its owner can move.
+- The release workflow's token is read-only except in the job that makes the
+  draft release. The `ci` job took the repository default, which CodeQL
+  pointed out.
 
 ### Fixed
 - `build_windows_package.py` no longer calls its `.pyc` mode source protection

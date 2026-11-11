@@ -4,6 +4,11 @@ on:
   push:
     tags: ["v*"]
 
+# Jobs get this rather than the repository default, so only build, which
+# makes the draft release, can write.
+permissions:
+  contents: read
+
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
