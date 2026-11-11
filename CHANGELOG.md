@@ -3,6 +3,22 @@
 All notable changes to ArduScope are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+- The Windows package runs on Python 3.14.10, which was 3.12.10. Python 3.12
+  has had six security releases since 3.12.10, and none of them has a Windows
+  build. The libraries in the package are the versions 0.9.9 carried.
+- The Windows package is built from pinned files: `win64-requirements.txt`
+  names the version and SHA-256 of each library, so two builds of one tag ship
+  the same files. The build stops when the Python download is not the file
+  python.org lists, when a pin does not meet `pyproject.toml`, or when a
+  library in the package needs one that is not in it.
+- A release is created as a draft, and is published once its Windows package
+  has passed `tools/win_package_check.py` on real Windows. The release used to
+  be public before the check ran. The check also compares the package's Python
+  and libraries with the pinned ones.
+
 ## [0.9.9] - 2026-11-11
 
 ### Fixed

@@ -121,13 +121,20 @@ python3 tools/release_gate.py    # about 30 min, needs the logs and SITL
 python3 tools/release.py patch   # 0.3.1 -> 0.3.2
 python3 tools/release.py minor   # 0.3.1 -> 0.4.0
 python3 tools/win_package_check.py --release vX.Y.Z
+gh release edit vX.Y.Z --draft=false
 ```
 
 `release.py` refuses a commit without a pass from the gate, then bumps the
 version, dates the notes, commits, tags `vX.Y.Z` and pushes. The tag push
 triggers `.github/workflows/release.yml`, which runs CI, builds wheel, sdist and
-the Windows zip, and creates a GitHub Release. The last command checks the
-published zip on real Windows, from WSL.
+the Windows zip, and creates a draft GitHub Release. `win_package_check.py`
+checks the draft's zip on real Windows, from WSL, and the draft is published
+only after it passes.
+
+The Windows zip carries the Python named by `DEFAULT_PYTHON` in
+`build_windows_package.py`, checked against python.org's SHA-256, and the
+libraries pinned with hashes in `win64-requirements.txt`. The release runner's
+Python has to be the same minor version.
 
 **Do not publish to PyPI** -- distribution is GitHub Release only.
 

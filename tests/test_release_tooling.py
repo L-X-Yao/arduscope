@@ -11,7 +11,9 @@ under "## [Unreleased]" rather than generating them.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -135,3 +137,128 @@ class TestWindowsBuildTooling:
         host_full = "%d.%d.0" % sys.version_info[:2]
         # The host's own minor version always has a matching interpreter.
         assert mod._get_compiler(host_full, "/tmp")
+
+
+REQUIREMENTS = REPO / "win64-requirements.txt"
+
+
+class TestWindowsPackagePins:
+    """Up to 0.9.9 the package took whatever pip found that day, with
+    --no-deps, on an embeddable whose download nothing checked. 0.9.10
+    pins the Python by its SHA-256 and each library by its wheel's."""
+
+    def test_a_download_that_is_not_the_listed_file_stops_the_build(self):
+        mod = _load_build()
+        with pytest.raises(RuntimeError, match="python.org lists"):
+            mod.check_embed(b"not the embeddable", mod.DEFAULT_PYTHON)
+
+    def test_a_python_with_no_hash_on_record_stops_the_build(self):
+        with pytest.raises(RuntimeError, match="No SHA-256 on record"):
+            _load_build().check_embed(b"", "3.99.0")
+
+    def test_the_listed_file_passes(self, monkeypatch):
+        mod = _load_build()
+        monkeypatch.setitem(mod.EMBED_SHA256, "9.9.9",
+                            hashlib.sha256(b"zip").hexdigest())
+        mod.check_embed(b"zip", "9.9.9")
+
+    def test_the_default_python_has_a_hash(self):
+        mod = _load_build()
+        assert re.fullmatch(r"[0-9a-f]{64}", mod.EMBED_SHA256[mod.DEFAULT_PYTHON])
+
+    def test_every_pin_carries_a_hash(self):
+        text = REQUIREMENTS.read_text().replace("\\\n", " ")
+        entries = [line for line in text.splitlines()
+                   if line.strip() and not line.startswith("#")]
+        pins = _load_build().read_requirements(str(REQUIREMENTS))
+        assert len(entries) == len(pins) >= 6
+        for entry in entries:
+            assert re.match(r"[A-Za-z0-9._-]+==[^\s]+ ", entry), entry
+            assert re.search(r"--hash=sha256:[0-9a-f]{64}\b", entry), entry
+
+    def test_the_pins_meet_pyproject(self):
+        tomllib = pytest.importorskip("tomllib")
+        mod = _load_build()
+        with open(REPO / "pyproject.toml", "rb") as f:
+            pyproject = tomllib.load(f)
+        pins = mod.read_requirements(str(REQUIREMENTS))
+        assert mod.check_requirements(pins, pyproject) == []
+
+    def test_a_pin_that_misses_pyproject_is_reported(self):
+        pyproject = {"project": {
+            "dependencies": ["numpy>=1.24,<3", "plotly>=6.0.0"],
+            "optional-dependencies": {"web": ["bottle>=0.13"]}}}
+        problems = _load_build().check_requirements(
+            {"numpy": "3.0.0", "plotly": "6.1"}, pyproject)
+        assert problems == ["numpy==3.0.0 does not satisfy numpy>=1.24,<3",
+                            "bottle is not pinned"]
+
+    @staticmethod
+    def _site(tmp_path, libraries):
+        for folder, requires in libraries.items():
+            info = tmp_path / f"{folder}.dist-info"
+            info.mkdir()
+            (info / "METADATA").write_text(
+                "Metadata-Version: 2.1\nName: x\n"
+                + "".join(f"Requires-Dist: {r}\n" for r in requires))
+        return str(tmp_path)
+
+    def test_a_dependency_left_out_stops_the_build(self, tmp_path):
+        site = self._site(tmp_path, {
+            "plotly-7.1.0": ["narwhals>=1.15.1", "packaging",
+                             'numpy>=1.22; extra == "express"'],
+            "packaging-26.3": [],
+            # Both left out on purpose, see _NOT_BUNDLED.
+            "pymavlink-2.4.50": ["lxml", "fastcrc"],
+            "Some_Lib-1.0": ['colorama; sys_platform == "win32"',
+                             'uvloop; sys_platform == "linux"',
+                             'tomli; python_version < "3.11"'],
+        })
+        assert _load_build().check_closure(site, "3.14.10") == [
+            "plotly needs narwhals, which is not pinned",
+            "some-lib needs colorama, which is not pinned",
+        ]
+
+
+class TestReleaseWorkflow:
+    WORKFLOW = (REPO / ".github" / "workflows" / "release.yml").read_text()
+
+    def test_the_release_is_a_draft(self):
+        step = self.WORKFLOW.split("softprops/action-gh-release", 1)[1]
+        assert re.search(r"^\s+draft: true$", step, re.M)
+
+    def test_the_runner_python_is_the_bundled_minor(self):
+        """.pyc compiled by another minor version does not load."""
+        build_job = self.WORKFLOW.split("\n  build:", 1)[1]
+        runner = re.search(r'python-version: "([\d.]+)"', build_job).group(1)
+        default = _load_build().DEFAULT_PYTHON
+        assert runner == ".".join(default.split(".")[:2])
+
+    def test_the_version_is_named_in_one_place(self):
+        assert "--python-version" not in self.WORKFLOW
+
+
+def _load_check():
+    spec = importlib.util.spec_from_file_location(
+        "wpc_mod", REPO / "tools" / "win_package_check.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class TestPackageCheck:
+    SITE = "arduscope/python/Lib/site-packages/"
+
+    def test_libraries_come_from_their_dist_info(self):
+        names = [self.SITE + "numpy-2.5.4.dist-info/METADATA",
+                 self.SITE + "numpy/__init__.py",
+                 self.SITE + "pip-26.0.dist-info/METADATA",
+                 self.SITE + "PyYAML-6.0.dist-info/RECORD"]
+        assert _load_check().bundled_libraries(names) == {"numpy": "2.5.4"}
+
+    def test_a_library_off_its_pin_is_named(self):
+        differ = _load_check().pin_differences(
+            {"numpy": "2.5.4", "plotly": "7.0.0"},
+            {"numpy": "2.5.4", "plotly": "7.1.0", "bottle": "0.13.4"})
+        assert differ == ["bottle: missing, pinned 0.13.4",
+                          "plotly: 7.0.0, pinned 7.1.0"]

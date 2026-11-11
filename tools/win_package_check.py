@@ -13,13 +13,21 @@ log, the web server takes eleven uploads, three of them damaged, one of them
 2 MB of zeros, and four under names Windows cannot store, and nothing is left
 behind.
 
+It also checks that the package carries the Python named by DEFAULT_PYTHON in
+build_windows_package.py and the libraries pinned in win64-requirements.txt.
+
 Usage:
     python3 tools/win_package_check.py --release v0.9.3
     python3 tools/win_package_check.py --zip dist/x.zip --version 0.9.3
 
+release.yml creates each release as a draft. --release downloads a draft's
+package too (gh shows drafts to the repository's collaborators), and the draft
+is published once this has passed:
+    gh release edit v0.9.3 --draft=false
+
 The result goes to reports/release-check/<version>.json, or to
 <version>-local.json for --zip, so a local build cannot stand in for the
-published package. The whole run takes about 15 minutes, so start it in the
+released package. The whole run takes about 15 minutes, so start it in the
 background.
 
 Exit 0 = every check passed; 1 = at least one did not.
@@ -32,17 +40,20 @@ import glob
 import json
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import zipfile
 
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(1, REPO_ROOT)
 
+import build_windows_package as builder  # noqa: E402
 import local_paths  # noqa: E402
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESULT_DIR = os.path.join(REPO_ROOT, "reports", "release-check")
 DRIVER = os.path.join(REPO_ROOT, "tools", "win_package_driver.py")
 DEFAULT_PLANE_LOG = "tests/sitl/logs/plane_tecs_tuning.BIN"
@@ -75,6 +86,30 @@ def package_modules(names: list[str]) -> set[str]:
     prefix = "arduscope/log_analysis/"
     return {name[len(prefix):-len(".pyc")] for name in names
             if name.startswith(prefix) and name.endswith(".pyc")}
+
+
+_SITE = "arduscope/python/Lib/site-packages/"
+# Installed with pip on a build made on Windows; not part of what is pinned.
+_TOOLING = {"pip", "setuptools", "wheel"}
+
+
+def bundled_libraries(names: list[str]) -> dict[str, str]:
+    """{name: version} of the libraries in a package zip, from their dist-info."""
+    found = {}
+    for name in names:
+        m = re.fullmatch(re.escape(_SITE) + r"([^/]+)-([^/-]+)\.dist-info/METADATA",
+                         name)
+        if m and builder._canonical(m.group(1)) not in _TOOLING:
+            found[builder._canonical(m.group(1))] = m.group(2)
+    return found
+
+
+def pin_differences(bundled: dict[str, str], pins: dict[str, str]) -> list[str]:
+    """Each library whose version in the package is not the pinned one."""
+    return [f"{name}: {bundled.get(name, 'missing')}, pinned "
+            f"{pins.get(name, 'nothing')}"
+            for name in sorted(set(bundled) | set(pins))
+            if bundled.get(name) != pins.get(name)]
 
 
 def source_modules(root: str = REPO_ROOT) -> set[str]:
@@ -172,11 +207,28 @@ def check_zip(path: str, version: str) -> list[dict]:
         names = z.namelist()
         init = z.read("arduscope/log_analysis/__init__.pyc")
     missing = sorted(source_modules() - package_modules(names))
+    pins = builder.read_requirements(os.path.join(REPO_ROOT, builder.REQUIREMENTS))
+    differ = pin_differences(bundled_libraries(names), pins)
     return [
         _check("version in package", version.encode() in init, version),
         _check("every module packaged", not missing, missing[:5]),
         _check("licence in package", "arduscope/LICENSE.txt" in names),
+        _check("libraries as pinned", not differ, differ[:5] or len(pins)),
     ]
+
+
+def check_runtime(package: str) -> list[dict]:
+    """The bundled Python is the one the build script names."""
+    try:
+        out = subprocess.run(
+            ["./python/python.exe", "-c",
+             "import platform; print(platform.python_version())"],
+            cwd=package, capture_output=True, text=True, timeout=60).stdout
+    except subprocess.TimeoutExpired:
+        out = "timed out"
+    found = out.strip()
+    return [_check(f"python {builder.DEFAULT_PYTHON}",
+                   found == builder.DEFAULT_PYTHON, found)]
 
 
 def _python(package: str, args: list[str], timeout: int) -> int:
@@ -281,6 +333,7 @@ def main(argv: list[str] | None = None) -> int:
             with zipfile.ZipFile(path) as z:
                 z.extractall(os.path.join(work, "package"))
             package = os.path.join(work, "package", "arduscope")
+            checks += check_runtime(package)
             checks += check_entry_points(package)
             checks += check_cli(package, work, plane_log)
             checks += check_web(package, work, args.port)
@@ -297,6 +350,9 @@ def main(argv: list[str] | None = None) -> int:
                   f, ensure_ascii=False, indent=2)
         f.write("\n")
     print(f"\n{version}: {len(checks) - len(failed)} of {len(checks)} passed")
+    if args.release and not failed:
+        print(f"If {args.release} is still a draft, publish it:\n"
+              f"  gh release edit {args.release} --draft=false")
     return 1 if failed else 0
 
 

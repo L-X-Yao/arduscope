@@ -162,7 +162,7 @@ passed all of it. Each row includes the rows above it.
 | Docs and tests | `python3 tools/ci_local.py` |
 | Analyzer logic, a threshold | `python3 tools/release_gate.py --steps snapshots,corpus`, and read the changes. CI runs neither |
 | A parameter suggestion | A source, a flight and a registry row, see Adding param_suggestions |
-| Log reader, pipeline, web server, Windows package | `python3 tools/win_package_check.py --zip <zip> --version <x.y.z>`, on a build from `python3 build_windows_package.py --python-version 3.12.10` |
+| Log reader, pipeline, web server, Windows package | `python3 tools/win_package_check.py --zip <zip> --version <x.y.z>`, on a build from `python3.14 build_windows_package.py`. The build compiles with a Python of the bundled minor version, 3.14 |
 | A release | See Releasing |
 
 The snapshots and the corpora are built on logs that are not public, so those
@@ -194,9 +194,15 @@ so a rebuild waits for it. Anything else that flies should take it too.
    half an hour, and needs the logs and SITL. If corpus results moved it stops
    at review: read the diff, then run it with `--accept "why they are right"`.
 3. Run `python3 tools/release.py patch`. It refuses a commit without a pass,
-   dates the notes, tags and pushes. The tag starts `release.yml`.
-4. Run `python3 tools/win_package_check.py --release vX.Y.Z` on the published
+   dates the notes, tags and pushes. The tag starts `release.yml`, which
+   creates the release as a draft.
+4. Run `python3 tools/win_package_check.py --release vX.Y.Z` on the draft's
    package. Linux will delete an open file, so only this finds a leaked handle.
+5. When it passes, publish the draft: `gh release edit vX.Y.Z --draft=false`.
+
+The Windows package carries the Python named by `DEFAULT_PYTHON` in
+`build_windows_package.py`, and the libraries pinned with their hashes in
+`win64-requirements.txt`. A rebuild of a tag ships the same files.
 
 Distribution is GitHub Release only, never PyPI.
 

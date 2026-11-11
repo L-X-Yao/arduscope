@@ -112,8 +112,12 @@ them readable.
 - **Top-level module names are generic.** `lib`, `analyzers`, `locales`, the
   five entry scripts and an `__init__.py` install at the root of site-packages.
   Give ArduScope a virtual environment of its own, or use the Windows package.
-- **The Windows package carries Python 3.12.10**, the last 3.12 with a Windows
-  build. Later 3.12 releases are source only.
+- **The Windows package carries its own Python**, 3.14.10 since 0.9.10, and
+  pinned libraries. A fix in either reaches it only with a new ArduScope
+  release. Once a Python version takes security fixes only, its releases are
+  source only and the package has to move to a newer one: 3.12 has had six
+  security releases since 3.12.10, the package's Python until 0.9.9, and none
+  of them has a Windows build.
 - **PDF export is tested with stand-ins.** A real export needs `weasyprint`
   and Chrome, and no test runs one.
 

@@ -3,8 +3,9 @@
 Build a standalone Windows distribution package.
 
 Automatically:
-1. Downloads Python 3.10 embeddable (~10MB, Windows runtime)
-2. Installs pip and dependencies (pymavlink / plotly / numpy / bottle)
+1. Downloads the Python embeddable (~12MB, Windows runtime) and checks it
+   against the SHA-256 python.org lists, see EMBED_SHA256
+2. Installs pip and the libraries pinned in win64-requirements.txt
 3. Compiles/protects source code (two modes)
 4. Packages as zip (extract and run, no Python install needed)
 
@@ -21,7 +22,7 @@ Source protection modes:
 Usage:
     python build_windows_package.py --nuitka --output arduscope-v12.zip
     python build_windows_package.py                    # fallback: pyc mode
-    python build_windows_package.py --python-version 3.10.12
+    python build_windows_package.py --python-version 3.14.10
 
 Requirements:
     --nuitka mode: Windows + pip install nuitka ordered-set + MSVC
@@ -29,9 +30,12 @@ Requirements:
 """
 
 import argparse
+import glob
+import hashlib
 import io
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -60,6 +64,25 @@ _BUILD_ONLY_FILES: list[str] = []
 INCLUDE_DIRS = ["lib", "analyzers"]
 # Data directories to copy verbatim (all files, preserving structure)
 INCLUDE_DATA_DIRS = ["locales", "lib/vendor"]
+
+# The Python the package carries. 3.12 stopped at 3.12.10: its later releases
+# are source only, with no embeddable. The runner that builds the release has
+# to be the same minor version, see release.yml.
+DEFAULT_PYTHON = "3.14.10"
+# The SHA-256 python.org lists for python-<version>-embed-amd64.zip, from
+# https://www.python.org/api/v2/downloads/release_file/ (sha256_sum). A version
+# that is not here is refused.
+EMBED_SHA256 = {
+    "3.14.10": "90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159",
+}
+REQUIREMENTS = "win64-requirements.txt"
+# Needed by a library in the package, by its metadata, and left out on purpose.
+# 0.9.9 shipped without both and passed its check on Windows.
+_NOT_BUNDLED = {
+    "fastcrc": "pymavlink falls back to its own CRC code without it",
+    "lxml": "pymavlink imports it only in DFReader.metadata_tree and mavgen, "
+            "which ArduScope does not call",
+}
 
 # Nuitka compilation: entry points get compiled as --standalone executables,
 # library packages get compiled as --module .pyd extensions.
@@ -151,6 +174,103 @@ def download(url: str, desc: str) -> bytes:
     data = resp.read()
     print(f"    Done ({len(data) / 1024 / 1024:.1f} MB)")
     return data
+
+
+def check_embed(data: bytes, py_ver: str) -> None:
+    """Stop unless data is the embeddable python.org lists for py_ver."""
+    expected = EMBED_SHA256.get(py_ver)
+    if expected is None:
+        raise RuntimeError(
+            f"No SHA-256 on record for Python {py_ver}: add the one python.org "
+            f"lists for python-{py_ver}-embed-amd64.zip to EMBED_SHA256")
+    actual = hashlib.sha256(data).hexdigest()
+    if actual != expected:
+        raise RuntimeError(
+            f"python-{py_ver}-embed-amd64.zip has SHA-256 {actual}, "
+            f"python.org lists {expected}")
+
+
+def _canonical(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def read_requirements(path: str) -> dict[str, str]:
+    """{name: version} of the `name==version` pins in a requirements file."""
+    pins = {}
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            m = re.match(r"([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s\\;]+)", line)
+            if m:
+                pins[_canonical(m.group(1))] = m.group(2)
+    return pins
+
+
+def _load_pyproject(script_dir: str) -> dict:
+    try:
+        import tomllib
+    except ImportError:
+        raise RuntimeError("Reading pyproject.toml needs Python 3.11 or later")
+    with open(os.path.join(script_dir, "pyproject.toml"), "rb") as f:
+        return tomllib.load(f)
+
+
+def check_requirements(pins: dict[str, str], pyproject: dict) -> list[str]:
+    """What in pyproject's dependencies and web extra the pins do not meet."""
+    from packaging.requirements import Requirement
+
+    project = pyproject["project"]
+    wanted = (list(project["dependencies"])
+              + project.get("optional-dependencies", {}).get("web", []))
+    problems = []
+    for text in wanted:
+        req = Requirement(text)
+        name = _canonical(req.name)
+        if name not in pins:
+            problems.append(f"{name} is not pinned")
+        elif not req.specifier.contains(pins[name], prereleases=True):
+            problems.append(f"{name}=={pins[name]} does not satisfy {text}")
+    return problems
+
+
+def _windows_markers(py_ver: str) -> dict[str, str]:
+    """Marker values of the bundled Python on 64-bit Windows."""
+    return {
+        "os_name": "nt", "sys_platform": "win32", "platform_system": "Windows",
+        "platform_machine": "AMD64", "platform_python_implementation": "CPython",
+        "implementation_name": "cpython", "implementation_version": py_ver,
+        "python_version": ".".join(py_ver.split(".")[:2]),
+        "python_full_version": py_ver, "extra": "",
+    }
+
+
+def check_closure(site_packages: str, py_ver: str) -> list[str]:
+    """Requirements of the installed libraries that are not installed.
+
+    --no-deps installs only what is pinned, so a library that gains a
+    dependency would ship without it. _NOT_BUNDLED names the ones left out
+    on purpose.
+    """
+    from packaging.requirements import Requirement
+
+    metadata = glob.glob(os.path.join(site_packages, "*.dist-info", "METADATA"))
+    installed = {}
+    for path in metadata:
+        folder = os.path.basename(os.path.dirname(path))
+        installed[_canonical(folder[:-len(".dist-info")].rsplit("-", 1)[0])] = path
+    env = _windows_markers(py_ver)
+    problems = []
+    for name, path in sorted(installed.items()):
+        with open(path, encoding="utf-8") as f:
+            lines = [line[len("Requires-Dist:"):].strip() for line in f
+                     if line.startswith("Requires-Dist:")]
+        for text in lines:
+            req = Requirement(text)
+            if req.marker is not None and not req.marker.evaluate(env):
+                continue
+            needed = _canonical(req.name)
+            if needed not in installed and needed not in _NOT_BUNDLED:
+                problems.append(f"{name} needs {needed}, which is not pinned")
+    return problems
 
 
 def _get_compiler(py_ver: str, build_dir: str) -> str:
@@ -392,8 +512,9 @@ def _build_nuitka(script_dir: str, pkg_dir: str, py_ver: str):
 def main():
     parser = argparse.ArgumentParser(description="Build standalone Windows package")
     parser.add_argument(
-        "--python-version", default="3.10.11",
-        help="Python embeddable version (default: 3.10.11)",
+        "--python-version", default=DEFAULT_PYTHON,
+        help="Python embeddable version, one of EMBED_SHA256 "
+             "(default: %(default)s)",
     )
     parser.add_argument(
         "--output", default=None,
@@ -408,6 +529,9 @@ def main():
         help="Path to a pre-downloaded Python embeddable zip (skips download)",
     )
     args = parser.parse_args()
+    if args.python_version not in EMBED_SHA256:
+        parser.error(f"no SHA-256 on record for Python {args.python_version}, "
+                     f"see EMBED_SHA256")
 
     if args.nuitka and platform.system() != "Windows":
         print("Error: --nuitka requires Windows (Nuitka does not support cross-compilation)")
@@ -448,6 +572,8 @@ def main():
             f"python-{py_ver}-embed-amd64.zip"
         )
         py_zip_data = download(py_url, "Python embeddable")
+    check_embed(py_zip_data, py_ver)
+    print(f"  SHA-256 matches python.org's")
 
     python_dir = os.path.join(pkg_dir, "python")
     os.makedirs(python_dir)
@@ -486,47 +612,34 @@ def main():
     else:
         print("  Skipped (using system pip on Linux)")
 
-    # ---- Step 4: Install dependencies (from pyproject.toml) ----
-    print(f"\n[4/6] Installing dependencies...")
+    # ---- Step 4: Install the pinned libraries ----
+    print(f"\n[4/6] Installing the libraries in {REQUIREMENTS}...")
     target_dir = os.path.join(python_dir, "Lib", "site-packages")
+    requirements = os.path.join(script_dir, REQUIREMENTS)
+    pins = read_requirements(requirements)
+    problems = check_requirements(pins, _load_pyproject(script_dir))
+    if problems:
+        raise RuntimeError(f"{REQUIREMENTS} does not meet pyproject.toml: "
+                           + "; ".join(problems))
 
-    # Read deps from pyproject.toml (required + web optional)
-    pyproject_path = os.path.join(script_dir, "pyproject.toml")
-    try:
-        import tomllib
-        with open(pyproject_path, "rb") as f:
-            pyproject = tomllib.load(f)
-    except ImportError:
-        # Python < 3.11 fallback
-        import re
-        with open(pyproject_path, encoding="utf-8") as f:
-            content = f.read()
-        deps = re.findall(r'"([a-zA-Z][\w.-]*(?:[><=!]+[\d.]+)?)"', content)
-        pyproject = {"project": {"dependencies": deps}}
-
-    deps = pyproject["project"]["dependencies"]
-    optional = pyproject.get("project", {}).get("optional-dependencies", {})
-    all_deps = list(deps) + optional.get("web", [])
-
+    # Exactly the pinned files: every pin carries its wheel's SHA-256.
+    pip_install = ["install", "--require-hashes", "--no-deps",
+                   "-r", requirements, "--no-warn-script-location", "-q"]
     if platform.system() == "Windows":
-        subprocess.run(
-            [python_exe, "-m", "pip", "install",
-             *all_deps,
-             "--no-warn-script-location", "-q"],
-            check=True,
-        )
+        subprocess.run([python_exe, "-m", "pip", *pip_install], check=True)
     else:
         subprocess.run(
-            ["pip3", "install",
-             *all_deps,
+            [sys.executable, "-m", "pip", *pip_install,
              "--platform", "win_amd64",
              "--target", target_dir,
              "--python-version", py_ver_short,
-             "--only-binary", ":all:",
-             "--no-deps", "-q"],
+             "--only-binary", ":all:"],
             check=True,
         )
-    print(f"  {len(all_deps)} dependencies installed")
+    problems = check_closure(target_dir, py_ver)
+    if problems:
+        raise RuntimeError("; ".join(problems))
+    print(f"  {len(pins)} libraries installed, nothing they need is missing")
 
     # ---- Step 5: Copy tool code ----
     print(f"\n[5/6] Copying tool code...")

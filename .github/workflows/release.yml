@@ -21,7 +21,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Install build tools
         run: pip install build
@@ -33,14 +33,15 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
-      # Standalone Windows package (.pyc mode). The runner Python is 3.12,
-      # matching the bundled 3.12.10 embeddable's minor version, so the
-      # compiled .pyc runs on it (build_windows_package guards a mismatch).
-      # Output lands in dist/, so the release upload below picks it up.
+      # Standalone Windows package (.pyc mode), on the Python named by
+      # DEFAULT_PYTHON in build_windows_package.py. The runner Python above has
+      # to be the same minor version, so the compiled .pyc runs on it
+      # (build_windows_package guards a mismatch). The libraries are the ones
+      # pinned in win64-requirements.txt. Output lands in dist/, so the release
+      # upload below picks it up.
       - name: Build standalone Windows package
         run: >-
           python build_windows_package.py
-          --python-version 3.12.10
           --output arduscope-v${{ steps.version.outputs.version }}-win64.zip
 
       - name: Generate release notes from CHANGELOG
@@ -58,9 +59,12 @@ jobs:
               print(f'Release v{ver}')
           " > release_notes.md
 
-      - name: Create GitHub Release
+      # A draft, seen only by the repository's collaborators. It is published
+      # once tools/win_package_check.py has passed on its Windows package.
+      - name: Create a draft GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           body_path: release_notes.md
           files: dist/*
+          draft: true
           generate_release_notes: false

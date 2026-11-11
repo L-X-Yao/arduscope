@@ -1,0 +1,24 @@
+# The libraries in the Windows package, for Python 3.14 on win_amd64.
+#
+# build_windows_package.py installs exactly these, with --require-hashes and
+# --no-deps, so two builds of one tag ship the same files. The build stops when
+# a pin does not satisfy pyproject.toml (its dependencies and the "web" extra)
+# or when a library here needs one that is not here. pymavlink's fastcrc and
+# lxml are left out on purpose, see _NOT_BUNDLED in the build script.
+#
+# To change a pin, hash the wheel pip picks for the package:
+#   pip download --no-deps --only-binary :all: --platform win_amd64 \
+#       --python-version 314 -d wheels "<name>==<version>"
+#   sha256sum wheels/*.whl
+bottle==0.13.4 \
+    --hash=sha256:045684fbd2764eac9cdeb824861d1551d113e8b683d8d26e296898d3dd99a12e
+narwhals==2.28.0 \
+    --hash=sha256:1f69d6385ec30e2fa6e1fdeb37c562ecabd0f713f6f3e3b58a668c5c9df9567f
+numpy==2.5.4 \
+    --hash=sha256:2ca144f15135b6212a5c47b1e2aeca6e412f102f95a2d5d88d8aec77eb255de3
+packaging==26.3 \
+    --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
+plotly==7.1.0 \
+    --hash=sha256:dbb7fa18afce40d0a8e80d1bf162eceb3faa0ce5a77fe741ad09a74cf78f53f3
+pymavlink==2.4.50 \
+    --hash=sha256:a2315bddb651d87f4d510e629bdce7d6935355c6031e198d1dfd3c8723db5f5b

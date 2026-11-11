@@ -171,7 +171,10 @@ def main() -> None:
         # Push only THIS tag — `--tags` would push every stray local
         # tag, and each one triggers the release workflow.
         _run(["git", "push", "origin", "main", tag])
-        print(f"\n  Pushed. GitHub Actions will build the release.")
+        print(f"\n  Pushed. GitHub Actions will build a draft release. When it")
+        print(f"  is there, check its Windows package, then publish it:")
+        print(f"    python3 tools/win_package_check.py --release {tag}")
+        print(f"    gh release edit {tag} --draft=false")
     else:
         print(f"\n  Skipped push. To push manually:")
         print(f"    git push origin main {tag}")
