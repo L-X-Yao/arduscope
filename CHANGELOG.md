@@ -3,7 +3,7 @@
 All notable changes to ArduScope are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.9.8] - 2026-11-11
 
 ### Fixed
 - `--ai-provider anthropic` read the first block of the reply as its text.
