@@ -10,6 +10,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   opens with a heading gave the summary `## Overall assessment`. The summary
   is the first line that says something, without its list or emphasis marks,
   and a heading of any level is shown as a heading.
+- An LLM card said that it is not a source only where it read warning or
+  critical, and a healthy flight is where its words are most likely to be taken
+  for the tool's. It says so at every status now. The prompt tells the model to
+  use only the analyzers' figures, to leave parameters to the analyzer cards
+  and not to call an aircraft airworthy: of the first replies from a real
+  service, one gave a 10% limit of its own and another called the aircraft
+  airworthy.
+- Emphasis in an LLM reply is shown as emphasis and a rule line is dropped. The
+  card showed `**` and `---` as they came.
 
 ### Changed
 - The LLM diagnosis takes its model from `--ai-model` and no longer has one
@@ -26,6 +35,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   that was cut off, filtered or empty is reported as what it is.
 - The card names the model that wrote it and the API it was asked through. It
   named the provider only, which says little once the address can be changed.
+- The LLM diagnosis was run against a real service for the first time:
+  DeepSeek, through both APIs. `docs/known_limitations.md` says what that does
+  and does not cover.
 
 ## [0.9.8] - 2026-11-11
 

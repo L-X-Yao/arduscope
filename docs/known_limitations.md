@@ -86,10 +86,18 @@ them readable.
 
 ## LLM diagnosis
 
-- **It is not tested against the services.** `--ai-provider anthropic` and
-  `openai` are covered by tests that put a stand-in where the request goes,
-  and no release check sends one. How the Anthropic reply is read was checked
-  against reply objects built with the `anthropic` SDK, 2.8.0.
+- **It was run against one service, by hand.** On 2026-11-11 DeepSeek answered
+  through both APIs, `deepseek-flash` through the OpenAI one and
+  `deepseek-v4-pro` through the Anthropic one, with the `openai` SDK 3.49.0 and
+  the `anthropic` SDK 2.8.0. Anthropic's and OpenAI's own services have not
+  been called. The tests put a stand-in where the request goes, and no release
+  check sends one.
+- **What the model writes is not checked.** The prompt tells it to use only
+  the analyzers' figures, to leave parameters to the analyzer cards and not to
+  call an aircraft airworthy. A model can still do otherwise: before those
+  lines were in the prompt, one reply gave a 10% limit of its own and another
+  called the aircraft airworthy. The card says at every status that it is not a
+  source. The verdict and the `.param` file come from the analyzers alone.
 - **Each service answers in its own way.** `--ai-provider` names the API that
   is spoken, `--ai-model` the model and `--ai-base-url` a service other than
   the provider's own. Which models a service has, what it accepts and how it

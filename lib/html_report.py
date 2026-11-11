@@ -497,9 +497,13 @@ class HtmlReportGenerator:
         if result.summary:
             summary_html = f'<p class="summary">{html.escape(result.summary)}</p>'
 
-        # Evidence source (POSITIONING.md: every warning/critical must cite)
+        # Evidence source (POSITIONING.md: every warning/critical must cite).
+        # A card an LLM wrote shows its line at any status: it says that
+        # the card is not a source.
         evidence_source_html = ""
-        if result.evidence_source and result.status in ("warning", "critical"):
+        if result.evidence_source and (
+                result.status in ("warning", "critical")
+                or result.provider in ("anthropic", "openai")):
             evidence_source_html = (
                 f'<p class="evidence-source">'
                 f'<span class="evidence-source-label">{t("report.evidence_label")}</span>'

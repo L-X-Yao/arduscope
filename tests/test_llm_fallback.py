@@ -9,7 +9,8 @@ import pytest
 
 from lib import ai_diagnosis
 from lib.ai_diagnosis import generate_diagnosis
-from lib.i18n import t
+from lib.html_report import HtmlReportGenerator
+from lib.i18n import set_locale, t
 from lib.results import AnalysisResult
 from lib.vehicle_detect import VehicleInfo
 
@@ -345,6 +346,71 @@ class TestLlmCardText:
         assert card.details[2:] == [
             "<strong>━━ &lt;script&gt;a&lt;/script&gt; ━━</strong>",
             "&lt;img src=x&gt;", "&lt;i&gt;text&lt;/i&gt;"]
+
+
+    def test_emphasis_becomes_markup_and_rules_are_dropped(self, monkeypatch):
+        card = self._card(monkeypatch, "fine\n---\n**Action:** do <x>\n"
+                                       "* item\n***\n## **Bold** title")
+        assert card.details[2:] == [
+            "<strong>Action:</strong> do &lt;x&gt;", "item",
+            "<strong>━━ Bold title ━━</strong>"]
+
+
+    @pytest.mark.parametrize("line, shown", [
+        ("*Recommendation:* check it", "<em>Recommendation:</em> check it"),
+        ("**a** and *b*", "<strong>a</strong> and <em>b</em>"),
+        ("gain is 2 * 3 * 4", "gain is 2 * 3 * 4"),
+        ("a lone * stays", "a lone * stays"),
+        ("x*y*z", "x*y*z"),
+    ])
+    def test_single_marks_are_emphasis_only_around_words(
+            self, monkeypatch, line, shown):
+        card = self._card(monkeypatch, "fine\n" + line)
+        assert card.details[2:] == [shown]
+
+
+class TestLlmIsNotASource:
+    """The card says what it is at any status, and the prompt says what the
+    report does not do. Both were added after reading real replies: one
+    gave a 10% limit of its own, another called the aircraft airworthy."""
+
+    @pytest.fixture(autouse=True)
+    def reply(self, monkeypatch):
+        monkeypatch.setattr(ai_diagnosis, "_call_anthropic",
+                            lambda *args, **kwargs: "All looks fine\n- ok")
+        yield
+        set_locale("zh")
+
+    @pytest.mark.parametrize("statuses", [("good",), ("good", "warning"),
+                                          ("good", "critical")])
+    def test_the_card_names_itself_at_any_status(self, statuses):
+        card = _diagnose(_results(*statuses))
+        assert card.provider == "anthropic"
+        assert card.evidence_source == t(
+            "ai.llm.evidence", model="some-model", provider="anthropic")
+
+    def test_a_healthy_llm_card_shows_the_line_in_the_report(self):
+        card = _diagnose(_results("good"))
+        assert card.status == "good"
+        page = HtmlReportGenerator(VEHICLE, [card]).generate()
+        assert 'class="evidence-source"' in page
+        assert "some-model" in page
+
+    def test_a_healthy_rule_card_shows_no_such_line(self):
+        card = _diagnose(_results("good"), provider="rule")
+        assert card.status == "good"
+        page = HtmlReportGenerator(VEHICLE, [card]).generate()
+        assert 'class="evidence-source"' not in page
+
+    @pytest.mark.parametrize("lang, words", [
+        ("en", ("threshold", "parameter", "airworthy")),
+        ("zh", ("阈值", "参数", "适航")),
+    ])
+    def test_the_prompt_keeps_the_model_to_the_analyzers(self, lang, words):
+        set_locale(lang)
+        prompt = t("ai.llm.system_prompt")
+        for word in words:
+            assert word in prompt
 
 
 class TestLlmCardStatus:

@@ -11,6 +11,7 @@ No external API dependency required.
 from __future__ import annotations
 
 import html as _html
+import re
 import sys
 from dataclasses import dataclass, field
 
@@ -1025,6 +1026,19 @@ def _worst_status(results_by_key: dict[str, AnalysisResult]) -> str:
     return "warning" if "warning" in statuses else "good"
 
 
+# What a reply carries besides headings and bullets, seen in real ones.
+_RULE_LINE = re.compile(r"[-*_\s]{3,}")
+_BOLD = re.compile(r"\*\*(.+?)\*\*")
+# One mark each side, hugging a word: "2 * 3 * 4" and a lone mark stay.
+_ITALIC = re.compile(r"(?<![*\w])\*(?=\S)([^*]+?)(?<=\S)\*(?![*\w])")
+
+
+def _emphasis(escaped: str) -> str:
+    """Markdown emphasis in an escaped line, as the markup details allow."""
+    return _ITALIC.sub(r"<em>\1</em>",
+                       _BOLD.sub(r"<strong>\1</strong>", escaped))
+
+
 def _llm_summary(lines: list[str]) -> str:
     """The first line of a reply that says something.
 
@@ -1059,17 +1073,17 @@ def _parse_llm_response(
                  provider=provider, n_analyzers=n_analyzers)]
     for line in lines:
         line = line.strip()
-        if not line:
+        if not line or _RULE_LINE.fullmatch(line):
             continue
         if line.startswith("#"):
             marks = len(line) - len(line.lstrip("#"))
-            title = _html.escape(line[marks:].strip())
+            title = _html.escape(line[marks:].replace("**", "").strip())
             details.append(f"<strong>━━ {title} ━━</strong>" if marks <= 2
                            else f"<strong>{title}</strong>")
-        elif line.startswith("- "):
-            details.append(_html.escape(line[2:]))
-        else:
-            details.append(_html.escape(line))
+            continue
+        if line.startswith(("- ", "* ")):
+            line = line[2:]
+        details.append(_emphasis(_html.escape(line)))
 
     return summary, details
 
@@ -1108,9 +1122,9 @@ def _generate_llm(
         figures=[],
         sub_results=[],
         # An LLM narrative is not a traceable source. Say so rather than
-        # letting it pass as one.
-        evidence_source=(t("ai.llm.evidence", model=model, provider=provider)
-                         if status in ("warning", "critical") else ""),
+        # letting it pass as one, and at any status: on a healthy flight
+        # its words are the most likely to be taken for the tool's.
+        evidence_source=t("ai.llm.evidence", model=model, provider=provider),
         provider=provider,
     )
 
