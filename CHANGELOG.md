@@ -3,6 +3,16 @@
 All notable changes to ArduScope are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+- `POSITIONING.md` is in English, with the Chinese text in `POSITIONING_zh.md`.
+  It says that feature work has ended and the maintainer fixes defects only,
+  that a suggestion gives a value only where its rule has a source and a
+  flight, and that a false alarm reported with its log is welcome. The roadmap
+  is now a list of what is finished and of ideas with no schedule. The README
+  has a Positioning section.
+
 ## [0.9.7] - 2026-11-11
 
 ### Fixed

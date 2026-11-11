@@ -175,6 +175,10 @@ class MyAnalyzer(BaseAnalyzer):
 
 No entry-point changes needed. Automatically registered in CLI, Web, and multi-log comparison.
 
+## Positioning
+
+ArduScope is for **ArduPilot tuning engineers**. Strictness is a feature, not a bug: finding a threshold strict is no ground for loosening it. Log data is welcome for calibrating thresholds, and so is a false alarm reported with its log. A request to lower the standard is not accepted. See [POSITIONING.md](POSITIONING.md).
+
 ## Known limitations
 
 [docs/known_limitations.md](docs/known_limitations.md) lists what ArduScope does not do or does not get right. Three to know before acting on a report:

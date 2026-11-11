@@ -186,7 +186,8 @@ def check_analyzer_count() -> list[str]:
         re.compile(r"(\d+)\s+auto-discovered"),   # "21 auto-discovered"
     ]
 
-    doc_files = ["README.md", "POSITIONING.md", "CLAUDE.md"]
+    doc_files = ["README.md", "README_zh.md", "POSITIONING.md",
+                 "POSITIONING_zh.md", "CLAUDE.md"]
     for doc in doc_files:
         fpath = os.path.join(PROJECT_ROOT, doc)
         if not os.path.exists(fpath):

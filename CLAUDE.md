@@ -136,3 +136,9 @@ See `POSITIONING.md` -- diagnostic strictness is a feature, not a bug.
 Thresholds follow METHODIC standards. Do not weaken thresholds to reduce
 warnings. Every diagnostic conclusion must be traceable to an authoritative
 source.
+
+`POSITIONING.md` and `POSITIONING_zh.md` change only at the maintainer's
+explicit word: do not edit them on your own, and keep the two in step when he
+asks for a change. Before a significant change to the tool, read the
+one-sentence positioning at the top and check that the change points the same
+way.

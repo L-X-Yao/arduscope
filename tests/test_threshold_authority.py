@@ -31,7 +31,7 @@ THRESHOLDS_FILE = (
 # Fields where `# E:` is accepted because their block-level comment
 # already documents the field as a secondary signal or proxy. These
 # are not "unknown authority" — they are transparently-labelled
-# auxiliary indicators. See POSITIONING.md §4.3.
+# auxiliary indicators. See POSITIONING.md §4.2.
 E_CLASS_WAIVERS: dict[str, str] = {
     # -- pid_tuning secondary metrics --
     # Authoritative PID metric is METHODIC RATE.*out RMS (pid_rate_out_*).

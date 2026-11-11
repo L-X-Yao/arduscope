@@ -1,135 +1,133 @@
-# ArduScope 产品定位（锁定版）
+# ArduScope positioning
 
-**锁定日期**：2026-05-24（v3 愿景更新）
-**锁定人**：L-X-Yao
-**本文档目的**：所有后续功能讨论、取舍、争议以本文件为准。如需修改定位，必须显式更新本文件，否则视为违反约定。
+[中文](POSITIONING_zh.md)
 
----
-
-## 一、一句话定位
-
-**给 ArduPilot 调参工程师用的专业诊断工具，把"飞得不好"翻译成"改哪个参数"。**
+**Last updated**: 2026-11-11
+**Maintainer**: L-X-Yao
+**What this document is for**: what the tool does and does not do is settled against it. To change the positioning, change this file.
 
 ---
 
-## 二、用户
+## 1. In one sentence
 
-**目标用户：ArduPilot 调参工程师**（有参数调整经验，能读懂 METHODIC 术语）
-
-- 设计决策由项目维护者（L-X-Yao）主导
-- 接受社区用户的**日志数据**作为阈值校准来源
-- 不接受"降低诊断标准"类的反馈——工具严格是特性，不是缺陷
-- 不做简化模式、不做降低门槛的设计
+**A diagnostic tool for ArduPilot tuning engineers that turns "it flies bad" into "change this parameter".**
 
 ---
 
-## 三、解决什么问题
+## 2. Users
 
-**唯一核心痛点：诊断能力 —— 从"飞得不好"到"改哪个参数"**
+**Target user: the ArduPilot tuning engineer**, who has changed parameters before and can read the terms of METHODIC, the [ArduPilot Methodic Configurator's tuning guide](https://ardupilot.github.io/MethodicConfigurator/TUNING_GUIDE_ArduCopter.html).
 
-行业现状：
-- 飞手能感觉飞机有问题，但**不知道改哪个参数**
-- 大部分工具只输出原始数据，不给诊断结论
-- ArduPilot METHODIC 文档知识门槛高，查找困难
-
-本工具定位：
-- 读日志 → 自动检测问题 → **直接给参数建议**
-- 把 METHODIC 的知识编码成 32 个分析器的判定规则
-- 每条结论都附具体参数名 + 建议值 + 判定依据
-
-**不做的事**（当前阶段）：
-- 不做"认证 / 评分"（证明飞机好不是本工具目标）。报告里的健康分只用于排序和分流，不是认证：含 critical 时封顶 49，落在红档（2026-11-05 确认）
-- 不做"教学"（教学是写文档的事，不是工具的事）
-- 不做"陪伴 / 安抚"（工具不和稀泥）
+- Design decisions are the maintainer's (L-X-Yao).
+- **Log data** from users is accepted as a source for calibrating thresholds.
+- A false alarm is a defect: a report of one, with the log, is welcome.
+- A request to lower the diagnostic standard is not accepted. Strictness is a feature, not a bug.
+- There is no simplified mode, and nothing is designed to lower the bar.
 
 ---
 
-## 四、工具的立场
+## 3. The problem it solves
 
-### 4.1 诊断严格性
-**阈值按 METHODIC 标准严格执行**，不为"让用户觉得飞得好"而调松。
+**One pain point: diagnosis, from "it flies bad" to "change this parameter".**
 
-- 用户主观"飞得好" ≠ 工具应该全绿
-- 工具发现差距就直接说（Q5=C：明确指出）
-- 用户不同意可以忽略建议，但**不能要求工具改变判断**
+Where things stand:
+- A pilot can feel that something is wrong and **does not know which parameter to change**.
+- Most tools show raw data and give no conclusion.
+- ArduPilot's METHODIC documents take knowledge to use and time to search.
 
-### 4.2 阈值来源（按优先级）
-1. **METHODIC 官方文档**（最高权威，baseline 不可违背）
-2. **ArduPilot 源码硬限**（failsafe/pre-arm 触发条件，critical 级别依据）
-3. **真实日志数据校准**（用真实飞行日志统计分布，修正 warning/optimize 边界）
-4. ❌ **不采用**：工程师个人经验拍脑袋定值（Q6 排除了 B 选项）
+What this tool does:
+- It reads the log, detects the problems, and gives its evidence and its parameter suggestions.
+- It encodes what METHODIC says into the rules of 32 analyzers.
+- Every warning and critical cites what it rests on.
+- A suggestion names its parameter. A value needs a source and a flight, both recorded in `docs/suggestion_evidence.md`. A rule that has not been flown either points the way without a value, or carries a waiver with its reason in `tools/check_suggestions.py` and is listed in `docs/known_limitations.md`. A setting that only changes what is logged is not graded by a flight.
 
-### 4.3 权威性表达
-报告里每条建议都要**标注依据**：
-- "来源：METHODIC IMU_Temperature.md §3.2"
-- "来源：ArduPilot wiki EKF Failsafe 默认 FS_EKF_THRESH=1.0"
-- "来源：21 份实飞日志 P75 分位"
-
-用户看到来源才愿意相信工具。
+**What it does not do**, at this stage:
+- No certification and no scoring: proving an aircraft good is not the aim. The health score in a report is for sorting and triage, not a certificate. With a critical it is capped at 49, in the red band (confirmed 2026-11-05).
+- No teaching: that is the job of documentation, not of a tool.
+- No reassurance: the tool does not soften what it finds.
 
 ---
 
-## 五、输出形态
+## 4. Where the tool stands
 
-当前形态：
+### 4.1 Strictness
+**Thresholds follow METHODIC strictly**, and are not loosened so that a user feels the aircraft flies well.
 
-- CLI：`flight_report.py log.BIN` → HTML 报告 + `.param` 建议
-- Web GUI：`web_app.py` → 浏览器拖拽上传
-- 多日志对比：`multi_report.py`、`batch_report.py`
-- 离线可用的 HTML 报告（地图瓦片除外）
+- "It flies fine" to the user does not mean the tool should be all green.
+- Where the tool finds a gap, it says so.
+- A user who disagrees can ignore a suggestion, and **cannot ask the tool to change its judgement**.
 
-优先级始终是**报告内容的深度和准确性**，形态其次。
+### 4.2 Where thresholds come from, in order
+1. **The METHODIC documents**: the highest authority, a baseline that is not crossed.
+2. **Hard limits in the ArduPilot source**: failsafe and pre-arm conditions, the basis for a critical.
+3. **Calibration on real logs**: the distribution over real flights, used to place the warning and optimize boundaries.
+4. ❌ **Not used**: a value an engineer picked from experience.
 
----
+Where the code does not meet this yet is listed in [docs/known_limitations.md](docs/known_limitations.md). The fields marked `E` in `lib/thresholds.py` have no authoritative source and stand as waivers: `tests/test_threshold_authority.py` holds the list, a new one needs a written reason, and those that still move a verdict are in the limitations.
 
-## 六、投入承诺
+### 4.3 Showing the authority
+Every suggestion in a report **cites what it rests on**:
+- "Source: METHODIC IMU_Temperature.md §3.2"
+- "Source: ArduPilot wiki, EKF Failsafe, default FS_EKF_THRESH=1.0"
+- "Source: 75th percentile over 21 flight logs"
 
-**无时间上限**（Q7=D）。这是长期项目，按需求优先级推进，不做短期权衡。
-
-但**每次动手前必须有明确目标**，不做以下事情：
-- ❌ 为"让报告看起来专业"做的美化
-- ❌ 为"覆盖更多场景"做的超前设计
-- ❌ 为单点反馈做的策略性调整（不因个别用户降低标准）
-
-**只做以下事情**：
-- ✅ 提升诊断准确率（减少误报、减少漏报）
-- ✅ 补充新的诊断维度（当遇到工具诊断不出来的问题时）
-- ✅ 把权威依据显性化（让建议可信）
-- ✅ 用真实日志数据校准阈值
-- ✅ 降低社区试用门槛（pip 安装、英文文档、i18n 报告）
+A user trusts the tool once the source is on the page.
 
 ---
 
-## 七、愿景路线图
+## 5. Form
 
-### 第一层：离线诊断引擎（已完成）
-- 32 个分析器覆盖主要诊断维度
-- METHODIC 阈值来源标注（`docs/convergence_criteria.md`）
-- `param_suggestions` 结构化输出 + `.param` 导出
-- 代码审计 + 测试覆盖
+Today:
 
-### 第二层：开源社区化（进行中）
-- `pip install .` 可安装（包名 `ardupilot-scope`，只发 GitHub Release，不发 PyPI）
-- 英文 README + 报告 i18n（英/中）
-- 接受社区 PR 贡献新分析器
-- 目标：成为 ArduPilot 生态的 post-flight 诊断标准工具
+- CLI: `flight_report.py log.BIN` gives an HTML report and `.param` suggestions
+- Web: `web_app.py`, drag and drop in the browser
+- Several logs: `multi_report.py`, `batch_report.py`
+- Fleet history: `fleet_report.py`, and `/fleet` in the web interface
+- HTML reports that work offline, map tiles aside
 
-### 第三层：闭环调参工作流（远期）
-- 多次飞行趋势追踪 → 调参收敛助手
-- 社区匿名日志数据集 → 统计驱动的阈值校准
-- Mission Planner / MAVProxy 集成
-
-### 待决策事项
-- **阈值分层**：warning/optimize 二档，下次动手时具体决定
+**How deep and how right the report is** comes first, its form second.
 
 ---
 
-## 八、变更规则
+## 6. Maintenance
 
-- 本文件更新需要维护者显式确认，Claude/助手不得自行修改
-- 社区反馈中**日志数据**可用于阈值校准，**降低标准的诉求**不构成变更依据
-- 每次重大改动前，助手必须读本文件开头一句话定位，确认改动方向一致
+**Feature work ended on 2026-11-10. The maintainer fixes defects and adds no features.**
+
+Pull requests go through the gates in [CONTRIBUTING.md](CONTRIBUTING.md). One that changes analyzer logic or a threshold waits for the maintainer to run the snapshot and corpus steps, on logs that are not public.
+
+**Not done**:
+- ❌ Polish so that a report looks professional
+- ❌ Design ahead of need, to cover more cases
+- ❌ A change of policy for one piece of feedback: the standard is not lowered for one user
+
+**Done**:
+- ✅ Better accuracy: fewer false alarms, fewer misses
+- ✅ Making the authority visible, so that a suggestion can be trusted
+- ✅ Calibrating thresholds on real log data
 
 ---
 
-**本文件结束。**
+## 7. Where it stands
+
+### Finished
+- The offline diagnostic engine: 32 analyzers over the main dimensions, threshold sources in `docs/convergence_criteria.md`, structured `param_suggestions` with `.param` export, audits and tests.
+- Open source: public since 2026-11-11. `pip install .` works (the package is `ardupilot-scope`, released on GitHub only, never on PyPI), the README is in English, and reports come in Chinese and English.
+
+### Ideas with no schedule
+Listed to show where the project was heading. None is a promise:
+- Trends over many flights, as a tuning convergence assistant
+- An anonymous community log dataset, for thresholds calibrated on statistics
+- Mission Planner and MAVProxy integration
+- Two tiers of threshold, warning and optimize
+
+---
+
+## 8. Changing this document
+
+- The maintainer changes it, and keeps the Chinese and English copies in step.
+- **Log data** from the community can calibrate a threshold. **A request for a lower standard** is no ground for a change.
+- Before a significant change, read the one-sentence positioning and check that the change points the same way.
+
+---
+
+**End of document.**

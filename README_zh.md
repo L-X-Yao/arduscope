@@ -154,7 +154,7 @@ ANTHROPIC_API_KEY=... python3 flight_report.py --ai-provider anthropic log.BIN
 
 ## 项目定位
 
-本工具面向 **ArduPilot 调参工程师**。诊断严格性是特性，不是缺陷——"觉得阈值严"不构成调松依据。社区日志数据欢迎用于阈值校准，降低标准的诉求不接受。详见 [POSITIONING.md](POSITIONING.md)。
+本工具面向 **ArduPilot 调参工程师**。诊断严格性是特性，不是缺陷——"觉得阈值严"不构成调松依据。社区日志数据欢迎用于阈值校准，降低标准的诉求不接受。详见 [POSITIONING_zh.md](POSITIONING_zh.md)。
 
 ## 已知限制
 
