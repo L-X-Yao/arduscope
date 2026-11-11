@@ -2,6 +2,8 @@
 
 Threshold traceability table for all fields in `lib/thresholds.py`.
 
+METHODIC is the [ArduPilot Methodic Configurator's tuning guide](https://ardupilot.github.io/MethodicConfigurator/TUNING_GUIDE_ArduCopter.html).
+
 Source key:
 - **A** -- Authoritative: METHODIC documentation, ArduPilot wiki, or ArduPilot source code.
 - **A(soft)** -- Authoritative but indirect: ArduPilot code value used as proxy (not its original purpose).

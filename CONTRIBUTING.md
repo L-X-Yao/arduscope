@@ -1,5 +1,10 @@
 # Contributing to ArduScope
 
+Feature work ended in November 2026: the maintainer fixes defects and adds no
+features, see [POSITIONING.md](POSITIONING.md). A pull request goes through the
+gates under "Which gates a change has to pass". What follows describes how the
+code is put together, for a fix and for anyone who extends a copy of their own.
+
 ## Adding a new analyzer
 
 1. Create a new file in `analyzers/`, e.g. `analyzers/my_check.py`.
@@ -69,6 +74,7 @@ Add a new field to the `Thresholds` dataclass in `lib/thresholds.py`.
 - Name the field as `<category>_<metric>_<level>` (e.g. `gps_hdop_warn`).
 - Cite the source in an inline comment using the prefix convention:
   - `A:` -- authoritative (METHODIC doc, ArduPilot wiki, ArduPilot source code).
+  - `A(soft):` -- an ArduPilot value used as a proxy, outside its own purpose.
   - `D:` -- derived from an authoritative source with stated reasoning.
   - `E:` -- engineering estimate (legacy/secondary, avoid for new thresholds).
 - Every threshold must have a corresponding entry in
@@ -218,6 +224,9 @@ Examples: `feat(vibration)`, `fix(pid_tuning)`, `i18n(locales)`, `chore(ruff)`.
 **Body** (optional): blank line after subject, wrap at 80 chars. Explain *why*, not *what*.
 
 **No trailers**: no `Co-Authored-By`, no `Signed-off-by`, no AI attribution.
+
+`tools/commit-msg-hook.sh` checks all of this. Install it with
+`cp tools/commit-msg-hook.sh .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg`.
 
 Examples:
 ```

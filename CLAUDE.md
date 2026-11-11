@@ -33,6 +33,7 @@ lib/                 Core library
   plane_phase.py     Rows a Plane flew on its wing: STAT lookups, VTOL windows
   hover.py           Rows where the lift motors carry the aircraft, level-hover thrust
   csv_safe.py        Spreadsheet-safe CSV cells
+  np_helpers.py      Numpy helpers shared by analyzers and report builders
 locales/             i18n string files
   zh.json            Chinese (primary/fallback locale)
   en.json            English

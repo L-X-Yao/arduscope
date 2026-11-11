@@ -12,6 +12,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   flight, and that a false alarm reported with its log is welcome. The roadmap
   is now a list of what is finished and of ideas with no schedule. The README
   has a Positioning section.
+- The README says what METHODIC is and links it, shows the scenario templates,
+  `--no-fleet-record` and the commands `pip install .` adds, and no longer says
+  "no guesswork": the limits without a source are in the known limitations.
+  `CONTRIBUTING.md` opens with the maintenance status and says how to install
+  the commit hook.
+- `docs/fleet_history_design.md` called itself a draft awaiting decisions. The
+  feature shipped in v0.6.0 and the document says so. The three ledgers under
+  `docs/` say that their commit hashes belong to the history from before the
+  repository went public.
 
 ## [0.9.7] - 2026-11-11
 

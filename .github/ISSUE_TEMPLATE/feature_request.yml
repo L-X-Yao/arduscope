@@ -2,6 +2,10 @@ name: Feature Request
 description: Suggest a new analyzer or improvement
 labels: [enhancement]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature work ended in November 2026: the maintainer fixes defects and adds no features, see POSITIONING.md. A request here is kept as a record and has no schedule. If the tool got something wrong, that is a defect: please use the bug report form.
   - type: textarea
     id: description
     attributes:

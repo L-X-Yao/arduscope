@@ -10,12 +10,12 @@ ArduPilot `.BIN` 飞行日志诊断工具。把"飞得不好"翻译成"改哪个
 
 ## 功能
 
-ArduScope 读取 ArduPilot `.BIN` 日志，运行 32 个分析器，生成可执行的参数调整建议，并附一份描述性飞行包络摘要。每条警告都引用权威来源（METHODIC 调参指南、ArduPilot wiki 或源码）。
+ArduScope 读取 ArduPilot `.BIN` 日志，运行 32 个分析器，生成可执行的参数调整建议，并附一份描述性飞行包络摘要。每条警告都引用来源：METHODIC（即 [ArduPilot Methodic Configurator 的调参指南](https://ardupilot.github.io/MethodicConfigurator/TUNING_GUIDE_ArduCopter.html)）、ArduPilot wiki 或 ArduPilot 源码。
 
 **核心特性：**
 - **32 个分析维度** — 自动发现，在 `analyzers/` 下新建 `.py` 文件即可扩展
 - **结构化参数建议** — 具体参数名 + 建议值，可导出 `.param` 文件直接导入 Mission Planner
-- **METHODIC 标准阈值** — 每条判断都附来源引用，不靠猜
+- **METHODIC 标准阈值** — 每条 warning 和 critical 都附来源引用。还没有出处的限值列在[已知限制](docs/known_limitations.md)里
 - **交叉关联诊断** — 27 条规则检测多系统联合故障模式
 - **交互式 HTML 报告** — Plotly 图表和地图代码内嵌，离线可用。地图瓦片需要联网，无网络时地图上会提示
 - **多日志对比** — 跟踪调参收敛过程
@@ -50,6 +50,8 @@ pip install .[web]
 python3 web_app.py
 ```
 
+`pip install .` 还会装上 `arduscope`、`arduscope-multi`、`arduscope-batch`、`arduscope-fleet`、`arduscope-web` 五个命令，分别对应上面的脚本和 `fleet_report.py`。
+
 ## 用法
 
 ```bash
@@ -70,6 +72,13 @@ python3 flight_report.py --thresholds custom.json log.BIN
 # 运行 / 跳过指定分析器
 python3 flight_report.py --only summary,attitude,motor log.BIN
 python3 flight_report.py --skip vibration,ekf log.BIN
+
+# 场景模板：只跑一部分分析器，有的模板阈值更严
+python3 flight_report.py --list-templates
+python3 flight_report.py --template crash-diagnosis log.BIN
+
+# 这一架次不记入机队历史（报告旁的 fleet.db）
+python3 flight_report.py --no-fleet-record log.BIN
 
 # 多日志对比
 python3 multi_report.py -o trend.html *.BIN
@@ -154,7 +163,7 @@ ANTHROPIC_API_KEY=... python3 flight_report.py --ai-provider anthropic log.BIN
 
 ## 项目定位
 
-本工具面向 **ArduPilot 调参工程师**。诊断严格性是特性，不是缺陷——"觉得阈值严"不构成调松依据。社区日志数据欢迎用于阈值校准，降低标准的诉求不接受。详见 [POSITIONING_zh.md](POSITIONING_zh.md)。
+本工具面向 **ArduPilot 调参工程师**。诊断严格性是特性，不是缺陷——"觉得阈值严"不构成调松依据。社区日志数据欢迎用于阈值校准，带日志的误报报告同样欢迎，降低标准的诉求不接受。功能开发已于 2026 年 11 月结束，维护者只修缺陷，不加新功能。详见 [POSITIONING_zh.md](POSITIONING_zh.md)。
 
 ## 已知限制
 

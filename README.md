@@ -10,12 +10,12 @@ ArduPilot .BIN flight log diagnostic tool. Turns "it flies bad" into "change thi
 
 ## What it does
 
-ArduScope reads ArduPilot `.BIN` logs and runs 32 analyzers to produce actionable parameter recommendations, plus a descriptive flight-envelope summary. Every warning cites its authoritative source (METHODIC tuning guide, ArduPilot wiki, or source code).
+ArduScope reads ArduPilot `.BIN` logs and runs 32 analyzers to produce actionable parameter recommendations, plus a descriptive flight-envelope summary. Every warning cites its source: METHODIC, which is the [ArduPilot Methodic Configurator's tuning guide](https://ardupilot.github.io/MethodicConfigurator/TUNING_GUIDE_ArduCopter.html), the ArduPilot wiki, or the ArduPilot source code.
 
 **Key features:**
 - **32 auto-discovered analyzers** — drop a new analyzer into `analyzers/` and it works
 - **Structured parameter suggestions** — concrete param names + values, exportable as `.param` files for Mission Planner
-- **METHODIC-backed thresholds** — every judgment cites its source, no guesswork
+- **METHODIC-backed thresholds** — every warning and critical cites its source. The limits that have none yet are listed in the [known limitations](docs/known_limitations.md)
 - **Cross-correlation diagnosis** — 27 rules detect multi-system fault patterns
 - **Interactive HTML reports** — Plotly charts and map code embedded, so reports work offline. Map tiles need a network; the map says so when it has none
 - **Multi-log comparison** — track tuning convergence across flights
@@ -51,6 +51,8 @@ pip install .[web]
 python3 web_app.py
 ```
 
+`pip install .` also installs the commands `arduscope`, `arduscope-multi`, `arduscope-batch`, `arduscope-fleet` and `arduscope-web`, one for each script above and for `fleet_report.py`.
+
 ## Usage
 
 ```bash
@@ -71,6 +73,13 @@ python3 flight_report.py --thresholds custom.json log.BIN
 # Run / skip specific analyzers
 python3 flight_report.py --only summary,attitude,motor log.BIN
 python3 flight_report.py --skip vibration,ekf log.BIN
+
+# Scenario templates: a subset of the analyzers, some with stricter thresholds
+python3 flight_report.py --list-templates
+python3 flight_report.py --template crash-diagnosis log.BIN
+
+# Leave a flight out of the fleet history (fleet.db, next to the report)
+python3 flight_report.py --no-fleet-record log.BIN
 
 # Multi-log comparison
 python3 multi_report.py -o trend.html *.BIN
@@ -177,7 +186,7 @@ No entry-point changes needed. Automatically registered in CLI, Web, and multi-l
 
 ## Positioning
 
-ArduScope is for **ArduPilot tuning engineers**. Strictness is a feature, not a bug: finding a threshold strict is no ground for loosening it. Log data is welcome for calibrating thresholds, and so is a false alarm reported with its log. A request to lower the standard is not accepted. See [POSITIONING.md](POSITIONING.md).
+ArduScope is for **ArduPilot tuning engineers**. Strictness is a feature, not a bug: finding a threshold strict is no ground for loosening it. Log data is welcome for calibrating thresholds, and so is a false alarm reported with its log. A request to lower the standard is not accepted. Feature work ended in November 2026: the maintainer fixes defects and adds no features. See [POSITIONING.md](POSITIONING.md).
 
 ## Known limitations
 
