@@ -1,0 +1,2130 @@
+{
+  "quadplane_flight": {
+    "summary": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "flight_profile": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "attitude": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "pid_tuning": {
+      "status": "warning",
+      "action_level": "run_autotune",
+      "param_count": 0
+    },
+    "motor": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "servo_dither": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vibration": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "gyro_saturation": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "notch_tuning": {
+      "status": "warning",
+      "action_level": "apply_param",
+      "param_count": 7
+    },
+    "ekf": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "battery": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "power": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "board_power": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "gps": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps_glitch": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf_vel_divergence": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass_consistency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "failsafe": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "clock_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "imu_consistency": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "temperature": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "rc_input": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "throttle_collapse": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "log_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vtol_transition": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "cruise_efficiency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "airspeed": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "mission": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "wind": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    }
+  },
+  "quadplane_ground": {
+    "summary": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "flight_profile": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "attitude": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "pid_tuning": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "motor": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "servo_dither": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vibration": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gyro_saturation": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "notch_tuning": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "battery": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "power": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "board_power": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "gps": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps_glitch": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf_vel_divergence": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass_consistency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "failsafe": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "clock_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "imu_consistency": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "temperature": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "rc_input": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "throttle_collapse": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "log_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vtol_transition": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "cruise_efficiency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "airspeed": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "mission": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "wind": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    }
+  },
+  "quadplane_flight_2": {
+    "summary": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "flight_profile": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "attitude": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "pid_tuning": {
+      "status": "critical",
+      "action_level": "run_autotune",
+      "param_count": 0
+    },
+    "motor": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "servo_dither": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vibration": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gyro_saturation": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "notch_tuning": {
+      "status": "info",
+      "action_level": "apply_param",
+      "param_count": 7
+    },
+    "ekf": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "battery": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "power": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "board_power": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "gps": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps_glitch": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf_vel_divergence": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass_consistency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "failsafe": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "clock_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "imu_consistency": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "temperature": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "rc_input": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "throttle_collapse": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "log_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vtol_transition": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "cruise_efficiency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "airspeed": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "mission": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "wind": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    }
+  },
+  "octa_notch_off": {
+    "summary": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "flight_profile": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "attitude": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "pid_tuning": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "motor": {
+      "status": "critical",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "servo_dither": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vibration": {
+      "status": "critical",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "gyro_saturation": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "notch_tuning": {
+      "status": "warning",
+      "action_level": "apply_param",
+      "param_count": 8
+    },
+    "ekf": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "battery": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "power": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "board_power": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps_glitch": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf_vel_divergence": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "compass_consistency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "failsafe": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "clock_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "imu_consistency": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "temperature": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "rc_input": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "throttle_collapse": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "log_health": {
+      "status": "good",
+      "action_level": "apply_param",
+      "param_count": 1
+    },
+    "vtol_transition": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "cruise_efficiency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "airspeed": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "wind": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    }
+  },
+  "octa_notch_bw10": {
+    "summary": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "flight_profile": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "attitude": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "pid_tuning": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "motor": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "servo_dither": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vibration": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gyro_saturation": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "notch_tuning": {
+      "status": "warning",
+      "action_level": "apply_param",
+      "param_count": 8
+    },
+    "ekf": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "battery": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "power": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "board_power": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps_glitch": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf_vel_divergence": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass_consistency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "failsafe": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "clock_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "imu_consistency": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "temperature": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "rc_input": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "throttle_collapse": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "log_health": {
+      "status": "good",
+      "action_level": "apply_param",
+      "param_count": 1
+    },
+    "vtol_transition": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "cruise_efficiency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "airspeed": {
+      "status": "critical",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "wind": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    }
+  },
+  "resonance_hover": {
+    "summary": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "flight_profile": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "attitude": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "pid_tuning": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "motor": {
+      "status": "critical",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "servo_dither": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vibration": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gyro_saturation": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "notch_tuning": {
+      "status": "info",
+      "action_level": "apply_param",
+      "param_count": 7
+    },
+    "ekf": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "battery": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "power": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "board_power": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps_glitch": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf_vel_divergence": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass_consistency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "failsafe": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "clock_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "imu_consistency": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "temperature": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "rc_input": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "throttle_collapse": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "log_health": {
+      "status": "good",
+      "action_level": "apply_param",
+      "param_count": 1
+    },
+    "vtol_transition": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "cruise_efficiency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "airspeed": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "mission": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "wind": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    }
+  },
+  "resonance_dampers_removed": {
+    "summary": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "flight_profile": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "attitude": {
+      "status": "warning",
+      "action_level": "run_autotune",
+      "param_count": 0
+    },
+    "pid_tuning": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "motor": {
+      "status": "critical",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "servo_dither": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vibration": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gyro_saturation": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "notch_tuning": {
+      "status": "info",
+      "action_level": "apply_param",
+      "param_count": 7
+    },
+    "ekf": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "battery": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "power": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "board_power": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps_glitch": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf_vel_divergence": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass_consistency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "failsafe": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "clock_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "imu_consistency": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "temperature": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "rc_input": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "throttle_collapse": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "log_health": {
+      "status": "good",
+      "action_level": "apply_param",
+      "param_count": 1
+    },
+    "vtol_transition": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "cruise_efficiency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "airspeed": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "mission": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "wind": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    }
+  },
+  "resonance_endurance": {
+    "summary": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "flight_profile": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "attitude": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "pid_tuning": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "motor": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "servo_dither": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vibration": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "gyro_saturation": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "notch_tuning": {
+      "status": "warning",
+      "action_level": "apply_param",
+      "param_count": 7
+    },
+    "ekf": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "battery": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "power": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "board_power": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps_glitch": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf_vel_divergence": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass_consistency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "failsafe": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "clock_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "imu_consistency": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "temperature": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "rc_input": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "throttle_collapse": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "log_health": {
+      "status": "good",
+      "action_level": "apply_param",
+      "param_count": 1
+    },
+    "vtol_transition": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "cruise_efficiency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "airspeed": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "mission": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "wind": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    }
+  },
+  "resonance_flight": {
+    "summary": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "flight_profile": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "attitude": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "pid_tuning": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "motor": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "servo_dither": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vibration": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gyro_saturation": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "notch_tuning": {
+      "status": "warning",
+      "action_level": "apply_param",
+      "param_count": 7
+    },
+    "ekf": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "battery": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "power": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "board_power": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps_glitch": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf_vel_divergence": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass_consistency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "failsafe": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "clock_health": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "imu_consistency": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "temperature": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "rc_input": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "throttle_collapse": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "log_health": {
+      "status": "warning",
+      "action_level": "apply_param",
+      "param_count": 1
+    },
+    "vtol_transition": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "cruise_efficiency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "airspeed": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "wind": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    }
+  },
+  "resonance_endurance_heavy": {
+    "summary": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "flight_profile": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "attitude": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "pid_tuning": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "motor": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "servo_dither": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vibration": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gyro_saturation": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "notch_tuning": {
+      "status": "info",
+      "action_level": "apply_param",
+      "param_count": 7
+    },
+    "ekf": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "battery": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "power": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "board_power": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps_glitch": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf_vel_divergence": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass_consistency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "failsafe": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "clock_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "imu_consistency": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "temperature": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "rc_input": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "throttle_collapse": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "log_health": {
+      "status": "good",
+      "action_level": "apply_param",
+      "param_count": 1
+    },
+    "vtol_transition": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "cruise_efficiency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "airspeed": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "mission": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "wind": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    }
+  },
+  "pusher_fault": {
+    "summary": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "flight_profile": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "attitude": {
+      "status": "critical",
+      "action_level": "run_autotune",
+      "param_count": 0
+    },
+    "pid_tuning": {
+      "status": "warning",
+      "action_level": "run_autotune",
+      "param_count": 0
+    },
+    "motor": {
+      "status": "critical",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "servo_dither": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vibration": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "gyro_saturation": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "notch_tuning": {
+      "status": "warning",
+      "action_level": "apply_param",
+      "param_count": 7
+    },
+    "ekf": {
+      "status": "critical",
+      "action_level": "safety_stop",
+      "param_count": 0
+    },
+    "battery": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "power": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "board_power": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps_glitch": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf_vel_divergence": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "compass_consistency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "failsafe": {
+      "status": "critical",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "clock_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "imu_consistency": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "temperature": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "rc_input": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "throttle_collapse": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "log_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vtol_transition": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "tecs_tuning": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "cruise_efficiency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "airspeed": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "mission": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "wind": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    }
+  },
+  "airspeed_fault": {
+    "summary": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "flight_profile": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "attitude": {
+      "status": "critical",
+      "action_level": "run_autotune",
+      "param_count": 0
+    },
+    "pid_tuning": {
+      "status": "critical",
+      "action_level": "run_autotune",
+      "param_count": 0
+    },
+    "motor": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "servo_dither": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vibration": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gyro_saturation": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "notch_tuning": {
+      "status": "info",
+      "action_level": "apply_param",
+      "param_count": 7
+    },
+    "ekf": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "battery": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "power": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "board_power": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "gps": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps_glitch": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf_vel_divergence": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "compass_consistency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "failsafe": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "clock_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "imu_consistency": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "temperature": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "rc_input": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "throttle_collapse": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "log_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vtol_transition": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "tecs_tuning": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "cruise_efficiency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "airspeed": {
+      "status": "critical",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "mission": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "wind": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    }
+  },
+  "ground_oscillation": {
+    "summary": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "flight_profile": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "attitude": {
+      "status": "warning",
+      "action_level": "run_autotune",
+      "param_count": 0
+    },
+    "pid_tuning": {
+      "status": "critical",
+      "action_level": "apply_param",
+      "param_count": 1
+    },
+    "motor": {
+      "status": "critical",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "servo_dither": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vibration": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gyro_saturation": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "notch_tuning": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "battery": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "power": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "board_power": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "gps": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps_glitch": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf_vel_divergence": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass_consistency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "failsafe": {
+      "status": "critical",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "clock_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "imu_consistency": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "temperature": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "rc_input": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "throttle_collapse": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "log_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vtol_transition": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "cruise_efficiency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "airspeed": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "mission": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "wind": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    }
+  },
+  "link_loss": {
+    "summary": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "flight_profile": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "attitude": {
+      "status": "critical",
+      "action_level": "run_autotune",
+      "param_count": 0
+    },
+    "pid_tuning": {
+      "status": "warning",
+      "action_level": "apply_param",
+      "param_count": 1
+    },
+    "motor": {
+      "status": "critical",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "servo_dither": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "vibration": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "gyro_saturation": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "notch_tuning": {
+      "status": "warning",
+      "action_level": "apply_param",
+      "param_count": 7
+    },
+    "ekf": {
+      "status": "critical",
+      "action_level": "safety_stop",
+      "param_count": 0
+    },
+    "battery": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "power": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "board_power": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "gps_glitch": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "ekf_vel_divergence": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "compass_consistency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "failsafe": {
+      "status": "critical",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "clock_health": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "imu_consistency": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "temperature": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "rc_input": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "throttle_collapse": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "log_health": {
+      "status": "good",
+      "action_level": "apply_param",
+      "param_count": 1
+    },
+    "vtol_transition": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "tecs_tuning": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "cruise_efficiency": {
+      "status": "info",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "airspeed": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    },
+    "mission": {
+      "status": "warning",
+      "action_level": "physical_check",
+      "param_count": 0
+    },
+    "wind": {
+      "status": "good",
+      "action_level": "ok",
+      "param_count": 0
+    }
+  }
+}

@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools>=77.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ardupilot-scope"
+dynamic = ["version"]
+description = "ArduPilot flight log diagnostic tool — turns 'it flies bad' into 'change this parameter'."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "L-X-Yao" },
+]
+keywords = ["ardupilot", "flight-log", "drone", "tuning", "diagnostics", "mavlink"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "plotly>=6.0.0",
+    "narwhals>=1.0.0",
+    "packaging>=21.0",
+    "pymavlink>=2.4.40",
+    "numpy>=1.24,<3",
+]
+
+[project.optional-dependencies]
+# Floors are the first releases with no advisory against them in the
+# PyPA database on 2026-11-10: waitress 3.0.1 (request smuggling and a
+# socket leak before it), weasyprint 70.0. bottle 0.13 is the line the
+# tests run on.
+web = ["bottle>=0.13"]
+production = ["bottle>=0.13", "waitress>=3.0.1"]
+pdf = ["weasyprint>=70.0", "kaleido>=0.2.1"]
+ai = ["anthropic>=0.40", "openai>=1.0"]
+test = ["pytest", "webtest", "ruff"]
+
+[project.urls]
+Homepage = "https://github.com/L-X-Yao/arduscope"
+Issues = "https://github.com/L-X-Yao/arduscope/issues"
+
+[project.scripts]
+arduscope = "flight_report:main"
+arduscope-multi = "multi_report:main"
+arduscope-batch = "batch_report:main"
+arduscope-web = "web_app:main"
+arduscope-fleet = "fleet_report:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "__init__.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["lib", "lib.*", "analyzers", "analyzers.*", "locales", "locales.*"]
+
+[tool.setuptools]
+py-modules = ["flight_report", "multi_report", "batch_report", "fleet_report", "web_app", "__init__"]
+
+[tool.setuptools.package-data]
+lib = ["vendor/leaflet/*"]
+locales = ["*.json"]
+
+[tool.pytest.ini_options]
+markers = [
+    "fast: Pure logic tests, no synthetic log generation (<10s total)",
+    "sitl: SITL integration tests, require pre-generated SITL logs",
+]
+
+[tool.ruff]
+line-length = 99
+
+[tool.ruff.lint]
+select = ["F401", "F811", "F841", "E722"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["F841"]

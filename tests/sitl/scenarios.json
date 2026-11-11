@@ -1,0 +1,449 @@
+{
+  "_doc": "SITL scenario definitions for ArduScope regression testing. Each scenario flies on the SITL binary and leaves a .BIN log with known conditions, then ArduScope should detect the expected issues. Steps are the step_ methods of Flight in generate_logs.py. Parameter names are checked against the firmware when the flight starts.",
+  "scenarios": [
+    {
+      "name": "copter_normal",
+      "vehicle": "ArduCopter",
+      "description": "Clean hover + waypoint mission, no faults injected",
+      "sitl_params": {},
+      "expected": {
+        "health_score_min": 70,
+        "analyzers_good": [
+          "vibration",
+          "motor",
+          "gps",
+          "ekf",
+          "battery"
+        ],
+        "analyzers_not_critical": [
+          "attitude",
+          "compass",
+          "imu_consistency"
+        ]
+      },
+      "steps": [
+        {
+          "takeoff": 15
+        },
+        {
+          "mission": [
+            [
+              60,
+              0,
+              20
+            ],
+            [
+              60,
+              60,
+              20
+            ],
+            [
+              0,
+              60,
+              20
+            ]
+          ]
+        },
+        {
+          "return": 240
+        }
+      ]
+    },
+    {
+      "name": "copter_high_vibration",
+      "vehicle": "ArduCopter",
+      "description": "Motor 1 loses 30% of its thrust, with high vibration",
+      "sitl_params": {
+        "SIM_ACC1_RND": 30,
+        "SIM_ACC2_RND": 30,
+        "SIM_ACC3_RND": 30,
+        "SIM_VIB_FREQ_X": 80,
+        "SIM_VIB_FREQ_Y": 80,
+        "SIM_VIB_FREQ_Z": 80,
+        "SIM_ENGINE_FAIL": 1,
+        "SIM_ENGINE_MUL": 0.7
+      },
+      "expected": {
+        "analyzers_warning_or_critical": [
+          "vibration"
+        ],
+        "cross_rules_should_fire": [
+          "vibration_motor",
+          "attitude_vibration_control",
+          "vibration_imu_consistency"
+        ]
+      },
+      "steps": [
+        {
+          "takeoff": 10
+        },
+        {
+          "hold": 30
+        },
+        {
+          "return": 240
+        }
+      ]
+    },
+    {
+      "name": "copter_gps_glitch",
+      "vehicle": "ArduCopter",
+      "description": "Satellites drop to 5 in flight and the position jumps repeatedly, as with multipath",
+      "sitl_params": {},
+      "expected": {
+        "analyzers_warning_or_critical": [
+          "gps",
+          "gps_glitch"
+        ],
+        "cross_rules_should_fire": [
+          "gps_glitch_ekf"
+        ]
+      },
+      "steps": [
+        {
+          "takeoff": 15
+        },
+        {
+          "hold": 10
+        },
+        {
+          "set": {
+            "SIM_GPS1_NUMSATS": 5
+          }
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0.0002,
+            "SIM_GPS1_GLTCH_Y": 0.0002
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0,
+            "SIM_GPS1_GLTCH_Y": 0
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0.0002,
+            "SIM_GPS1_GLTCH_Y": 0.0002
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0,
+            "SIM_GPS1_GLTCH_Y": 0
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0.0002,
+            "SIM_GPS1_GLTCH_Y": 0.0002
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0,
+            "SIM_GPS1_GLTCH_Y": 0
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0.0002,
+            "SIM_GPS1_GLTCH_Y": 0.0002
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0,
+            "SIM_GPS1_GLTCH_Y": 0
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0.0002,
+            "SIM_GPS1_GLTCH_Y": 0.0002
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0,
+            "SIM_GPS1_GLTCH_Y": 0
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "hold": 20
+        },
+        {
+          "return": 240
+        }
+      ]
+    },
+    {
+      "name": "copter_compass_interference",
+      "vehicle": "ArduCopter",
+      "description": "Motor compass interference",
+      "sitl_params": {
+        "SIM_MAG_MOT_X": 7.0,
+        "SIM_MAG_MOT_Y": 7.0,
+        "SIM_MAG_MOT_Z": 7.0
+      },
+      "expected": {
+        "analyzers_warning_or_critical": [
+          "compass"
+        ]
+      },
+      "steps": [
+        {
+          "takeoff": 10
+        },
+        {
+          "throttle": 1500
+        },
+        {
+          "mode": "CIRCLE"
+        },
+        {
+          "hold": 60
+        },
+        {
+          "return": 240
+        }
+      ]
+    },
+    {
+      "name": "plane_tecs_tuning",
+      "vehicle": "ArduPlane",
+      "description": "Fixed-wing with deliberately poor TECS tuning",
+      "sitl_params": {
+        "TECS_SPDWEIGHT": 0.1,
+        "TECS_PITCH_MAX": 10,
+        "TECS_TIME_CONST": 10,
+        "TECS_THR_DAMP": 0,
+        "TECS_INTEG_GAIN": 0
+      },
+      "expected": {
+        "analyzers_warning_or_critical": [
+          "tecs_tuning"
+        ],
+        "analyzers_good": [
+          "gps"
+        ]
+      },
+      "steps": [
+        {
+          "mission": [
+            [
+              300,
+              0,
+              60
+            ],
+            [
+              300,
+              300,
+              120
+            ],
+            [
+              0,
+              300,
+              60
+            ],
+            [
+              -300,
+              0,
+              40
+            ]
+          ]
+        },
+        {
+          "wait_disarm": 300
+        }
+      ]
+    },
+    {
+      "name": "copter_battery_aging",
+      "vehicle": "ArduCopter",
+      "description": "Small pack whose voltage sags below BATT_CRT_VOLT in a long hover",
+      "sitl_params": {
+        "SIM_BATT_VOLTAGE": 15.0,
+        "SIM_BATT_CAP_AH": 1.0,
+        "BATT_LOW_VOLT": 14.0,
+        "BATT_CRT_VOLT": 13.5
+      },
+      "expected": {
+        "analyzers_warning_or_critical": [
+          "battery"
+        ]
+      },
+      "steps": [
+        {
+          "takeoff": 10
+        },
+        {
+          "hold": 120
+        },
+        {
+          "return": 240
+        }
+      ]
+    },
+    {
+      "name": "copter_motor_noise",
+      "vehicle": "ArduCopter",
+      "description": "Motor noise on the gyros, no notch configured",
+      "sitl_params": {
+        "SIM_VIB_MOT_MAX": 250,
+        "SIM_GYR1_RND": 20,
+        "SIM_GYR2_RND": 20,
+        "SIM_GYR3_RND": 20,
+        "INS_LOG_BAT_MASK": 1,
+        "INS_LOG_BAT_OPT": 2,
+        "INS_GYRO_FILTER": 100
+      },
+      "expected": {
+        "suggestions_include": [
+          "INS_HNTCH_ENABLE",
+          "INS_HNTCH_MODE",
+          "INS_HNTCH_REF",
+          "INS_HNTCH_FREQ",
+          "INS_HNTCH_BW"
+        ],
+        "suggestions_equal": {
+          "INS_HNTCH_MODE": 3,
+          "INS_HNTCH_REF": 1
+        },
+        "suggestions_between": {
+          "INS_HNTCH_FREQ": [
+            110,
+            128
+          ]
+        }
+      },
+      "steps": [
+        {
+          "takeoff": 10
+        },
+        {
+          "hold": 60
+        },
+        {
+          "return": 240
+        }
+      ]
+    },
+    {
+      "name": "copter_motor_noise_climbs",
+      "vehicle": "ArduCopter",
+      "description": "Motor noise through fast climbs and descents, no notch configured",
+      "sitl_params": {
+        "SIM_VIB_MOT_MAX": 250,
+        "SIM_GYR1_RND": 20,
+        "SIM_GYR2_RND": 20,
+        "SIM_GYR3_RND": 20,
+        "INS_LOG_BAT_MASK": 1,
+        "INS_LOG_BAT_OPT": 2,
+        "INS_GYRO_FILTER": 100,
+        "WP_SPD_UP": 8,
+        "WP_SPD_DN": 5,
+        "WP_ACC_Z": 3
+      },
+      "expected": {
+        "suggestions_include": [
+          "INS_HNTCH_ENABLE",
+          "INS_HNTCH_MODE",
+          "INS_HNTCH_REF",
+          "INS_HNTCH_FREQ",
+          "INS_HNTCH_BW"
+        ],
+        "suggestions_equal": {
+          "INS_HNTCH_MODE": 3,
+          "INS_HNTCH_REF": 1
+        },
+        "suggestions_between": {
+          "INS_HNTCH_FREQ": [
+            95,
+            115
+          ]
+        }
+      },
+      "steps": [
+        {
+          "takeoff": 20
+        },
+        {
+          "hold": 15
+        },
+        {
+          "mission": [
+            [
+              0,
+              0,
+              110
+            ],
+            [
+              0,
+              0,
+              20
+            ],
+            [
+              0,
+              0,
+              110
+            ],
+            [
+              0,
+              0,
+              20
+            ],
+            [
+              0,
+              0,
+              110
+            ],
+            [
+              0,
+              0,
+              20
+            ]
+          ]
+        },
+        {
+          "hold": 5
+        },
+        {
+          "return": 240
+        }
+      ]
+    }
+  ]
+}

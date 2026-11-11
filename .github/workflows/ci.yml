@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# The checks only read the repository. release.yml asks for more on the one
+# job that publishes.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: pip-${{ matrix.python-version }}-
+
+      - name: Install dependencies
+        run: pip install .[test,web]
+
+      - name: Verify locale integrity
+        run: |
+          python -c "
+          import json, re, glob
+          zh = json.load(open('locales/zh.json', encoding='utf-8'))
+          en = json.load(open('locales/en.json', encoding='utf-8'))
+          assert set(zh) == set(en), f'Key mismatch: zh-only={set(zh)-set(en)}, en-only={set(en)-set(zh)}'
+          print(f'Locale OK: {len(zh)} keys, zh/en matched')
+          "
+
+      - name: Lint
+        run: |
+          ruff check .
+          python tools/lint_project.py
+
+      - name: Check i18n safety
+        run: python tools/check_i18n.py
+
+      - name: Check analyzer contracts
+        run: python tools/check_analyzers.py
+
+      - name: Check message field matrix
+        run: python tools/check_msg_fields.py
+
+      - name: Check parameter names
+        run: python tools/check_params.py
+
+      - name: Check the suggestion registry
+        run: python tools/check_suggestions.py
+
+      - name: Run tests
+        run: python -m pytest tests/ -q --tb=short -m "not sitl"
+
+      - name: Syntax check all Python files
+        run: |
+          python -c "
+          import ast, glob
+          for f in glob.glob('**/*.py', recursive=True):
+              ast.parse(open(f, encoding='utf-8').read())
+          print('All Python files pass syntax check')
+          "
+
+      - name: Start every entry point from the installed package
+        run: |
+          pip install build
+          python -m build --wheel --outdir wheel-check
+          python -m venv /tmp/wheel-check
+          /tmp/wheel-check/bin/pip install -q "$(ls wheel-check/*.whl)[web]"
+          cd /tmp
+          for cmd in arduscope arduscope-multi arduscope-batch arduscope-fleet arduscope-web; do
+            /tmp/wheel-check/bin/$cmd --help > /dev/null
+          done

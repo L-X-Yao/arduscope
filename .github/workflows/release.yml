@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install build
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      # Standalone Windows package (.pyc mode). The runner Python is 3.12,
+      # matching the bundled 3.12.10 embeddable's minor version, so the
+      # compiled .pyc runs on it (build_windows_package guards a mismatch).
+      # Output lands in dist/, so the release upload below picks it up.
+      - name: Build standalone Windows package
+        run: >-
+          python build_windows_package.py
+          --python-version 3.12.10
+          --output arduscope-v${{ steps.version.outputs.version }}-win64.zip
+
+      - name: Generate release notes from CHANGELOG
+        id: notes
+        run: |
+          python -c "
+          import re, sys
+          text = open('CHANGELOG.md').read()
+          ver = '${{ steps.version.outputs.version }}'
+          pattern = rf'## \[{re.escape(ver)}\].*?\n(.*?)(?=\n## |\Z)'
+          m = re.search(pattern, text, re.DOTALL)
+          if m:
+              print(m.group(1).strip())
+          else:
+              print(f'Release v{ver}')
+          " > release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          body_path: release_notes.md
+          files: dist/*
+          generate_release_notes: false
