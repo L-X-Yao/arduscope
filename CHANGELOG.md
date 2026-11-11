@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.9.10] - 2026-11-11
 
 ### Changed
 - The Windows package runs on Python 3.14.10, which was 3.12.10. Python 3.12
