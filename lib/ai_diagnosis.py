@@ -932,6 +932,34 @@ def _build_llm_prompt(
     return "\n".join(lines)
 
 
+# claude-sonnet-5-5 decides for itself whether to think before it answers,
+# and what it thinks counts against max_tokens: 2000 could be gone before
+# the first word of the reply. The reply itself is a page at most.
+_ANTHROPIC_MAX_TOKENS = 16000
+
+
+def _anthropic_text(msg) -> str:
+    """The text of a Messages reply, or an error that says what came instead.
+
+    A reply is a list of blocks. When the model thought first, the first
+    block is its thinking and has no text. A refusal is a normal reply
+    with no text at all.
+    """
+    stop = getattr(msg, "stop_reason", None)
+    if stop == "refusal":
+        category = getattr(getattr(msg, "stop_details", None),
+                           "category", None)
+        raise ValueError("the model declined the request"
+                         + (f" ({category})" if category else ""))
+    if stop == "max_tokens":
+        raise ValueError("the reply was cut off at max_tokens")
+    text = "".join(block.text for block in msg.content
+                   if getattr(block, "type", None) == "text").strip()
+    if not text:
+        raise ValueError(f"no text in the reply (stop_reason: {stop})")
+    return text
+
+
 def _call_anthropic(system: str, user: str, api_key: str,
                     model: str = "claude-sonnet-5-5") -> str:
     """Call Anthropic Claude API and return the response text."""
@@ -939,11 +967,11 @@ def _call_anthropic(system: str, user: str, api_key: str,
     client = anthropic.Anthropic(api_key=api_key)
     msg = client.messages.create(
         model=model,
-        max_tokens=2000,
+        max_tokens=_ANTHROPIC_MAX_TOKENS,
         system=system,
         messages=[{"role": "user", "content": user}],
     )
-    return msg.content[0].text
+    return _anthropic_text(msg)
 
 
 def _call_openai(system: str, user: str, api_key: str,

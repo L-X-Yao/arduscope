@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -61,6 +62,107 @@ class TestFallback:
         card = _diagnose(_results("good"), provider="openai")
         assert card.provider == "rule"
         assert "ConnectionError: refused" in card.details[0]
+
+
+class _FakeAnthropic:
+    """Stands in for the anthropic module: one reply, and the request kept."""
+
+    def __init__(self, reply):
+        self.reply = reply
+        self.request: dict = {}
+        self.messages = self            # client.messages.create(...)
+
+    def Anthropic(self, api_key=None):  # noqa: N802 - the SDK's name
+        return self
+
+    def create(self, **request):
+        self.request = request
+        return self.reply
+
+
+def _text(text: str) -> SimpleNamespace:
+    return SimpleNamespace(type="text", text=text)
+
+
+def _thinking() -> SimpleNamespace:
+    """A thinking block as the API returns it: no text attribute."""
+    return SimpleNamespace(type="thinking", thinking="", signature="sig")
+
+
+def _reply(*blocks, stop: str = "end_turn", **extra) -> SimpleNamespace:
+    return SimpleNamespace(content=list(blocks), stop_reason=stop, **extra)
+
+
+class TestAnthropicReply:
+    """A reply is a list of blocks, and the first one is not always text."""
+
+    @pytest.fixture(autouse=True)
+    def no_env_key(self, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    @staticmethod
+    def _install(monkeypatch, reply) -> _FakeAnthropic:
+        fake = _FakeAnthropic(reply)
+        monkeypatch.setitem(sys.modules, "anthropic", fake)
+        return fake
+
+    def test_text_after_a_thinking_block_is_returned(self, monkeypatch):
+        assert not hasattr(_thinking(), "text")
+        self._install(monkeypatch, _reply(_thinking(), _text("Looks fine")))
+        assert ai_diagnosis._call_anthropic("sys", "user", "key") == \
+            "Looks fine"
+
+    def test_text_blocks_are_joined_in_order(self, monkeypatch):
+        self._install(monkeypatch, _reply(
+            _thinking(), _text("One. "), _thinking(), _text("Two.")))
+        assert ai_diagnosis._call_anthropic("sys", "user", "key") == \
+            "One. Two."
+
+    def test_a_refusal_is_an_error_that_names_its_category(self, monkeypatch):
+        self._install(monkeypatch, _reply(
+            stop="refusal", stop_details=SimpleNamespace(category="cyber")))
+        with pytest.raises(ValueError, match=r"declined.*cyber"):
+            ai_diagnosis._call_anthropic("sys", "user", "key")
+
+    def test_a_refusal_without_details_is_still_an_error(self, monkeypatch):
+        self._install(monkeypatch, _reply(stop="refusal"))
+        with pytest.raises(ValueError, match="declined"):
+            ai_diagnosis._call_anthropic("sys", "user", "key")
+
+    def test_a_reply_cut_at_max_tokens_is_an_error(self, monkeypatch):
+        self._install(monkeypatch, _reply(
+            _thinking(), _text("Half a sent"), stop="max_tokens"))
+        with pytest.raises(ValueError, match="cut off"):
+            ai_diagnosis._call_anthropic("sys", "user", "key")
+
+    def test_a_reply_with_no_text_is_an_error(self, monkeypatch):
+        self._install(monkeypatch, _reply(_thinking()))
+        with pytest.raises(ValueError, match="no text"):
+            ai_diagnosis._call_anthropic("sys", "user", "key")
+
+    def test_the_request_leaves_room_for_thinking(self, monkeypatch):
+        fake = self._install(monkeypatch, _reply(_text("ok")))
+        ai_diagnosis._call_anthropic("sys", "user", "key")
+        assert fake.request["system"] == "sys"
+        assert fake.request["messages"] == [
+            {"role": "user", "content": "user"}]
+        # 2000 was the cap when the first block was always text.
+        assert fake.request["max_tokens"] >= 16000
+
+    def test_the_card_is_the_llms_when_it_thought_first(self, monkeypatch):
+        self._install(monkeypatch, _reply(
+            _thinking(), _text("All looks fine\n- ok")))
+        card = _diagnose(_results("good"))
+        assert card.provider == "anthropic"
+        assert card.summary == "All looks fine"
+
+    def test_a_refusal_gives_the_rule_engine_and_says_why(
+            self, monkeypatch, capsys):
+        self._install(monkeypatch, _reply(stop="refusal"))
+        card = _diagnose(_results("good"))
+        assert card.provider == "rule"
+        assert "declined" in card.details[0]
+        assert "declined" in capsys.readouterr().err
 
 
 class TestLlmCardStatus:

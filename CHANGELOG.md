@@ -6,6 +6,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Fixed
+- `--ai-provider anthropic` read the first block of the reply as its text.
+  `claude-sonnet-5-5` may think before it answers, and then the first block is
+  not text: the call failed and the report fell back to the rule engine. The
+  reply is read by block type now, a refusal and a reply cut short are
+  reported as what they are, and the request leaves room for the thinking.
 - The feedback card in a report says where the feedback goes: an issue on
   GitHub. It said "tell us" and named no place, and the Chinese text of the
   multi-log report pointed at a support channel that a public tool does not
