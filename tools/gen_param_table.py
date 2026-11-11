@@ -26,7 +26,11 @@ properly, but it needs a build environment and did not complete on this
 tree; the harvest below is source-only and takes seconds.
 
 Usage:
-    python3 tools/gen_param_table.py --ap-path ../ardupilot
+    python3 tools/gen_param_table.py --ap-path /path/to/ardupilot
+
+The tree has to be checked out at an ArduPilot release tag, such as
+Copter-4.7.2. The table is published with ArduScope, so it holds the
+names of upstream releases only: a fork or a working branch adds its own.
 """
 
 from __future__ import annotations
@@ -40,6 +44,9 @@ import sys
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TABLE_PATH = os.path.join(REPO_ROOT, "tools", "param_table.json")
+
+# Versioned release tags only: ArduCopter-stable and the like move.
+_RELEASE_TAG = re.compile(r"(Copter|Plane|Rover|Sub|Tracker|Blimp)-\d+\.\d+\.\d+")
 
 # Leaf segments: the last piece of a parameter name.
 _LEAF = re.compile(
@@ -95,15 +102,32 @@ def _commit(ap_path: str) -> str:
         return "unknown"
 
 
+def _release_tags(ap_path: str) -> list[str]:
+    """The ArduPilot release tags at the tree's HEAD, or []."""
+    try:
+        out = subprocess.run(["git", "-C", ap_path, "tag", "--points-at",
+                              "HEAD"], capture_output=True, text=True,
+                             timeout=15)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return sorted(t for t in out.stdout.split() if _RELEASE_TAG.fullmatch(t))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--ap-path", default="../ardupilot",
-                    help="path to an ArduPilot source tree")
+    ap.add_argument("--ap-path", required=True,
+                    help="ArduPilot source tree checked out at a release tag")
     args = ap.parse_args()
 
     ap_path = os.path.abspath(args.ap_path)
     if not os.path.isdir(ap_path):
         print(f"not a directory: {ap_path}", file=sys.stderr)
+        return 2
+    tags = _release_tags(ap_path)
+    if not tags:
+        print(f"{ap_path} is not at an ArduPilot release tag such as "
+              f"Copter-4.7.2. The table ships with ArduScope, so it is built "
+              f"from upstream releases only.", file=sys.stderr)
         return 2
 
     prefixes, leaves, n_files = harvest(ap_path)
@@ -114,7 +138,8 @@ def main() -> int:
         return 1
 
     table = {
-        "_source": {"commit": _commit(ap_path), "files_scanned": n_files},
+        "_source": {"commit": _commit(ap_path), "tags": tags,
+                    "files_scanned": n_files},
         "prefixes": sorted(prefixes),
         "leaves": sorted(leaves),
     }

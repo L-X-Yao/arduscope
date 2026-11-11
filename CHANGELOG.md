@@ -18,6 +18,13 @@ releases are not published.
 - The release workflow's token is read-only except in the job that makes the
   draft release. The `ci` job took the repository default, which CodeQL
   pointed out.
+- The tables behind the parameter-name and log-field checks are built from
+  ArduPilot 4.7.2 (`Copter-4.7.2`, `Plane-4.7.2` and the other vehicles' tags
+  at `fb77356`), and each names its release. Their generators take only a
+  tree checked out at a release tag, and `--ap-path` has no default.
+- The history was rewritten on 2026-11-11: two generated files changed in
+  every commit, so commit ids and the tags moved. The release files are the
+  same.
 
 ### Fixed
 - `build_windows_package.py` no longer calls its `.pyc` mode source protection

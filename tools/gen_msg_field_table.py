@@ -13,7 +13,11 @@ check" bug class (the largest class of the 2026-07 bug hunt) into a CI
 failure.
 
 Usage:
-    python3 tools/gen_msg_field_table.py --ap-path ../ardupilot
+    python3 tools/gen_msg_field_table.py --ap-path /path/to/ardupilot
+
+The tree has to be checked out at an ArduPilot release tag, such as
+Copter-4.7.2. The table is published with ArduScope, so it holds the
+messages of upstream releases only: a fork or a working branch adds its own.
 """
 
 from __future__ import annotations
@@ -28,6 +32,20 @@ import sys
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TABLE_PATH = os.path.join(REPO_ROOT, "tools", "msg_field_table.json")
+
+# Versioned release tags only: ArduCopter-stable and the like move.
+_RELEASE_TAG = re.compile(r"(Copter|Plane|Rover|Sub|Tracker|Blimp)-\d+\.\d+\.\d+")
+
+
+def _release_tags(ap_path: str) -> list[str]:
+    """The ArduPilot release tags at the tree's HEAD, or []."""
+    try:
+        out = subprocess.run(["git", "-C", ap_path, "tag", "--points-at",
+                              "HEAD"], capture_output=True, text=True,
+                             timeout=15)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return sorted(t for t in out.stdout.split() if _RELEASE_TAG.fullmatch(t))
 
 # Three consecutive C string literals — the shape shared by both
 # LogStructure entries (name, fmt, labels) and Write() calls
@@ -138,14 +156,19 @@ def harvest(ap_path: str) -> dict[str, list[str]]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    ap.add_argument("--ap-path", default="../ardupilot",
-                    help="ArduPilot source tree (default ../ardupilot)")
+    ap.add_argument("--ap-path", required=True,
+                    help="ArduPilot source tree checked out at a release tag")
     args = ap.parse_args()
 
     ap_path = os.path.abspath(os.path.join(REPO_ROOT, args.ap_path)) \
         if not os.path.isabs(args.ap_path) else args.ap_path
     if not os.path.isdir(os.path.join(ap_path, "libraries")):
         sys.exit(f"Not an ArduPilot tree: {ap_path}")
+    tags = _release_tags(ap_path)
+    if not tags:
+        sys.exit(f"{ap_path} is not at an ArduPilot release tag such as "
+                 f"Copter-4.7.2. The table ships with ArduScope, so it is "
+                 f"built from upstream releases only.")
 
     table = harvest(ap_path)
     if len(table) < 50:
@@ -159,7 +182,7 @@ def main() -> int:
         commit = r.stdout.strip()
 
     out = {
-        "_source": {"commit": commit},
+        "_source": {"commit": commit, "tags": tags},
         "messages": table,
     }
     with open(TABLE_PATH, "w", encoding="utf-8") as f:

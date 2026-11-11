@@ -1,6 +1,13 @@
 {
  "_source": {
   "commit": "fb77356",
+  "tags": [
+   "Copter-4.7.2",
+   "Plane-4.7.2",
+   "Rover-4.7.2",
+   "Sub-4.7.2",
+   "Tracker-4.7.2"
+  ],
   "files_scanned": 242
  },
  "prefixes": [
