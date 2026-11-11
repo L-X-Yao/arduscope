@@ -135,7 +135,8 @@ its files and tag cannot change, so a defect found later ships as a new version.
 The Windows zip carries the Python named by `DEFAULT_PYTHON` in
 `build_windows_package.py`, checked against python.org's SHA-256, and the
 libraries pinned with hashes in `win64-requirements.txt`. The release runner's
-Python has to be the same minor version.
+Python has to be the same minor version. Run the gate with those library
+versions too: its record lists the versions it ran on and names any that differ.
 
 **Do not publish to PyPI** -- distribution is GitHub Release only.
 

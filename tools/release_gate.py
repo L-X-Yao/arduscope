@@ -46,11 +46,13 @@ import argparse
 import datetime
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
 import sys
 import time
+from importlib import metadata
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -160,6 +162,35 @@ def judge_corpus(accepted: dict | None, scan: dict) -> dict:
     return {"status": "review" if moved else "pass", "detail": detail}
 
 
+def _windows_pins() -> dict[str, str]:
+    if REPO_ROOT not in sys.path:
+        sys.path.insert(1, REPO_ROOT)
+    import build_windows_package as builder
+    return builder.read_requirements(
+        os.path.join(REPO_ROOT, builder.REQUIREMENTS))
+
+
+def environment(version=metadata.version) -> dict:
+    """The Python and the libraries the gate ran on.
+
+    The Windows package ships the libraries pinned in win64-requirements.txt.
+    A run on other versions checked something a little different, so the
+    record names them.
+    """
+    pins = _windows_pins()
+
+    def found(name: str) -> str | None:
+        try:
+            return version(name)
+        except metadata.PackageNotFoundError:
+            return None
+
+    libraries = {name: found(name) for name in sorted(pins)}
+    return {"python": platform.python_version(), "libraries": libraries,
+            "off_the_windows_pins": [name for name in libraries
+                                     if libraries[name] != pins[name]]}
+
+
 def overall(steps: dict[str, dict]) -> str:
     statuses = {step["status"] for step in steps.values()}
     if "fail" in statuses:
@@ -256,6 +287,12 @@ def run_gate(args) -> int:
     log_dir = os.path.join(GATE_DIR, commit)
     os.makedirs(log_dir, exist_ok=True)
     started = datetime.datetime.now().isoformat(timespec="seconds")
+    env = environment()
+    if env["off_the_windows_pins"]:
+        print("Note: " + ", ".join(f"{name} {env['libraries'][name]}"
+                                    for name in env["off_the_windows_pins"])
+              + " differ from win64-requirements.txt, which the Windows "
+                "package ships.", flush=True)
 
     steps: dict[str, dict] = {}
     for name in args.steps:
@@ -273,6 +310,7 @@ def run_gate(args) -> int:
         "commit": commit,
         "started": started,
         "finished": datetime.datetime.now().isoformat(timespec="seconds"),
+        "environment": env,
         "status": overall(steps),
         "steps": steps,
     }

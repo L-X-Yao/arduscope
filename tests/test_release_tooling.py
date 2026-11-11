@@ -282,3 +282,42 @@ class TestPackageCheck:
             {"numpy": "2.5.4", "plotly": "7.1.0", "bottle": "0.13.4"})
         assert differ == ["bottle: missing, pinned 0.13.4",
                           "plotly: 7.0.0, pinned 7.1.0"]
+
+
+def _load_gate():
+    spec = importlib.util.spec_from_file_location(
+        "gate_mod", REPO / "tools" / "release_gate.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class TestGateEnvironment:
+    """The gate ran on whatever the local environment held, a numpy and a
+    plotly older than the ones the Windows package ships, and its record did
+    not say so."""
+
+    PINS = _load_build().read_requirements(str(REQUIREMENTS))
+
+    def test_the_record_lists_every_pinned_library(self):
+        env = _load_gate().environment(version=lambda name: self.PINS[name])
+        assert env["libraries"] == self.PINS
+        assert env["off_the_windows_pins"] == []
+        assert re.fullmatch(r"\d+\.\d+\.\d+\S*", env["python"])
+
+    def test_a_library_off_its_pin_is_named(self):
+        older = {**self.PINS, "numpy": "2.4.6"}
+        env = _load_gate().environment(version=lambda name: older[name])
+        assert env["off_the_windows_pins"] == ["numpy"]
+
+    def test_a_missing_library_is_named(self):
+        from importlib import metadata
+
+        def version(name):
+            if name == "bottle":
+                raise metadata.PackageNotFoundError(name)
+            return self.PINS[name]
+
+        env = _load_gate().environment(version=version)
+        assert env["libraries"]["bottle"] is None
+        assert env["off_the_windows_pins"] == ["bottle"]

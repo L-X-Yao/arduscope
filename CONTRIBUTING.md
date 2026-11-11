@@ -193,6 +193,9 @@ so a rebuild waits for it. Anything else that flies should take it too.
 2. Run `python3 tools/release_gate.py` on the commit to release. It takes about
    half an hour, and needs the logs and SITL. If corpus results moved it stops
    at review: read the diff, then run it with `--accept "why they are right"`.
+   Run it with the library versions pinned in `win64-requirements.txt`, the
+   ones the Windows package ships: its record lists the Python and library
+   versions it ran on, and it names any library off those pins.
 3. Run `python3 tools/release.py patch`. It refuses a commit without a pass,
    dates the notes, tags and pushes. The tag starts `release.yml`, which
    creates the release as a draft.

@@ -25,6 +25,9 @@ releases are not published.
 - The history was rewritten on 2026-11-11: two generated files changed in
   every commit, so commit ids and the tags moved. The release files are the
   same.
+- `tools/release_gate.py` records the Python and library versions it ran on,
+  and names any library that differs from the versions the Windows package
+  pins.
 
 ### Fixed
 - `build_windows_package.py` no longer calls its `.pyc` mode source protection
