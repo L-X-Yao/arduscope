@@ -98,5 +98,5 @@ them readable.
 
 - **CI runs about 40% of the tests.** The rest need the log corpora and SITL
   and run in `tools/release_gate.py`, on a machine that has both.
-- **No pull request has had a review**, and the repository has no branch
-  protection.
+- **No pull request has had a review.** `main` refuses force pushes and
+  deletion, and nothing requires a review or a passing check before a merge.
