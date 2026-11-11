@@ -52,7 +52,8 @@ class TestLogLabels:
 
 class TestRecursiveCollision:
     @pytest.fixture(scope="class")
-    def run(self, tmp_path_factory):
+    @classmethod
+    def run(cls, tmp_path_factory):
         root = tmp_path_factory.mktemp("batch")
         for folder, seconds in (("flightA", 30.0), ("flightB", 50.0)):
             (root / "logs" / folder).mkdir(parents=True)

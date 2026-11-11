@@ -54,7 +54,8 @@ class TestReportedTemplate:
     hides the template contradicts its own evidence."""
 
     @pytest.fixture(scope="class")
-    def log_path(self, tmp_path_factory):
+    @classmethod
+    def log_path(cls, tmp_path_factory):
         path = tmp_path_factory.mktemp("tpl") / "flight.BIN"
         return flight_log(duration_s=12.0).save(path)
 
