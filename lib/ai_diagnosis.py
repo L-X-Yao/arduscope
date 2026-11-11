@@ -1025,6 +1025,22 @@ def _worst_status(results_by_key: dict[str, AnalysisResult]) -> str:
     return "warning" if "warning" in statuses else "good"
 
 
+def _llm_summary(lines: list[str]) -> str:
+    """The first line of a reply that says something.
+
+    The prompt asks for the assessment first, and a model may still open
+    with a heading or a rule. Neither is an assessment.
+    """
+    for line in lines:
+        text = line.strip()
+        if not text or text.startswith("#"):
+            continue
+        text = text.lstrip("-*>_ ").replace("**", "").strip()
+        if text:
+            return text
+    return ""
+
+
 def _parse_llm_response(
     text: str,
     health_score: int,
@@ -1035,7 +1051,8 @@ def _parse_llm_response(
 ) -> tuple[str, list[str]]:
     """Parse LLM response into (summary, details)."""
     lines = text.strip().split("\n")
-    summary = lines[0] if lines else t("ai.llm.fallback_summary", score=health_score)
+    summary = (_llm_summary(lines)
+               or t("ai.llm.fallback_summary", score=health_score))
 
     # The model name comes from the command line and this line is markup.
     details = [t("ai.llm.generated_by", model=_html.escape(model),
@@ -1044,15 +1061,15 @@ def _parse_llm_response(
         line = line.strip()
         if not line:
             continue
-        safe = _html.escape(line)
-        if line.startswith("## "):
-            details.append(f"<strong>━━ {_html.escape(line[3:])} ━━</strong>")
-        elif line.startswith("### "):
-            details.append(f"<strong>{_html.escape(line[4:])}</strong>")
+        if line.startswith("#"):
+            marks = len(line) - len(line.lstrip("#"))
+            title = _html.escape(line[marks:].strip())
+            details.append(f"<strong>━━ {title} ━━</strong>" if marks <= 2
+                           else f"<strong>{title}</strong>")
         elif line.startswith("- "):
             details.append(_html.escape(line[2:]))
         else:
-            details.append(safe)
+            details.append(_html.escape(line))
 
     return summary, details
 

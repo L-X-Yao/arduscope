@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+- The card took the first line of an LLM reply as its summary. A reply that
+  opens with a heading gave the summary `## Overall assessment`. The summary
+  is the first line that says something, without its list or emphasis marks,
+  and a heading of any level is shown as a heading.
+
 ### Changed
 - The LLM diagnosis takes its model from `--ai-model` and no longer has one
   built in: `--ai-provider anthropic` or `openai` without it is refused. The

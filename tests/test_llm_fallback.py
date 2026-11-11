@@ -302,6 +302,51 @@ class TestOpenAiReply:
         assert "some-model" in card.evidence_source
 
 
+class TestLlmCardText:
+    """What the card shows of a reply, whatever shape the model gave it."""
+
+    @staticmethod
+    def _card(monkeypatch, reply: str, score: int = 82):
+        monkeypatch.setattr(ai_diagnosis, "_call_anthropic",
+                            lambda *args, **kwargs: reply)
+        return _diagnose(_results("good"), score=score)
+
+    def test_the_summary_is_the_first_line_that_says_something(
+            self, monkeypatch):
+        card = self._card(monkeypatch,
+                          "## Overall assessment\n\nHealthy, one item to tune."
+                          "\n- notch")
+        assert card.provider == "anthropic"
+        assert card.summary == "Healthy, one item to tune."
+
+    @pytest.mark.parametrize("first, shown", [
+        ("**Overall:** healthy", "Overall: healthy"),
+        ("- Healthy flight", "Healthy flight"),
+        ("> Healthy flight", "Healthy flight"),
+        ("---\nHealthy flight", "Healthy flight"),
+    ])
+    def test_list_and_emphasis_marks_are_not_part_of_it(
+            self, monkeypatch, first, shown):
+        assert self._card(monkeypatch, first).summary == shown
+
+    def test_a_reply_of_headings_only_gets_the_score(self, monkeypatch):
+        card = self._card(monkeypatch, "# Report\n## Findings", score=77)
+        assert card.summary == t("ai.llm.fallback_summary", score=77)
+
+    def test_every_heading_level_is_shown_as_a_heading(self, monkeypatch):
+        card = self._card(monkeypatch, "fine\n# One\n## Two\n### Three")
+        assert card.details[2:] == ["<strong>━━ One ━━</strong>",
+                                    "<strong>━━ Two ━━</strong>",
+                                    "<strong>Three</strong>"]
+
+    def test_markup_in_a_reply_is_escaped(self, monkeypatch):
+        card = self._card(monkeypatch, "fine\n## <script>a</script>\n"
+                                       "- <img src=x>\n<i>text</i>")
+        assert card.details[2:] == [
+            "<strong>━━ &lt;script&gt;a&lt;/script&gt; ━━</strong>",
+            "&lt;img src=x&gt;", "&lt;i&gt;text&lt;/i&gt;"]
+
+
 class TestLlmCardStatus:
     @pytest.fixture(autouse=True)
     def reply(self, monkeypatch):
