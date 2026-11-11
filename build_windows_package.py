@@ -6,27 +6,32 @@ Automatically:
 1. Downloads the Python embeddable (~12MB, Windows runtime) and checks it
    against the SHA-256 python.org lists, see EMBED_SHA256
 2. Installs pip and the libraries pinned in win64-requirements.txt
-3. Compiles/protects source code (two modes)
+3. Compiles the code (two modes)
 4. Packages as zip (extract and run, no Python install needed)
 
-Source protection modes:
+The source is public under the MIT license. Neither mode is meant to hide it.
 
-  --nuitka (recommended, requires Windows):
-    Python -> C -> native .pyd (machine code), cannot decompile back to Python.
-    Requires: Windows + Python 3.10 + Nuitka + MSVC/MinGW.
+Compile modes:
 
-  Default (.pyc, best compatibility):
-    .py -> .pyc, lightweight protection. Can be reversed by decompyle3.
-    Suitable for quick testing, not for production delivery.
+  Default (.pyc):
+    .py -> .pyc, compiled by a Python of the bundled minor version, 3.14 for
+    DEFAULT_PYTHON. The release workflow builds this mode on Linux, and
+    tools/win_package_check.py checks the result on Windows.
+
+  --nuitka (Windows only, untested):
+    lib/ and analyzers/ to native .pyd modules through Nuitka. No test or
+    release step runs it. A .pyd loads only in the Python minor version that
+    built it, so this mode needs Python 3.14 as well.
 
 Usage:
-    python build_windows_package.py --nuitka --output arduscope-v12.zip
-    python build_windows_package.py                    # fallback: pyc mode
-    python build_windows_package.py --python-version 3.14.10
+    python3.14 build_windows_package.py
+    python3.14 build_windows_package.py --embed-zip python-3.14.10-embed-amd64.zip
+    python build_windows_package.py --nuitka            # on Windows
 
 Requirements:
-    --nuitka mode: Windows + pip install nuitka ordered-set + MSVC
-    Default mode: Linux/Windows, needs internet to download Python embeddable
+    Default mode: Linux or Windows. On Linux a python3.14 on PATH compiles the
+    .pyc. The embeddable is downloaded unless --embed-zip names one
+    --nuitka mode: Windows + Python 3.14 + pip install nuitka ordered-set + MSVC
 """
 
 import argparse
@@ -458,12 +463,12 @@ def _nuitka_compile_entry(entry_py: str, output_dir: str, extra_paths: list) -> 
 
 def _build_nuitka(script_dir: str, pkg_dir: str, py_ver: str):
     """
-    Nuitka protected build — compile lib/ and analyzers/ to .pyd,
-    entry points remain as thin .pyc wrappers that import the .pyd modules.
+    Nuitka build, untested: compile lib/ and analyzers/ to .pyd, entry
+    points remain as thin .pyc wrappers that import the .pyd modules.
 
     Strategy:
-      - lib/ → lib.cpython-310-x86_64.pyd (single compiled extension)
-      - analyzers/ → analyzers.cpython-310-x86_64.pyd
+      - lib/ → one compiled extension module
+      - analyzers/ → one compiled extension module
       - Entry points (web_app.py etc.) → .pyc (tiny, just "import lib; main()")
         The actual logic is in the .pyd which is native machine code.
     """
@@ -518,11 +523,12 @@ def main():
     )
     parser.add_argument(
         "--output", default=None,
-        help="Output zip filename (default: arduscope-vX.zip)",
+        help="Output zip filename (default: dist/arduscope-win64.zip)",
     )
     parser.add_argument(
         "--nuitka", action="store_true",
-        help="Compile core modules to native .pyd with Nuitka (requires Windows + MSVC)",
+        help="Compile lib/ and analyzers/ to native .pyd with Nuitka "
+             "(Windows + MSVC, untested)",
     )
     parser.add_argument(
         "--embed-zip",
@@ -535,7 +541,7 @@ def main():
 
     if args.nuitka and platform.system() != "Windows":
         print("Error: --nuitka requires Windows (Nuitka does not support cross-compilation)")
-        print("Hint: use GitHub Actions workflow 'ArduScope Package' for automated builds")
+        print("Hint: the default .pyc mode builds on Linux, as the Release workflow does")
         sys.exit(1)
 
     if args.nuitka:
@@ -677,7 +683,7 @@ def main():
                 data_count += len(files)
     print(f"  Copied {len(INCLUDE_FILES)} entry files + {file_count} module files + {data_count} data files")
 
-    # ---- Step 6: Compile and protect source ----
+    # ---- Step 6: Compile ----
     if args.nuitka:
         print(f"\n[6/6] Nuitka compiling core modules to native .pyd...")
         _build_nuitka(script_dir, pkg_dir, py_ver)
@@ -746,7 +752,7 @@ def main():
                  os.path.join(pkg_dir, "LICENSE.txt"))
 
     # ---- Zip ----
-    raw_output = args.output or f"{PACKAGE_NAME}-v5.zip"
+    raw_output = args.output or f"{PACKAGE_NAME}-win64.zip"
     if os.path.dirname(raw_output):
         output_path = os.path.abspath(raw_output)
     else:
@@ -773,10 +779,9 @@ def main():
     print(f"Size: {zip_size / 1024 / 1024:.1f} MB")
     print(f"\nDistribute: send {output_name}, extract and run start.bat")
     if args.nuitka:
-        print("Protection: Nuitka native compilation (.pyd machine code)")
+        print("Compiled: Nuitka .pyd for lib/ and analyzers/ (untested mode)")
     else:
-        print("Protection: .pyc bytecode (basic, reversible with decompyle3)")
-        print("Tip: use --nuitka on Windows for strongest protection")
+        print("Compiled: .pyc bytecode")
 
     # Cleanup
     shutil.rmtree(build_dir)

@@ -16,6 +16,13 @@ releases are not published.
 - The release workflow names `softprops/action-gh-release` by commit, the one
   v3.0.4 has, rather than by its `v3` tag, which its owner can move.
 
+### Fixed
+- `build_windows_package.py` no longer calls its `.pyc` mode source protection
+  unfit for delivery, nor recommends `--nuitka` on Python 3.10. The release is
+  built in the `.pyc` mode, and no test or release step runs `--nuitka`, which
+  needs Python 3.14 as well. Without `--output` the zip is
+  `dist/arduscope-win64.zip`, which was `arduscope-v5.zip`.
+
 ## [0.9.10] - 2026-11-11
 
 ### Changed
