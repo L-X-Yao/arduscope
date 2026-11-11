@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+- The feedback card in a report says where the feedback goes: an issue on
+  GitHub. It said "tell us" and named no place, and the Chinese text of the
+  multi-log report pointed at a support channel that a public tool does not
+  have.
+
 ### Changed
 - `POSITIONING.md` is in English, with the Chinese text in `POSITIONING_zh.md`.
   It says that feature work has ended and the maintainer fixes defects only,
