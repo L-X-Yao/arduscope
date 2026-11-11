@@ -30,6 +30,9 @@ On Windows without Python: download `arduscope-vX.Y.Z-win64.zip` from
 double-click `start.bat`. The package carries its own Python and opens the web
 interface in the browser.
 
+ArduScope is not published on PyPI. A package there called `arduscope` or
+`ardupilot-scope` is not this project.
+
 From source, with Python 3.10 or later:
 
 ```bash

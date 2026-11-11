@@ -3,6 +3,10 @@
 All notable changes to ArduScope are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+0.9.7 is the first release in this repository. The versions before it were
+made in a private repository: their entries are kept here, and their tags and
+releases are not published.
+
 ## [Unreleased]
 
 ### Changed
@@ -18,6 +22,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   has passed `tools/win_package_check.py` on real Windows. The release used to
   be public before the check ran. The check also compares the package's Python
   and libraries with the pinned ones.
+- The README says that ArduScope is not published on PyPI, and this file says
+  where the versions before 0.9.7 were made.
 
 ## [0.9.9] - 2026-11-11
 

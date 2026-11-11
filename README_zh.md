@@ -29,6 +29,8 @@ Windows 且没有 Python：从 [Releases](https://github.com/L-X-Yao/arduscope/r
 下载 `arduscope-vX.Y.Z-win64.zip`，解压后双击 `start.bat`。包内自带 Python，
 启动后在浏览器里打开 Web 界面。
 
+ArduScope 不在 PyPI 上发布，PyPI 上名为 `arduscope` 或 `ardupilot-scope` 的包不是本项目。
+
 从源码安装，需要 Python 3.10 或更高：
 
 ```bash
