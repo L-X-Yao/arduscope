@@ -24,9 +24,11 @@ def _results(*statuses: str) -> dict[str, AnalysisResult]:
             for i, s in enumerate(statuses)}
 
 
-def _diagnose(results, provider="anthropic", api_key="key", score=82):
+def _diagnose(results, provider="anthropic", api_key="key", score=82,
+              model="some-model", base_url=""):
     return generate_diagnosis(results, VEHICLE, score, 60.0,
-                              provider=provider, api_key=api_key)
+                              provider=provider, api_key=api_key,
+                              model=model, base_url=base_url)
 
 
 class TestFallback:
@@ -45,6 +47,14 @@ class TestFallback:
         assert card.provider == "rule"
         reason = t("ai.llm.no_key", env="ANTHROPIC_API_KEY")
         note = t("ai.llm.fallback", provider="anthropic", reason=reason)
+        assert card.details[0] == note
+        assert note in capsys.readouterr().err
+
+    def test_missing_model_is_reported(self, capsys):
+        card = _diagnose(_results("good"), model="")
+        assert card.provider == "rule"
+        note = t("ai.llm.fallback", provider="anthropic",
+                 reason=t("ai.llm.no_model"))
         assert card.details[0] == note
         assert note in capsys.readouterr().err
 
@@ -70,9 +80,11 @@ class _FakeAnthropic:
     def __init__(self, reply):
         self.reply = reply
         self.request: dict = {}
+        self.client: dict = {}
         self.messages = self            # client.messages.create(...)
 
-    def Anthropic(self, api_key=None):  # noqa: N802 - the SDK's name
+    def Anthropic(self, **client):      # noqa: N802 - the SDK's name
+        self.client = client
         return self
 
     def create(self, **request):
@@ -109,45 +121,57 @@ class TestAnthropicReply:
     def test_text_after_a_thinking_block_is_returned(self, monkeypatch):
         assert not hasattr(_thinking(), "text")
         self._install(monkeypatch, _reply(_thinking(), _text("Looks fine")))
-        assert ai_diagnosis._call_anthropic("sys", "user", "key") == \
+        assert ai_diagnosis._call_anthropic("sys", "user", "key", "m") == \
             "Looks fine"
 
     def test_text_blocks_are_joined_in_order(self, monkeypatch):
         self._install(monkeypatch, _reply(
             _thinking(), _text("One. "), _thinking(), _text("Two.")))
-        assert ai_diagnosis._call_anthropic("sys", "user", "key") == \
+        assert ai_diagnosis._call_anthropic("sys", "user", "key", "m") == \
             "One. Two."
 
     def test_a_refusal_is_an_error_that_names_its_category(self, monkeypatch):
         self._install(monkeypatch, _reply(
             stop="refusal", stop_details=SimpleNamespace(category="cyber")))
         with pytest.raises(ValueError, match=r"declined.*cyber"):
-            ai_diagnosis._call_anthropic("sys", "user", "key")
+            ai_diagnosis._call_anthropic("sys", "user", "key", "m")
 
     def test_a_refusal_without_details_is_still_an_error(self, monkeypatch):
         self._install(monkeypatch, _reply(stop="refusal"))
         with pytest.raises(ValueError, match="declined"):
-            ai_diagnosis._call_anthropic("sys", "user", "key")
+            ai_diagnosis._call_anthropic("sys", "user", "key", "m")
 
     def test_a_reply_cut_at_max_tokens_is_an_error(self, monkeypatch):
         self._install(monkeypatch, _reply(
             _thinking(), _text("Half a sent"), stop="max_tokens"))
         with pytest.raises(ValueError, match="cut off"):
-            ai_diagnosis._call_anthropic("sys", "user", "key")
+            ai_diagnosis._call_anthropic("sys", "user", "key", "m")
 
     def test_a_reply_with_no_text_is_an_error(self, monkeypatch):
         self._install(monkeypatch, _reply(_thinking()))
         with pytest.raises(ValueError, match="no text"):
-            ai_diagnosis._call_anthropic("sys", "user", "key")
+            ai_diagnosis._call_anthropic("sys", "user", "key", "m")
 
     def test_the_request_leaves_room_for_thinking(self, monkeypatch):
         fake = self._install(monkeypatch, _reply(_text("ok")))
-        ai_diagnosis._call_anthropic("sys", "user", "key")
+        ai_diagnosis._call_anthropic("sys", "user", "key", "m")
+        assert fake.request["model"] == "m"
         assert fake.request["system"] == "sys"
         assert fake.request["messages"] == [
             {"role": "user", "content": "user"}]
         # 2000 was the cap when the first block was always text.
         assert fake.request["max_tokens"] >= 16000
+
+    def test_the_address_goes_to_the_client_only_when_given(
+            self, monkeypatch):
+        fake = self._install(monkeypatch, _reply(_text("ok")))
+        ai_diagnosis._call_anthropic("sys", "user", "key", "m")
+        assert fake.client == {"api_key": "key"}
+
+        ai_diagnosis._call_anthropic("sys", "user", "key", "m",
+                                     "https://api.example.com")
+        assert fake.client == {"api_key": "key",
+                               "base_url": "https://api.example.com"}
 
     def test_the_card_is_the_llms_when_it_thought_first(self, monkeypatch):
         self._install(monkeypatch, _reply(
@@ -163,6 +187,119 @@ class TestAnthropicReply:
         assert card.provider == "rule"
         assert "declined" in card.details[0]
         assert "declined" in capsys.readouterr().err
+
+
+class _FakeOpenAI:
+    """Stands in for the openai module: one reply, and the request kept."""
+
+    def __init__(self, reply):
+        self.reply = reply
+        self.request: dict = {}
+        self.client: dict = {}
+        self.chat = SimpleNamespace(completions=self)
+
+    def OpenAI(self, **client):         # noqa: N802 - the SDK's name
+        self.client = client
+        return self
+
+    def create(self, **request):
+        self.request = request
+        return self.reply
+
+
+def _completion(content, finish: str = "stop") -> SimpleNamespace:
+    return SimpleNamespace(choices=[SimpleNamespace(
+        finish_reason=finish, message=SimpleNamespace(content=content))])
+
+
+class TestOpenAiReply:
+    """Many services speak this API, and they do not all answer alike."""
+
+    @pytest.fixture(autouse=True)
+    def no_env_key(self, monkeypatch):
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    @staticmethod
+    def _install(monkeypatch, reply) -> _FakeOpenAI:
+        fake = _FakeOpenAI(reply)
+        monkeypatch.setitem(sys.modules, "openai", fake)
+        return fake
+
+    def test_the_content_is_returned(self, monkeypatch):
+        self._install(monkeypatch, _completion("Looks fine\n"))
+        assert ai_diagnosis._call_openai("sys", "user", "key", "m") == \
+            "Looks fine"
+
+    def test_a_reply_spent_on_reasoning_is_an_error(self, monkeypatch):
+        self._install(monkeypatch, _completion(None, finish="length"))
+        with pytest.raises(ValueError, match="cut off"):
+            ai_diagnosis._call_openai("sys", "user", "key", "m")
+
+    def test_a_cut_reply_with_text_is_an_error_too(self, monkeypatch):
+        self._install(monkeypatch, _completion("Half a sent", "length"))
+        with pytest.raises(ValueError, match="cut off"):
+            ai_diagnosis._call_openai("sys", "user", "key", "m")
+
+    def test_a_filtered_reply_is_an_error(self, monkeypatch):
+        self._install(monkeypatch, _completion(None, "content_filter"))
+        with pytest.raises(ValueError, match="filtered"):
+            ai_diagnosis._call_openai("sys", "user", "key", "m")
+
+    @pytest.mark.parametrize("content", [None, "", "  \n"])
+    def test_a_reply_with_no_text_is_an_error(self, monkeypatch, content):
+        self._install(monkeypatch, _completion(content))
+        with pytest.raises(ValueError, match="no text"):
+            ai_diagnosis._call_openai("sys", "user", "key", "m")
+
+    def test_a_reply_with_no_choices_is_an_error(self, monkeypatch):
+        self._install(monkeypatch, SimpleNamespace(choices=[]))
+        with pytest.raises(ValueError, match="no choices"):
+            ai_diagnosis._call_openai("sys", "user", "key", "m")
+
+    def test_the_request_names_the_model_and_no_ceiling(self, monkeypatch):
+        fake = self._install(monkeypatch, _completion("ok"))
+        ai_diagnosis._call_openai("sys", "user", "key", "m")
+        assert fake.request == {
+            "model": "m",
+            "messages": [{"role": "system", "content": "sys"},
+                         {"role": "user", "content": "user"}],
+        }
+
+    def test_the_address_goes_to_the_client_only_when_given(
+            self, monkeypatch):
+        fake = self._install(monkeypatch, _completion("ok"))
+        ai_diagnosis._call_openai("sys", "user", "key", "m")
+        assert fake.client == {"api_key": "key"}
+
+        ai_diagnosis._call_openai("sys", "user", "key", "m",
+                                  "https://api.example.com/v1")
+        assert fake.client == {"api_key": "key",
+                               "base_url": "https://api.example.com/v1"}
+
+    def test_the_card_names_the_model_and_the_api(self, monkeypatch):
+        self._install(monkeypatch, _completion("All looks fine\n- ok"))
+        card = _diagnose(_results("good"), provider="openai",
+                         model="some-model",
+                         base_url="https://api.example.com/v1")
+        assert card.provider == "openai"
+        assert card.summary == "All looks fine"
+        assert "some-model" in card.details[0]
+        assert "openai" in card.details[0]
+
+    def test_a_model_name_cannot_put_markup_on_the_card(self, monkeypatch):
+        self._install(monkeypatch, _completion("fine"))
+        card = _diagnose(_results("good"), provider="openai",
+                         model="<script>x</script>")
+        assert "<script>" not in card.details[0]
+        assert "&lt;script&gt;" in card.details[0]
+
+    def test_a_warning_card_says_which_model_is_not_a_source(
+            self, monkeypatch):
+        self._install(monkeypatch, _completion("something is off"))
+        card = _diagnose(_results("good", "warning"), provider="openai",
+                         model="some-model")
+        assert card.status == "warning"
+        assert "some-model" in card.evidence_source
 
 
 class TestLlmCardStatus:

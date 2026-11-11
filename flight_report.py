@@ -228,8 +228,21 @@ def main():
         "--ai-provider",
         choices=["rule", "anthropic", "openai"],
         default="rule",
-        help="AI diagnosis provider (default: rule-based; anthropic/openai "
-             "read their key from ANTHROPIC_API_KEY / OPENAI_API_KEY)",
+        help="Who writes the AI diagnosis (default: rule, the offline rule "
+             "engine). anthropic and openai name the API an LLM is asked "
+             "through, read their key from ANTHROPIC_API_KEY / "
+             "OPENAI_API_KEY and need --ai-model",
+    )
+    parser.add_argument(
+        "--ai-model",
+        metavar="NAME",
+        help="Model the LLM diagnosis asks for. No name is built in",
+    )
+    parser.add_argument(
+        "--ai-base-url",
+        metavar="URL",
+        help="Where the API is, for a service other than the provider's "
+             "own that speaks the same API. The key goes to this address",
     )
     # Kept only to refuse it with an explanation, see below.
     parser.add_argument("--ai-key", help=argparse.SUPPRESS)
@@ -279,6 +292,25 @@ def main():
         print(t("cli.err_ai_key_argv",
                 env="ANTHROPIC_API_KEY / OPENAI_API_KEY"), file=sys.stderr)
         sys.exit(1)
+    if args.ai_provider == "rule":
+        # An option that changes nothing is a typo or a wrong belief about
+        # what will happen to the report.
+        for option, value in (("--ai-model", args.ai_model),
+                              ("--ai-base-url", args.ai_base_url)):
+            if value is not None:
+                print(t("cli.err_ai_option_without_provider", option=option),
+                      file=sys.stderr)
+                sys.exit(1)
+    else:
+        if not args.ai_model:
+            print(t("cli.err_ai_model_missing", provider=args.ai_provider),
+                  file=sys.stderr)
+            sys.exit(1)
+        if args.ai_base_url is not None and not args.ai_base_url.startswith(
+                ("http://", "https://")):
+            print(t("cli.err_ai_base_url", url=args.ai_base_url),
+                  file=sys.stderr)
+            sys.exit(1)
 
     template = None
     if args.template:
@@ -357,6 +389,8 @@ def main():
             results_by_key, vehicle_info, health_score,
             reader.get_flight_duration(),
             provider=args.ai_provider,
+            model=args.ai_model or "",
+            base_url=args.ai_base_url or "",
         )
         results.insert(0, diagnosis)
         print(t("cli.ai_diagnosis", provider=diagnosis.provider, summary=diagnosis.summary))

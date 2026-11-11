@@ -3,6 +3,24 @@
 All notable changes to ArduScope are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+- The LLM diagnosis takes its model from `--ai-model` and no longer has one
+  built in: `--ai-provider anthropic` or `openai` without it is refused. The
+  names in the code were `claude-sonnet-5-5` and `gpt-4o-mini`, and a name in
+  the code stops working the day its service retires it: OpenAI's deprecations
+  page lists GPT-4o mini (`gpt-4o-mini-2024-07-18`) for shutdown on 2027-01-14.
+- `--ai-base-url` gives the address of the API, so a service other than
+  Anthropic and OpenAI that speaks one of the two APIs can be used. The key
+  still comes from `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` and goes to that
+  address. Either option without an LLM provider is refused.
+- The OpenAI request no longer sends `max_tokens`: services that speak the API
+  disagree on its name and on whether reasoning counts against it. A reply
+  that was cut off, filtered or empty is reported as what it is.
+- The card names the model that wrote it and the API it was asked through. It
+  named the provider only, which says little once the address can be changed.
+
 ## [0.9.8] - 2026-11-11
 
 ### Fixed

@@ -932,9 +932,10 @@ def _build_llm_prompt(
     return "\n".join(lines)
 
 
-# claude-sonnet-5-5 decides for itself whether to think before it answers,
-# and what it thinks counts against max_tokens: 2000 could be gone before
-# the first word of the reply. The reply itself is a page at most.
+# The Messages API wants a ceiling on the reply. A current Claude model
+# decides for itself whether to think before it answers, and what it thinks
+# counts against max_tokens: 2000 could be gone before the first word of
+# the reply. The reply itself is a page at most.
 _ANTHROPIC_MAX_TOKENS = 16000
 
 
@@ -960,11 +961,12 @@ def _anthropic_text(msg) -> str:
     return text
 
 
-def _call_anthropic(system: str, user: str, api_key: str,
-                    model: str = "claude-sonnet-5-5") -> str:
-    """Call Anthropic Claude API and return the response text."""
+def _call_anthropic(system: str, user: str, api_key: str, model: str,
+                    base_url: str = "") -> str:
+    """Ask a service that speaks Anthropic's Messages API, return its text."""
     import anthropic
-    client = anthropic.Anthropic(api_key=api_key)
+    where = {"base_url": base_url} if base_url else {}
+    client = anthropic.Anthropic(api_key=api_key, **where)
     msg = client.messages.create(
         model=model,
         max_tokens=_ANTHROPIC_MAX_TOKENS,
@@ -974,20 +976,45 @@ def _call_anthropic(system: str, user: str, api_key: str,
     return _anthropic_text(msg)
 
 
-def _call_openai(system: str, user: str, api_key: str,
-                 model: str = "gpt-4o-mini") -> str:
-    """Call OpenAI API and return the response text."""
+def _openai_text(resp) -> str:
+    """The text of a chat completion, or an error that says what came instead.
+
+    A model that reasons first can spend the whole reply on it and leave
+    the content empty, and a filtered reply has no content either.
+    """
+    choices = getattr(resp, "choices", None) or []
+    if not choices:
+        raise ValueError("no choices in the reply")
+    stop = getattr(choices[0], "finish_reason", None)
+    if stop == "content_filter":
+        raise ValueError("the service filtered the reply")
+    if stop == "length":
+        raise ValueError("the reply was cut off at the length limit")
+    text = (getattr(choices[0].message, "content", None) or "").strip()
+    if not text:
+        raise ValueError(f"no text in the reply (finish_reason: {stop})")
+    return text
+
+
+def _call_openai(system: str, user: str, api_key: str, model: str,
+                 base_url: str = "") -> str:
+    """Ask a service that speaks OpenAI's chat completions API.
+
+    No ceiling on the reply is sent. The services disagree on its name
+    (max_tokens, max_completion_tokens) and on whether reasoning counts
+    against it, and every one of them accepts a request without it.
+    """
     from openai import OpenAI
-    client = OpenAI(api_key=api_key)
+    where = {"base_url": base_url} if base_url else {}
+    client = OpenAI(api_key=api_key, **where)
     resp = client.chat.completions.create(
         model=model,
-        max_tokens=2000,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
     )
-    return resp.choices[0].message.content
+    return _openai_text(resp)
 
 
 def _worst_status(results_by_key: dict[str, AnalysisResult]) -> str:
@@ -1004,12 +1031,15 @@ def _parse_llm_response(
     n_analyzers: int,
     provider: str,
     status: str,
+    model: str = "",
 ) -> tuple[str, list[str]]:
     """Parse LLM response into (summary, details)."""
     lines = text.strip().split("\n")
     summary = lines[0] if lines else t("ai.llm.fallback_summary", score=health_score)
 
-    details = [t("ai.llm.generated_by", provider=provider, n_analyzers=n_analyzers)]
+    # The model name comes from the command line and this line is markup.
+    details = [t("ai.llm.generated_by", model=_html.escape(model),
+                 provider=provider, n_analyzers=n_analyzers)]
     for line in lines:
         line = line.strip()
         if not line:
@@ -1034,6 +1064,8 @@ def _generate_llm(
     flight_duration: float,
     provider: str = "anthropic",
     api_key: str = "",
+    model: str = "",
+    base_url: str = "",
 ) -> AnalysisResult:
     """Generate diagnosis via LLM API. Raises if the call fails."""
     user_prompt = _build_llm_prompt(
@@ -1042,13 +1074,13 @@ def _generate_llm(
 
     system_prompt = t("ai.llm.system_prompt")
     call = _call_anthropic if provider == "anthropic" else _call_openai
-    text = call(system_prompt, user_prompt, api_key)
+    text = call(system_prompt, user_prompt, api_key, model, base_url)
     if not text:
         raise ValueError("empty response")
 
     status = _worst_status(results_by_key)
     summary, details = _parse_llm_response(
-        text, health_score, len(results_by_key), provider, status,
+        text, health_score, len(results_by_key), provider, status, model,
     )
 
     return AnalysisResult(
@@ -1060,7 +1092,7 @@ def _generate_llm(
         sub_results=[],
         # An LLM narrative is not a traceable source. Say so rather than
         # letting it pass as one.
-        evidence_source=(t("ai.llm.evidence", provider=provider)
+        evidence_source=(t("ai.llm.evidence", model=model, provider=provider)
                          if status in ("warning", "critical") else ""),
         provider=provider,
     )
@@ -1077,6 +1109,8 @@ def generate_diagnosis(
     flight_duration: float,
     provider: str = "rule",
     api_key: str = "",
+    model: str = "",
+    base_url: str = "",
 ) -> AnalysisResult:
     """
     Generate an AI diagnosis AnalysisResult from all analyzer results.
@@ -1086,9 +1120,14 @@ def generate_diagnosis(
         vehicle_info: detected vehicle information
         health_score: 0-100 composite health score
         flight_duration: flight duration in seconds
-        provider: "rule" (default), "anthropic", or "openai"
+        provider: "rule" (default), or the API an LLM is asked through:
+                  "anthropic" (Messages) or "openai" (chat completions)
         api_key: API key for LLM providers (or set env var
                  ANTHROPIC_API_KEY / OPENAI_API_KEY)
+        model: the model to ask for. No name is built in: a name in the
+               code stops working the day its service retires it
+        base_url: where the API is, for a service other than the
+                  provider's own that speaks the same API
 
     Returns:
         AnalysisResult with title from t("ai.report_title"). Falls back to
@@ -1103,19 +1142,21 @@ def generate_diagnosis(
         env = ("ANTHROPIC_API_KEY" if provider == "anthropic"
                else "OPENAI_API_KEY")
         key = api_key or _os.environ.get(env, "")
-        if key:
+        if not key:
+            reason = t("ai.llm.no_key", env=env)
+        elif not model:
+            reason = t("ai.llm.no_model")
+        else:
             try:
                 return _generate_llm(
                     results_by_key, vehicle_info, health_score,
-                    flight_duration, provider, key,
+                    flight_duration, provider, key, model, base_url,
                 )
             except ImportError:
                 reason = t("ai.llm.no_package", package=provider)
             except Exception as e:  # noqa: BLE001 - SDK raises many types
                 reason = t("ai.llm.call_failed",
                            error=f"{type(e).__name__}: {str(e)[:200]}")
-        else:
-            reason = t("ai.llm.no_key", env=env)
 
     card = _generate_rule_based(
         results_by_key, vehicle_info, health_score, flight_duration,

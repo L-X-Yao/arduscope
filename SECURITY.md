@@ -20,8 +20,11 @@ packages stay on the Releases page as they were built and do not get fixes.
   and a damaged one is read as far as it goes. Text from a log is escaped in
   the report, and reports are served with a Content-Security-Policy.
 - The LLM diagnosis is off by default. `--ai-provider anthropic` or `openai`
-  sends each analyzer's status and summary to that provider, with the vehicle
-  type, firmware version and board name, under your API key.
+  sends each analyzer's status and summary to that provider under your API
+  key, with the vehicle type, firmware version, board name, motor and IMU
+  counts, flight duration and health score. With `--ai-base-url` all of that
+  goes to the address you give instead, and so does the key from
+  `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`.
 - A flight log holds the GPS track of the flight and the serial number of the
   flight controller, and so does a report made from it. Think before posting
   either in a public issue.

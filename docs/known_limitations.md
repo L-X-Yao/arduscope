@@ -90,13 +90,14 @@ them readable.
   `openai` are covered by tests that put a stand-in where the request goes,
   and no release check sends one. How the Anthropic reply is read was checked
   against reply objects built with the `anthropic` SDK, 2.8.0.
-- **The model names are fixed**: `claude-sonnet-5-5` and `gpt-4o-mini`, in
-  `lib/ai_diagnosis.py`. OpenAI's
-  [deprecations page](https://developers.openai.com/api/docs/deprecations)
-  lists GPT-4o mini (`gpt-4o-mini-2024-07-18`) for shutdown on 2027-01-14 and
-  names `gpt-6-luna` in its place, which has not been tried here. A call that
-  fails for any reason gives the rule engine's diagnosis, and the card says
-  why.
+- **Each service answers in its own way.** `--ai-provider` names the API that
+  is spoken, `--ai-model` the model and `--ai-base-url` a service other than
+  the provider's own. Which models a service has, what it accepts and how it
+  reports a refusal are its own. The OpenAI request sends no ceiling on the
+  reply, because the services disagree on what it is called. A call that fails
+  for any reason gives the rule engine's diagnosis, and the card says why.
+- **Only `flight_report.py` has it.** The web interface, the batch and
+  multi-log reports and the Windows package use the rule engine.
 
 ## Install
 

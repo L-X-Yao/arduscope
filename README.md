@@ -97,7 +97,9 @@ python3 web_app.py --server waitress --workers 8
 
 # AI diagnosis through an LLM (default: the offline rule engine)
 pip install .[ai]
-ANTHROPIC_API_KEY=... python3 flight_report.py --ai-provider anthropic log.BIN
+ANTHROPIC_API_KEY=... python3 flight_report.py --ai-provider anthropic --ai-model MODEL log.BIN
+# The same through any service that speaks the OpenAI chat completions API
+OPENAI_API_KEY=... python3 flight_report.py --ai-provider openai --ai-base-url https://api.example.com/v1 --ai-model MODEL log.BIN
 ```
 
 ## Analyzers

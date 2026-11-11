@@ -94,7 +94,9 @@ python3 web_app.py --server waitress --workers 8
 
 # 用 LLM 做 AI 诊断（默认是离线规则引擎）
 pip install .[ai]
-ANTHROPIC_API_KEY=... python3 flight_report.py --ai-provider anthropic log.BIN
+ANTHROPIC_API_KEY=... python3 flight_report.py --ai-provider anthropic --ai-model 模型名 log.BIN
+# 任何兼容 OpenAI chat completions 接口的服务也可以用
+OPENAI_API_KEY=... python3 flight_report.py --ai-provider openai --ai-base-url https://api.example.com/v1 --ai-model 模型名 log.BIN
 ```
 
 ## 分析器
