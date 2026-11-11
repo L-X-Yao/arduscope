@@ -21,7 +21,7 @@ ArduScope reads ArduPilot `.BIN` logs and runs 32 analyzers to produce actionabl
 - **Multi-log comparison** — track tuning convergence across flights
 - **Fleet history** — every flight auto-archived per airframe (hardware-serial keyed); trend card in reports, `fleet_report.py` CLI (incl. `--backfill` for historical logs) + web fleet page (`/fleet`, with alias editing)
 - **Web + CLI** — browser drag-and-drop or command-line batch processing
-- **Bilingual** — Chinese / English (`--lang zh|en`)
+- **Bilingual** — Chinese by default, English with `--lang en`
 
 ## Quick start
 
@@ -52,6 +52,8 @@ python3 web_app.py
 ```
 
 `pip install .` also installs the commands `arduscope`, `arduscope-multi`, `arduscope-batch`, `arduscope-fleet` and `arduscope-web`, one for each script above and for `fleet_report.py`.
+
+Reports and the web interface are in Chinese unless told otherwise: add `--lang en` to any command, or use the switch at the top of the web page.
 
 ## Usage
 

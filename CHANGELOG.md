@@ -32,6 +32,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   feature shipped in v0.6.0 and the document says so. The three ledgers under
   `docs/` say that their commit hashes belong to the history from before the
   repository went public.
+- The README says that reports and the web interface are in Chinese by
+  default. `docs/known_limitations.md` has a section on the LLM diagnosis: it
+  is not tested against the services, its model names are fixed, and OpenAI
+  lists `gpt-4o-mini` for shutdown on 2027-01-14.
 
 ## [0.9.7] - 2026-11-11
 
