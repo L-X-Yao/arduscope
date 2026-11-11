@@ -3,7 +3,7 @@
 All notable changes to ArduScope are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.9.9] - 2026-11-11
 
 ### Fixed
 - The card took the first line of an LLM reply as its summary. A reply that
