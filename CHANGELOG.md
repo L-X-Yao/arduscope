@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Fixed
+- The Windows package includes `lib/agent`. The v0.10.0 draft package was
+  built from a top-level file list that skipped subpackages, so every entry
+  point importing the agent failed on Windows. The package check now scans
+  subpackages too, which is how the omission was found.
+
 ## [0.10.0] - 2026-11-12
 
 ### Added
