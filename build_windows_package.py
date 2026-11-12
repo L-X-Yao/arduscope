@@ -220,12 +220,14 @@ def _load_pyproject(script_dir: str) -> dict:
 
 
 def check_requirements(pins: dict[str, str], pyproject: dict) -> list[str]:
-    """What in pyproject's dependencies and web extra the pins do not meet."""
+    """What in pyproject's dependencies and bundled extras the pins miss."""
     from packaging.requirements import Requirement
 
     project = pyproject["project"]
+    extras = project.get("optional-dependencies", {})
     wanted = (list(project["dependencies"])
-              + project.get("optional-dependencies", {}).get("web", []))
+              + extras.get("web", [])
+              + extras.get("ai", []))
     problems = []
     for text in wanted:
         req = Requirement(text)

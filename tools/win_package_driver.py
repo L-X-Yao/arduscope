@@ -110,6 +110,12 @@ if port_answers():
     sys.exit(1)
 
 proc = start()
+try:
+    page = urllib.request.urlopen(base + "/settings", timeout=10)
+    body = page.read().decode("utf-8", "replace")
+    say(event="settings_page", ok=page.status == 200 and len(body) > 0)
+except Exception as e:
+    say(event="settings_page", ok=False, error=repr(e)[:160])
 files = sorted(os.listdir(inputs))
 sent = [(name, name, None) for name in files]
 sent += [(case, name, "normal.BIN") for case, name in ODD_NAMES.items()]

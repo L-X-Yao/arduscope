@@ -240,6 +240,13 @@ def _python(package: str, args: list[str], timeout: int) -> int:
         return -1
 
 
+def check_agent_sdks(package: str) -> list[dict]:
+    """The online agent's two SDKs have to import in the packaged Python."""
+    code = _python(package, ["-c", "import anthropic, openai"], 120)
+    return [_check("import anthropic and openai", code == 0,
+                   f"exit {code}")]
+
+
 def check_entry_points(package: str) -> list[dict]:
     checks = []
     for name in ENTRY_POINTS:
@@ -292,7 +299,11 @@ def check_web(package: str, work: str, port: int) -> list[dict]:
     with open(results, encoding="utf-8") as f:
         lines = [json.loads(line) for line in f if line.strip()]
     busy = any(line.get("event") == "port_busy" for line in lines)
-    return ([_check(f"port {port} free", not busy)]
+    settings = next((line for line in lines
+                     if line.get("event") == "settings_page"), None)
+    return ([_check(f"port {port} free", not busy),
+             _check("settings page", bool(settings and settings.get("ok")),
+                    (settings or {}).get("error", ""))]
             + judge_uploads(lines))
 
 
@@ -334,6 +345,7 @@ def main(argv: list[str] | None = None) -> int:
                 z.extractall(os.path.join(work, "package"))
             package = os.path.join(work, "package", "arduscope")
             checks += check_runtime(package)
+            checks += check_agent_sdks(package)
             checks += check_entry_points(package)
             checks += check_cli(package, work, plane_log)
             checks += check_web(package, work, args.port)

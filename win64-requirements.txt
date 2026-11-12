@@ -2,9 +2,10 @@
 #
 # build_windows_package.py installs exactly these, with --require-hashes and
 # --no-deps, so two builds of one tag ship the same files. The build stops when
-# a pin does not satisfy pyproject.toml (its dependencies and the "web" extra)
-# or when a library here needs one that is not here. pymavlink's fastcrc and
-# lxml are left out on purpose, see _NOT_BUNDLED in the build script.
+# a pin does not satisfy pyproject.toml (its dependencies and the "web" and
+# "ai" extras) or when a library here needs one that is not here. pymavlink's
+# fastcrc and lxml are left out on purpose, see _NOT_BUNDLED in the build
+# script.
 #
 # To change a pin, hash the wheel pip picks for the package:
 #   pip download --no-deps --only-binary :all: --platform win_amd64 \
@@ -22,3 +23,41 @@ plotly==7.1.0 \
     --hash=sha256:dbb7fa18afce40d0a8e80d1bf162eceb3faa0ce5a77fe741ad09a74cf78f53f3
 pymavlink==2.4.50 \
     --hash=sha256:a2315bddb651d87f4d510e629bdce7d6935355c6031e198d1dfd3c8723db5f5b
+
+# Online analysis agent: the two SDKs and their full closure. Every one is
+# listed because the install uses --no-deps; jiter and pydantic-core have
+# cp314 win_amd64 wheels.
+annotated-types==0.8.0 \
+    --hash=sha256:f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0
+anthropic==2.8.0 \
+    --hash=sha256:76ad332e2d500fc54d0112cf100544ad1a7605e71e092b98d9eb664d2b66e283
+anyio==4.16.0 \
+    --hash=sha256:c66ae634e0b8228396b801741beb3294326d4b6102f7bba4041c0dfb58c29026
+docstring-parser==0.18.0 \
+    --hash=sha256:b3fcbed555c47d8479be0796ef7e19c2670d428d72e96da63f3a40122860374b
+h11==0.16.0 \
+    --hash=sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86
+httpcore2==2.16.0 \
+    --hash=sha256:5c4358319f2602d984ad93182c9fee5160f22e9da7babdda870a5e7c4e2dc34f
+httpx2==2.16.0 \
+    --hash=sha256:fd2c5d7909e8d86fe92d53020c310ca0e4e431b838c207c5754b9bbf0308d49a
+idna==3.20 \
+    --hash=sha256:ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c
+jiter==0.19.0 \
+    --hash=sha256:76cb5b95b07f853911a39835de285da6954f44634890c26dd6ecdfc465fc977c
+openai==3.49.0 \
+    --hash=sha256:3977754792115027ba80ae16996ba3366478b5b228e1ab58e2660bd7ac8c3d78
+opentelemetry-api==1.45.2 \
+    --hash=sha256:2cbd737377e710ee740d261c94e93fa0f08e6d037c18f17513cc0a2d94479a34
+pydantic==2.14.3 \
+    --hash=sha256:3f7b347782ab7e4cf4c798496ae3a82787d9f21ec12676a9c564355eeef8daa8
+pydantic-core==2.50.4 \
+    --hash=sha256:b0cdb655fbd1562c2dfc9986f9103a106f7058cd0915afc6e656d4b1d73f3387
+sniffio==1.3.1 \
+    --hash=sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2
+truststore==0.10.5 \
+    --hash=sha256:9aaaedaefaf06d8b206278cf8b5012bc897f485a874503501e12d776df78951c
+typing-extensions==4.16.0 \
+    --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8
+typing-inspection==0.4.5 \
+    --hash=sha256:bc210535442b39e1bf2805e0c7a17dfd6a4ace760c84c7f7d16245d23a6b1c39
