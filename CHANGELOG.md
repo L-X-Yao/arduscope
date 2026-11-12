@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.10.0] - 2026-11-12
 
 ### Added
 - Online analysis agent: `--ai-agent` on the command line and the "Analyze
