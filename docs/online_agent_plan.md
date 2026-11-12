@@ -202,7 +202,7 @@ SITL 场景：`copter_normal`、`copter_high_vibration`、`copter_gps_glitch`、
 
 | 文件 | 改动 |
 |---|---|
-| `POSITIONING.md`、`POSITIONING_zh.md` 第 6 节 | 重开一项：在线分析 agent，其余仍只修缺陷；中英同步 |
+| `POSITIONING.md`、`POSITIONING_zh.md` 第 6 节 | 重开一项：在线分析 agent（已随 v0.10.0 发布）；中英同步 |
 | `README.md`、`README_zh.md` | 在线分析用法、厂商示例、数据外发说明 |
 | `docs/known_limitations.md` | 删掉「网页和 Windows 包没有大模型」；写清新限制 |
 | `docs/online_agent.md` | 新文件：设置、工具清单、外发数据、降级规则 |
