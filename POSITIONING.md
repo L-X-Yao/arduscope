@@ -111,6 +111,7 @@ Pull requests go through the gates in [CONTRIBUTING.md](CONTRIBUTING.md). One th
 
 ### Finished
 - The offline diagnostic engine: 32 analyzers over the main dimensions, threshold sources in `docs/convergence_criteria.md`, structured `param_suggestions` with `.param` export, audits and tests.
+- The online analysis agent: optional model-driven analysis through read-only tools, with citations; released in v0.10.0. The offline engine remains the authority.
 - Open source: public since 2026-11-11. `pip install .` works (the package is `ardupilot-scope`, released on GitHub only, never on PyPI), the README is in English, and reports come in Chinese and English.
 
 ### Ideas with no schedule

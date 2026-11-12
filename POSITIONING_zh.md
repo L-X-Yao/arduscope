@@ -111,6 +111,7 @@
 
 ### 已完成
 - 离线诊断引擎：32 个分析器覆盖主要诊断维度；METHODIC 阈值来源标注（`docs/convergence_criteria.md`）；`param_suggestions` 结构化输出 + `.param` 导出；代码审计 + 测试覆盖
+- 在线分析 agent：可选的模型分析，走只读工具并带引用；随 v0.10.0 发布。离线引擎仍是权威
 - 开源：2026-11-11 公开。`pip install .` 可安装（包名 `ardupilot-scope`，只发 GitHub Release，不发 PyPI）；英文 README；报告中英双语
 
 ### 没有排期的设想
