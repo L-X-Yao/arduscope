@@ -113,11 +113,20 @@ def pin_differences(bundled: dict[str, str], pins: dict[str, str]) -> list[str]:
 
 
 def source_modules(root: str = REPO_ROOT) -> set[str]:
-    """Modules the package has to ship, as `lib/results`."""
+    """Modules the package has to ship, as `lib/results`, subpackages too.
+
+    A top-level glob here missed lib/agent entirely and let the v0.10.0
+    package pass this check without the module every agent entry point
+    imports.
+    """
     found = set()
     for folder in ("lib", "analyzers"):
-        for path in glob.glob(os.path.join(root, folder, "*.py")):
-            found.add(f"{folder}/{os.path.basename(path)[:-3]}")
+        for path in glob.glob(os.path.join(root, folder, "**", "*.py"),
+                              recursive=True):
+            rel = os.path.relpath(path, root)
+            if "__pycache__" in rel.split(os.sep):
+                continue
+            found.add(rel[:-3].replace(os.sep, "/"))
     return found
 
 

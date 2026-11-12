@@ -92,3 +92,35 @@ def test_declared_python_matches_the_ci_matrix():
     matrix = re.search(r'python-version: \[(.*?)\]', workflow).group(1)
     oldest = re.search(r'"(\d+\.\d+)"', matrix).group(1)
     assert f'requires-python = ">={oldest}"' in PYPROJECT
+
+
+def test_the_package_check_sees_subpackages():
+    """v0.10.0 shipped without lib/agent because both scans were top-level."""
+    import sys
+    sys.path.insert(0, str(ROOT))
+    sys.path.insert(0, str(ROOT / "tools"))
+    import win_package_check
+
+    modules = win_package_check.source_modules(str(ROOT))
+    assert "lib/agent/__init__" in modules
+    assert "lib/agent/tools" in modules
+
+
+def test_the_windows_build_copies_subpackages(tmp_path):
+    import sys
+    sys.path.insert(0, str(ROOT))
+    import build_windows_package as builder
+
+    (tmp_path / "lib" / "agent").mkdir(parents=True)
+    (tmp_path / "lib" / "agent" / "__init__.py").write_text("")
+    (tmp_path / "lib" / "agent" / "tools.py").write_text("")
+    (tmp_path / "analyzers").mkdir()
+    (tmp_path / "analyzers" / "one.py").write_text("")
+
+    out = tmp_path / "out"
+    copied = builder.copy_module_files(str(tmp_path), str(out))
+
+    assert copied == 3
+    assert (out / "lib" / "agent" / "__init__.py").is_file()
+    assert (out / "lib" / "agent" / "tools.py").is_file()
+    assert (out / "analyzers" / "one.py").is_file()

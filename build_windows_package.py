@@ -340,6 +340,28 @@ def _get_compiler(py_ver: str, build_dir: str) -> str:
     )
 
 
+def copy_module_files(script_dir: str, la_dir: str) -> int:
+    """Copy every .py under INCLUDE_DIRS, subpackages included.
+
+    Returns the number of files copied. __pycache__ stays behind; the
+    compile step walks the whole tree afterwards.
+    """
+    file_count = 0
+    for subdir in INCLUDE_DIRS:
+        src_dir = os.path.join(script_dir, subdir)
+        for root, dirs, files in os.walk(src_dir):
+            dirs[:] = sorted(d for d in dirs if d != "__pycache__")
+            rel = os.path.relpath(root, src_dir)
+            dst_dir = (os.path.join(la_dir, subdir) if rel == "."
+                       else os.path.join(la_dir, subdir, rel))
+            os.makedirs(dst_dir, exist_ok=True)
+            for fname in sorted(files):
+                if fname.endswith(".py"):
+                    shutil.copy2(os.path.join(root, fname), dst_dir)
+                    file_count += 1
+    return file_count
+
+
 def _precompile(la_dir: str, py_exe: str) -> int:
     """
     Compile all .py files in la_dir to same-dir .pyc using py_exe.
@@ -662,16 +684,11 @@ def main():
         else:
             print(f"  Warning: {fname} not found")
 
-    # Copy subdirectories (all .py files, auto-discovers new analyzers)
-    file_count = 0
-    for subdir in INCLUDE_DIRS:
-        src_dir = os.path.join(script_dir, subdir)
-        dst_dir = os.path.join(la_dir, subdir)
-        os.makedirs(dst_dir, exist_ok=True)
-        for fname in sorted(os.listdir(src_dir)):
-            if fname.endswith(".py"):
-                shutil.copy2(os.path.join(src_dir, fname), dst_dir)
-                file_count += 1
+    # Copy subdirectories (all .py files, auto-discovers new analyzers and
+    # subpackages such as lib/agent). A top-level listdir here shipped
+    # v0.10.0 without lib/agent, and every entry point that imports it
+    # failed on Windows.
+    file_count = copy_module_files(script_dir, la_dir)
 
     # Copy data directories (locales, etc.) preserving structure
     data_count = 0
