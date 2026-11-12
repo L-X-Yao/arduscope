@@ -33,6 +33,8 @@ from lib.i18n import set_locale, t
 from lib.log_reader import LogReader
 from lib.html_report import ChartRenderError, HtmlReportGenerator
 from lib.ai_diagnosis import generate_diagnosis
+from lib.agent import analyze_with_agent
+from lib.agent.config import config_from_args
 from lib.param_conflict import distinct_values, merge_suggestions
 from lib.pipeline import run_analysis
 from lib.templates import get_template, list_templates
@@ -244,6 +246,14 @@ def main():
         help="Where the API is, for a service other than the provider's "
              "own that speaks the same API. The key goes to this address",
     )
+    parser.add_argument(
+        "--ai-agent",
+        action="store_true",
+        help="Let the model check the analyzer results through read-only "
+             "tools and write the diagnosis. Needs --ai-provider and "
+             "--ai-model; falls back to the single-shot summary when the "
+             "service does not support tool calls",
+    )
     # Kept only to refuse it with an explanation, see below.
     parser.add_argument("--ai-key", help=argparse.SUPPRESS)
     parser.add_argument(
@@ -291,6 +301,9 @@ def main():
     if args.ai_key:
         print(t("cli.err_ai_key_argv",
                 env="ANTHROPIC_API_KEY / OPENAI_API_KEY"), file=sys.stderr)
+        sys.exit(1)
+    if args.ai_agent and args.ai_provider == "rule":
+        print(t("cli.err_agent_with_rule"), file=sys.stderr)
         sys.exit(1)
     if args.ai_provider == "rule":
         # An option that changes nothing is a typo or a wrong belief about
@@ -385,13 +398,20 @@ def main():
     # AI diagnosis (post-pipeline, CLI-specific)
     print(t('cli.stage_report'))
     if not args.no_ai and results_by_key:
-        diagnosis = generate_diagnosis(
-            results_by_key, vehicle_info, health_score,
-            reader.get_flight_duration(),
-            provider=args.ai_provider,
-            model=args.ai_model or "",
-            base_url=args.ai_base_url or "",
-        )
+        if args.ai_agent:
+            diagnosis = analyze_with_agent(
+                pipeline,
+                config_from_args(args.ai_provider, args.ai_model or "",
+                                 args.ai_base_url or ""),
+            )
+        else:
+            diagnosis = generate_diagnosis(
+                results_by_key, vehicle_info, health_score,
+                reader.get_flight_duration(),
+                provider=args.ai_provider,
+                model=args.ai_model or "",
+                base_url=args.ai_base_url or "",
+            )
         results.insert(0, diagnosis)
         print(t("cli.ai_diagnosis", provider=diagnosis.provider, summary=diagnosis.summary))
 

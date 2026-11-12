@@ -63,9 +63,11 @@ def _source_files() -> list[str]:
         full = os.path.join(PROJECT_ROOT, d)
         if not os.path.isdir(full):
             continue
-        for fname in sorted(os.listdir(full)):
-            if fname.endswith(".py"):
-                files.append(os.path.join(full, fname))
+        for root, dirs, names in os.walk(full):
+            dirs[:] = sorted(x for x in dirs if x != "__pycache__")
+            for fname in sorted(names):
+                if fname.endswith(".py"):
+                    files.append(os.path.join(root, fname))
     for name in ("flight_report.py", "multi_report.py", "batch_report.py",
                  "fleet_report.py", "web_app.py"):
         p = os.path.join(PROJECT_ROOT, name)

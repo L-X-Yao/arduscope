@@ -223,3 +223,32 @@ class TestLlmEndpoint:
               str(tmp_path / "out.html"))
 
         assert calls == [("sk-a", "m", "")]
+
+
+class TestAgentFlag:
+    """--ai-agent names a different engine; it must not be a no-op."""
+
+    def test_agent_with_the_rule_engine_is_refused(self, log_path, tmp_path,
+                                                   capsys):
+        out = tmp_path / "out.html"
+
+        with pytest.raises(SystemExit) as stop:
+            _main(log_path, "--ai-agent", "--no-open", "--no-fleet-record",
+                  "--lang", "en", "-o", str(out))
+
+        assert stop.value.code == 1
+        assert "--ai-agent" in capsys.readouterr().err
+        assert not out.exists()
+
+    def test_agent_without_a_model_is_refused(self, log_path, tmp_path,
+                                              capsys):
+        out = tmp_path / "out.html"
+
+        with pytest.raises(SystemExit) as stop:
+            _main(log_path, "--ai-agent", "--ai-provider", "openai",
+                  "--no-open", "--no-fleet-record", "--lang", "en",
+                  "-o", str(out))
+
+        assert stop.value.code == 1
+        assert "model" in capsys.readouterr().err.lower()
+        assert not out.exists()

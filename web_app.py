@@ -59,6 +59,10 @@ from lib.i18n import available_locales, get_locale, set_locale, t
 from lib import fleet_history
 from lib.html_report import HtmlReportGenerator
 from lib.ai_diagnosis import generate_diagnosis
+from lib.agent import analyze_with_agent
+from lib.agent.config import (CONFIG_PATH, ConfigError, load_config,
+                              update_config)
+from lib.agent.providers import NoProviderPackage, test_connection
 from lib.pipeline import run_analysis
 from lib.templates import get_template
 
@@ -93,6 +97,11 @@ _ALLOWED_HOST_NAMES: set[str] = {"localhost"}
 # Bound to every interface, the server cannot know its addresses, but an IP
 # literal in Host cannot be the product of DNS rebinding.
 _ACCEPT_ANY_IP = False
+
+# The settings page writes a key to this machine, so it is served only
+# when the server binds a loopback address. A LAN listener would hand the
+# page to anyone on the network.
+_ALLOW_SETTINGS = True
 
 
 def _configure_allowed_hosts(bind_host: str, extra_names: list[str]) -> None:
@@ -457,7 +466,7 @@ def _analyze_then_free_slot(*args) -> None:
 
 
 def _start_job(job_id: str, save_path: str, filename: str, written: int,
-               template_name: str = "") -> None:
+               template_name: str = "", use_agent: bool = False) -> None:
     """List a saved upload as a job and hand it to an analysis thread.
 
     The caller holds a pending slot, and the thread gives it back. If the
@@ -478,10 +487,14 @@ def _start_job(job_id: str, save_path: str, filename: str, written: int,
             'metrics': None,
             'start_time': time.time(),
             'file_size': written,
+            'agent': use_agent,
+            'agent_calls': 0,
+            'agent_fallback': '',
         }
     worker = threading.Thread(
         target=_analyze_then_free_slot,
-        args=(job_id, save_path, filename, template_name, get_locale()),
+        args=(job_id, save_path, filename, template_name, get_locale(),
+              use_agent),
         daemon=True,
     )
     try:
@@ -491,6 +504,14 @@ def _start_job(job_id: str, save_path: str, filename: str, written: int,
             JOBS.pop(job_id, None)
         _discard(save_path)
         raise
+
+
+def _agent_ready() -> bool:
+    """Whether the agent has a provider, a model and a key."""
+    try:
+        return load_config().is_configured()
+    except ConfigError:
+        return False
 
 
 @app.route('/api/upload', method='POST')
@@ -521,6 +542,10 @@ def upload():
     if template_name and get_template(template_name) is None:
         return _json_error(400, t("web.unknown_template", name=template_name))
 
+    use_agent = qs.get('agent', [''])[0].lower() in ('1', 'true', 'on')
+    if use_agent and not _agent_ready():
+        return _json_error(400, t("web.agent_not_configured"))
+
     refused = _refuse_upload_length()
     if refused:
         return refused
@@ -537,7 +562,8 @@ def upload():
         print(f"  [upload] {filename} ({written / 1024 / 1024:.0f} MB) -> "
               f"{job_id}"
               + (f" [template: {template_name}]" if template_name else ""))
-        _start_job(job_id, save_path, filename, written, template_name)
+        _start_job(job_id, save_path, filename, written, template_name,
+                   use_agent)
         handed_over = True
     finally:
         # Whatever went wrong, the slot goes back: each one that leaked
@@ -704,6 +730,222 @@ def compare_history():
 
     response.content_type = 'application/json'
     return json.dumps({'url': f'/reports/{output_name}'})
+
+
+def _settings_allowed() -> bool:
+    return _ALLOW_SETTINGS
+
+
+def _settings_same_origin() -> bool:
+    """Refuse a POST another site sent from the browser.
+
+    No Origin header is a local tool (curl, a script); the settings server
+    only listens on loopback, so those are the owner's own requests.
+    """
+    origin = request.headers.get("Origin", "")
+    if not origin:
+        return True
+    try:
+        return urlsplit(origin).hostname == request.headers.get("Host", "").split(":")[0]
+    except ValueError:
+        return False
+
+
+def _build_settings_html(config, error: str = "") -> str:
+    data = config.public_dict()
+    lang_code = "zh-CN" if get_locale() == "zh" else "en"
+    key_hint = (t("web.settings_key_hint", hint=data["key_hint"])
+                if data["has_key"] else "")
+    checked = lambda value: " checked" if value else ""
+    options = "".join(
+        f'<option value="{p}"'
+        + (' selected' if p == data.get("provider") else "")
+        + f'>{p}</option>'
+        for p in ("anthropic", "openai"))
+    return f"""<!DOCTYPE html>
+<html lang="{lang_code}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArduScope - {html.escape(t('web.settings_title'))}</title>
+<style>
+body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+background:#1b1f24;color:#e6e6e6;margin:0;padding:24px}}
+.card{{max-width:640px;margin:0 auto;background:#24292f;border-radius:10px;
+padding:24px}}
+h1{{font-size:20px;margin:0 0 18px}}
+label{{display:block;margin:12px 0 4px;font-size:13px;color:#b8c0c8}}
+input[type=text],input[type=password],select{{width:100%;box-sizing:border-box;
+padding:8px;border-radius:6px;border:1px solid #3d444d;background:#0d1117;
+color:#e6e6e6;font-size:14px}}
+.row{{display:flex;gap:12px;margin-top:18px;align-items:center;flex-wrap:wrap}}
+button{{padding:8px 14px;border-radius:6px;border:0;cursor:pointer;font-size:14px}}
+.primary{{background:#2f81f7;color:#fff}} .secondary{{background:#30363d;color:#e6e6e6}}
+.msg{{margin-top:14px;font-size:13px;min-height:18px}}
+.err{{color:#f85149}} .ok{{color:#3fb950}} .hint{{font-size:12px;color:#8b949e;margin-top:6px}}
+.check{{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:13px}}
+a{{color:#58a6ff}}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>{html.escape(t('web.settings_title'))}</h1>
+<p class="hint">{html.escape(t('web.settings_hint', path=CONFIG_PATH))}</p>
+<label for="provider">{html.escape(t('web.settings_provider'))}</label>
+<select id="provider">{options}</select>
+<div class="hint">{html.escape(t('web.settings_provider_hint'))}</div>
+<label for="base_url">{html.escape(t('web.settings_base_url'))}</label>
+<input type="text" id="base_url" value="{html.escape(data.get('base_url', ''))}">
+<label for="model">{html.escape(t('web.settings_model'))}</label>
+<input type="text" id="model" value="{html.escape(data.get('model', ''))}">
+<label for="api_key">{html.escape(t('web.settings_key'))}</label>
+<input type="password" id="api_key" placeholder="{html.escape(key_hint)}">
+<div class="check"><input type="checkbox" id="allow_gps"{checked(data['allow_gps'])}>
+<label for="allow_gps" style="margin:0">{html.escape(t('web.settings_allow_gps'))}</label></div>
+<div class="check"><input type="checkbox" id="allow_serial"{checked(data['allow_serial'])}>
+<label for="allow_serial" style="margin:0">{html.escape(t('web.settings_allow_serial'))}</label></div>
+<div class="check"><input type="checkbox" id="allow_text"{checked(data['allow_text'])}>
+<label for="allow_text" style="margin:0">{html.escape(t('web.settings_allow_text'))}</label></div>
+<div class="check"><input type="checkbox" id="clear_key">
+<label for="clear_key" style="margin:0">{html.escape(t('web.settings_clear_key'))}</label></div>
+<div class="row">
+<button class="primary" onclick="saveSettings()">{html.escape(t('web.settings_save'))}</button>
+<button class="secondary" onclick="testSettings()">{html.escape(t('web.settings_test'))}</button>
+<a href="/">{html.escape(t('web.settings_back'))}</a>
+</div>
+<div class="msg" id="msg">{html.escape(error)}</div>
+</div>
+<script>
+const I18N = {json.dumps({
+    "saved": t("web.settings_saved"),
+    "test_ok": t("web.settings_test_ok"),
+    "test_failed": t("web.settings_test_failed", error="{error}"),
+    "error": t("web.settings_error", error="{error}"),
+    "testing": t("web.settings_testing"),
+}, ensure_ascii=False)};
+function values() {{
+  return {{
+    provider: document.getElementById('provider').value,
+    base_url: document.getElementById('base_url').value.trim(),
+    model: document.getElementById('model').value.trim(),
+    api_key: document.getElementById('api_key').value,
+    allow_gps: document.getElementById('allow_gps').checked,
+    allow_serial: document.getElementById('allow_serial').checked,
+    allow_text: document.getElementById('allow_text').checked,
+    egress_ack: true,
+    clear_key: document.getElementById('clear_key').checked,
+  }};
+}}
+function show(text, ok) {{
+  const el = document.getElementById('msg');
+  el.textContent = text; el.className = 'msg ' + (ok ? 'ok' : 'err');
+}}
+async function post(url) {{
+  const r = await fetch(url, {{method:'POST', headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify(values())}});
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || r.status);
+  return data;
+}}
+async function saveSettings() {{
+  try {{ await post('/api/settings'); show(I18N.saved, true); }}
+  catch (e) {{ show(I18N.error.replace('{error}', e.message), false); }}
+}}
+async function testSettings() {{
+  show(I18N.testing, true);
+  try {{
+    const data = await post('/api/settings/test');
+    show(data.ok ? I18N.test_ok : I18N.test_failed.replace('{error}', data.error || ''), data.ok);
+  }} catch (e) {{ show(I18N.test_failed.replace('{error}', e.message), false); }}
+}}
+</script>
+</body>
+</html>"""
+
+
+@app.route('/settings')
+def settings_page():
+    if not _settings_allowed():
+        abort(404, t("web.settings_only_local"))
+    try:
+        config = load_config()
+    except ConfigError as e:
+        config = None
+        return _build_settings_html(_empty_agent_config(), error=str(e))
+    return _build_settings_html(config)
+
+
+def _empty_agent_config():
+    from lib.agent.config import AgentConfig
+    return AgentConfig()
+
+
+@app.route('/api/settings')
+def settings_get():
+    if not _settings_allowed():
+        abort(404, t("web.settings_only_local"))
+    response.content_type = 'application/json'
+    try:
+        return json.dumps(load_config().public_dict(), ensure_ascii=False)
+    except ConfigError as e:
+        return _json_error(500, str(e))
+
+
+@app.route('/api/settings', method='POST')
+def settings_post():
+    if not _settings_allowed() or not _settings_same_origin():
+        abort(404, t("web.settings_only_local"))
+    data = _json_object()
+    if data is None:
+        return _json_error(400, t("web.invalid_json"))
+    provider = str(data.get("provider") or "")
+    model = str(data.get("model") or "").strip()
+    base_url = str(data.get("base_url") or "").strip()
+    if provider not in ("anthropic", "openai"):
+        return _json_error(400, t("web.settings_provider"))
+    if not model:
+        return _json_error(400, t("web.settings_model"))
+    if base_url and not base_url.startswith(("http://", "https://")):
+        return _json_error(400, t("web.settings_base_url"))
+    try:
+        config = load_config()
+        config = update_config(config, data)
+    except (ConfigError, OSError) as e:
+        return _json_error(500, t("web.settings_error", error=e))
+    response.content_type = 'application/json'
+    return json.dumps(config.public_dict(), ensure_ascii=False)
+
+
+@app.route('/api/settings/test', method='POST')
+def settings_test():
+    if not _settings_allowed() or not _settings_same_origin():
+        abort(404, t("web.settings_only_local"))
+    response.content_type = 'application/json'
+    data = _json_object()
+    if data is None:
+        return _json_error(400, t("web.invalid_json"))
+    try:
+        saved = load_config()
+    except ConfigError as e:
+        return _json_error(500, t("web.settings_error", error=e))
+    from dataclasses import replace
+    candidate = replace(
+        saved,
+        provider=str(data.get("provider") or saved.provider),
+        base_url=str(data.get("base_url", saved.base_url) or "").strip(),
+        model=str(data.get("model", saved.model) or "").strip(),
+        api_key=(str(data["api_key"]).strip()
+                 if str(data.get("api_key") or "").strip()
+                 else saved.api_key),
+    )
+    if not candidate.is_configured():
+        return json.dumps({"ok": False,
+                           "error": t("web.agent_not_configured")})
+    try:
+        ok, message = test_connection(candidate)
+    except NoProviderPackage as e:
+        return json.dumps({"ok": False, "error": str(e)})
+    return json.dumps({"ok": ok, "error": "" if ok else message})
 
 
 @app.route('/reports/<filepath:path>')
@@ -874,7 +1116,8 @@ def _append_history(job: dict):
 
 
 def _run_analysis(job_id: str, filepath: str, original_name: str,
-                   template_name: str = "", locale: str = ""):
+                   template_name: str = "", locale: str = "",
+                   use_agent: bool = False):
     """Run the full analysis pipeline for a single .BIN file."""
     # The worker runs in its own thread; the before_request hook does not
     # fire here, and the i18n locale is thread-local, so re-apply the UI
@@ -927,10 +1170,43 @@ def _run_analysis(job_id: str, filepath: str, original_name: str,
         _update_job(job_id, message=t("web.ai_diagnosis"), progress=85)
         if results_by_key:
             try:
-                diagnosis = generate_diagnosis(
-                    results_by_key, vehicle_info, health_score,
-                    reader.get_flight_duration(),
-                )
+                if use_agent:
+                    try:
+                        agent_config = load_config()
+                    except ConfigError as e:
+                        agent_config = None
+                        _update_job(job_id, agent_fallback=str(e))
+                    if agent_config is not None and agent_config.is_configured():
+                        _update_job(job_id,
+                                    message=t("web.agent_analyzing"),
+                                    progress=85)
+
+                        def _on_agent(event):
+                            if event.get("stage") == "tool":
+                                _update_job(
+                                    job_id,
+                                    message=t("web.agent_tool",
+                                              tool=event.get("tool", ""),
+                                              calls=event.get("calls", 0)),
+                                    agent_calls=event.get("calls", 0))
+                            elif event.get("stage") == "fallback":
+                                _update_job(job_id,
+                                            agent_fallback=event.get("reason", ""))
+
+                        diagnosis = analyze_with_agent(
+                            pipeline, agent_config, on_event=_on_agent)
+                    else:
+                        diagnosis = generate_diagnosis(
+                            results_by_key, vehicle_info, health_score,
+                            reader.get_flight_duration(),
+                        )
+                        diagnosis.details.insert(
+                            0, html.escape(t("web.agent_not_configured")))
+                else:
+                    diagnosis = generate_diagnosis(
+                        results_by_key, vehicle_info, health_score,
+                        reader.get_flight_duration(),
+                    )
                 results.insert(0, diagnosis)
             except Exception:
                 pass
@@ -1121,6 +1397,11 @@ body{
     cursor:pointer;
 }
 .template-bar select:focus{outline:none;border-color:#409eff}
+.template-bar .agent-check{
+    display:flex;align-items:center;gap:6px;white-space:nowrap;
+    cursor:pointer;color:var(--text-secondary);font-size:13px;
+}
+.template-bar .agent-check input{cursor:pointer}
 
 /* ---- Upload zone ---- */
 .upload-zone{
@@ -1286,6 +1567,11 @@ body{
         <a class="nav-fleet" href="/fleet">"""
     + t("web.nav_fleet")
     + r"""</a>
+        """
+    + (f'<a class="nav-fleet" href="/settings">'
+       f'{html.escape(t("web.nav_settings"))}</a>'
+       if _ALLOW_SETTINGS else "")
+    + r"""
         <button onclick="switchLang('zh')" """
     + ('class="active"' if get_locale() == "zh" else '')
     + r""">中文</button>
@@ -1321,6 +1607,11 @@ body{
     + t("web.template_copter_factory")
     + r"""</option>
         </select>
+        <label class="agent-check">
+            <input type="checkbox" id="agent-check"> """
+    + t("web.agent_checkbox")
+    + r"""
+        </label>
     </div>
     <div class="upload-zone" id="upload-zone"
          onclick="document.getElementById('file-input').click()">
@@ -1397,6 +1688,8 @@ const I18N = """
         "js.history_date_group": t("history.date_group"),
         "js.file_too_large": t("web.file_too_large",
                                max_mb=MAX_UPLOAD_BYTES // 1024 // 1024),
+        "js.agent_confirm": t("web.agent_egress_confirm"),
+        "js.agent_tag": t("web.agent_tag"),
     }, ensure_ascii=False)
     + f";\nconst MAX_UPLOAD_BYTES = {MAX_UPLOAD_BYTES};"
     + r"""
@@ -1453,6 +1746,18 @@ async function switchLang(lang) {
 /* =================== State =================== */
 let pollTimer = null;
 
+/* The agent choice survives a reload. The first tick asks what leaves
+   the machine; saying no leaves the choice off. */
+const agentCheck = document.getElementById('agent-check');
+agentCheck.checked = localStorage.getItem('arduscope_agent') === '1';
+agentCheck.addEventListener('change', () => {
+    if (agentCheck.checked && localStorage.getItem('arduscope_agent_ack') !== '1') {
+        if (!confirm(I18N['js.agent_confirm'])) { agentCheck.checked = false; return; }
+        localStorage.setItem('arduscope_agent_ack', '1');
+    }
+    localStorage.setItem('arduscope_agent', agentCheck.checked ? '1' : '0');
+});
+
 /* =================== Upload =================== */
 const zone = document.getElementById('upload-zone');
 const fileInput = document.getElementById('file-input');
@@ -1495,6 +1800,7 @@ async function uploadOneFile(file) {
         const tpl = document.getElementById('template-select').value;
         let url = '/api/upload?filename=' + encodeURIComponent(file.name);
         if (tpl) url += '&template=' + encodeURIComponent(tpl);
+        if (document.getElementById('agent-check').checked) url += '&agent=1';
         const resp = await fetch(url, {
             method: 'POST',
             body: file,
@@ -1596,6 +1902,13 @@ function renderJobCard(job) {
         elapsedTag = `<span class="vehicle-tag">${job.elapsed}s</span>`;
     }
 
+    /* online analysis: shown while it runs and after it finishes */
+    let agentTag = '';
+    if (job.agent) {
+        const calls = job.agent_calls ? ' ' + job.agent_calls : '';
+        agentTag = `<span class="vehicle-tag">${I18N['js.agent_tag']}${calls}</span>`;
+    }
+
     /* analyzer dots */
     let dots = '';
     if (job.analyzer_results) {
@@ -1610,6 +1923,8 @@ function renderJobCard(job) {
     let err = '';
     if (job.status === 'error') {
         err = `<div class="error-msg">${esc(job.message)}</div>`;
+    } else if (job.agent_fallback) {
+        err = `<div class="error-msg">${esc(job.agent_fallback)}</div>`;
     } else if (job.archive_warning) {
         err = `<div class="error-msg">${esc(job.archive_warning)}</div>`;
     }
@@ -1629,7 +1944,7 @@ function renderJobCard(job) {
 
     return `<div class="job-card ${cls}">
         <div class="job-header">
-            <span class="job-filename">${esc(job.filename)}</span>${sizeTag}${veh}${score}${elapsedTag}
+            <span class="job-filename">${esc(job.filename)}</span>${sizeTag}${veh}${score}${agentTag}${elapsedTag}
         </div>
         ${prog}${dots}${err}${act}
     </div>`;
@@ -2039,8 +2354,9 @@ def main():
     MAX_KEPT_REPORTS = args.keep_reports
 
     from lib.i18n import set_locale
-    global _UI_LOCALE, REPORT_DIR, HISTORY_FILE
+    global _UI_LOCALE, REPORT_DIR, HISTORY_FILE, _ALLOW_SETTINGS
     _UI_LOCALE = args.lang
+    _ALLOW_SETTINGS = _is_loopback(args.host)
     set_locale(args.lang)
     # The fleet archive and analysis history live here, so the default has
     # to be the same directory on every start, from any working directory.
