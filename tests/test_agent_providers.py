@@ -139,3 +139,50 @@ def test_openai_api_error_is_a_provider_error(monkeypatch):
     monkeypatch.setitem(sys.modules, "openai", fake)
     with pytest.raises(ProviderError):
         OpenAIAdapter(CONFIG).complete("s", [], TOOLS)
+
+
+def test_client_construction_error_is_a_provider_error(monkeypatch):
+    def boom(**kwargs):
+        raise RuntimeError("missing credentials")
+
+    fake = SimpleNamespace(OpenAI=boom)
+    monkeypatch.setitem(sys.modules, "openai", fake)
+    with pytest.raises(ProviderError):
+        OpenAIAdapter(CONFIG)
+
+
+def test_openai_sends_an_output_cap(monkeypatch):
+    reply = SimpleNamespace(
+        choices=[SimpleNamespace(
+            finish_reason="stop",
+            message=SimpleNamespace(content="done", tool_calls=None))],
+        usage=None)
+    messages = _FakeMessages(reply=reply)
+    fake = SimpleNamespace(OpenAI=lambda **kw: SimpleNamespace(
+        chat=SimpleNamespace(completions=messages)))
+    monkeypatch.setitem(sys.modules, "openai", fake)
+    OpenAIAdapter(CONFIG).complete("s", [], TOOLS)
+    assert messages.requests[0]["max_tokens"] > 0
+
+
+def test_openai_retries_with_the_other_cap_name(monkeypatch):
+    reply = SimpleNamespace(
+        choices=[SimpleNamespace(
+            finish_reason="stop",
+            message=SimpleNamespace(content="done", tool_calls=None))],
+        usage=None)
+
+    class _TwoStep(_FakeMessages):
+        def create(self, **kwargs):
+            self.requests.append(kwargs)
+            if "max_tokens" in kwargs:
+                raise ValueError("max_tokens is not supported")
+            return reply
+
+    messages = _TwoStep()
+    fake = SimpleNamespace(OpenAI=lambda **kw: SimpleNamespace(
+        chat=SimpleNamespace(completions=messages)))
+    monkeypatch.setitem(sys.modules, "openai", fake)
+    turn = OpenAIAdapter(CONFIG).complete("s", [], TOOLS)
+    assert turn.text == "done"
+    assert "max_completion_tokens" in messages.requests[1]

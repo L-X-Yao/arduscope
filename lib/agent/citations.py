@@ -39,6 +39,7 @@ class Submission:
     summary: str
     observations: list[Observation]
     unverified_count: int
+    summary_unverified: bool = False
 
 
 def _numbers(text: str) -> list[float]:
@@ -58,10 +59,48 @@ def _content_numbers(records: list[ToolRecord]) -> list[float]:
     return values
 
 
+def _close(value: float, other: float) -> bool:
+    return abs(value - other) <= max(0.01, abs(value) * 0.01)
+
+
+def _unique_numbers(known: list[float]) -> list[float]:
+    seen = set()
+    unique = []
+    for value in known:
+        key = round(value, 6)
+        if key not in seen:
+            seen.add(key)
+            unique.append(value)
+    return unique
+
+
 def _matches(value: float, known: list[float]) -> bool:
-    for other in known:
-        if abs(value - other) <= max(0.01, abs(value) * 0.01):
-            return True
+    """The number, or a simple arithmetic result from two cited numbers.
+
+    A model that writes a difference, a percentage or a ratio is still
+    grounded when both operands are in the cited result; refusing those
+    would mark honest arithmetic as invented. With a long message series
+    the pair check would be quadratic, so it is skipped there: a derived
+    figure is then unverified unless it is also a raw value.
+    """
+    known = _unique_numbers(known)
+    if any(_close(value, other) for other in known):
+        return True
+    if len(known) > 200:
+        return False
+    for i, left in enumerate(known):
+        for right in known[i + 1:]:
+            candidates = [left + right, abs(left - right), left * right]
+            if right:
+                candidates.append(abs(left / right))
+                candidates.append(abs(left / right) * 100.0)
+                candidates.append(abs(left - right) / abs(right) * 100.0)
+            if left:
+                candidates.append(abs(right / left))
+                candidates.append(abs(right / left) * 100.0)
+                candidates.append(abs(left - right) / abs(left) * 100.0)
+            if any(_close(value, candidate) for candidate in candidates):
+                return True
     return False
 
 
@@ -87,24 +126,37 @@ def validate(raw: dict, records: list[ToolRecord]) -> Submission:
         kind = str(row.get("kind") or "observation")
         if kind not in ("observation", "correlation", "data_gap"):
             kind = "observation"
+        is_gap = kind == "data_gap"
         cites: list[int] = []
         reason = ""
         for cite in row.get("cites") or []:
             if isinstance(cite, bool) or not isinstance(cite, int):
-                reason = "bad_citation"
+                if not is_gap:
+                    reason = "bad_citation"
                 continue
             if cite not in by_seq:
-                reason = "unknown_citation"
+                if not is_gap:
+                    reason = "unknown_citation"
                 continue
-            if by_seq[cite].is_error:
+            if by_seq[cite].is_error and not is_gap:
                 reason = "error_citation"
                 continue
             if cite not in cites:
                 cites.append(cite)
 
-        if not cites and not reason:
+        if is_gap:
+            # A data gap names what is missing. It needs no citation, and
+            # its evidence is often an error, but a figure it repeats must
+            # still exist somewhere in the tool results.
+            known = _content_numbers([record for record in records
+                                      if not record.is_error])
+            for value in _numbers(text):
+                if not _matches(value, known):
+                    reason = "number_not_in_citation"
+                    break
+        elif not cites and not reason:
             reason = "no_citation"
-        if cites:
+        elif cites:
             known = _content_numbers([by_seq[c] for c in cites])
             for value in _numbers(text):
                 if not _matches(value, known):
@@ -119,8 +171,13 @@ def validate(raw: dict, records: list[ToolRecord]) -> Submission:
             unverified += 1
         observations.append(observation)
 
+    known = _content_numbers([record for record in records
+                              if not record.is_error])
+    summary_unverified = any(not _matches(value, known)
+                             for value in _numbers(summary))
     return Submission(summary=summary, observations=observations,
-                      unverified_count=unverified)
+                      unverified_count=unverified,
+                      summary_unverified=summary_unverified)
 
 
 def records_as_text(records: list[ToolRecord]) -> str:

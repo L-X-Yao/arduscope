@@ -12,6 +12,11 @@ from dataclasses import dataclass, field
 
 from .config import AgentConfig
 
+# A tool-calling reply is a short explanation, not a page. The cap also
+# bounds how long a service can spend generating one; without it a model
+# that decides to write an essay can hold a run far past its time budget.
+AGENT_MAX_TOKENS = 8192
+
 
 class ProviderError(RuntimeError):
     """The request failed. The caller falls back and says why."""
@@ -64,7 +69,10 @@ class AnthropicAdapter(_Adapter):
         kwargs = {"api_key": config.resolved_key(), "timeout": 120.0}
         if config.base_url:
             kwargs["base_url"] = config.base_url
-        self._client = anthropic.Anthropic(**kwargs)
+        try:
+            self._client = anthropic.Anthropic(**kwargs)
+        except Exception as e:  # noqa: BLE001 - the SDK raises its own types
+            raise ProviderError(str(e)[:300]) from e
         self._model = config.model
 
     def complete(self, system: str, messages: list, tools: list) -> Turn:
@@ -106,7 +114,7 @@ class AnthropicAdapter(_Adapter):
         try:
             reply = self._client.messages.create(
                 model=self._model,
-                max_tokens=16000,
+                max_tokens=AGENT_MAX_TOKENS,
                 system=system,
                 messages=converted,
                 tools=api_tools,
@@ -143,7 +151,10 @@ class OpenAIAdapter(_Adapter):
         kwargs = {"api_key": config.resolved_key(), "timeout": 120.0}
         if config.base_url:
             kwargs["base_url"] = config.base_url
-        self._client = openai.OpenAI(**kwargs)
+        try:
+            self._client = openai.OpenAI(**kwargs)
+        except Exception as e:  # noqa: BLE001 - the SDK raises its own types
+            raise ProviderError(str(e)[:300]) from e
         self._model = config.model
 
     def complete(self, system: str, messages: list, tools: list) -> Turn:
@@ -176,16 +187,30 @@ class OpenAIAdapter(_Adapter):
                                    "description": tool["description"],
                                    "parameters": tool["parameters"]}}
                      for tool in tools]
-        try:
-            reply = self._client.chat.completions.create(
+        def _create(extra: dict):
+            return self._client.chat.completions.create(
                 model=self._model,
                 messages=converted,
                 tools=api_tools,
+                **extra,
             )
+
+        try:
+            reply = _create({"max_tokens": AGENT_MAX_TOKENS})
         except Exception as e:  # noqa: BLE001 - SDK raises many types
-            if _looks_like_tool_refusal(e):
+            text = str(e).lower()
+            if "max_tokens" in text or "max_completion_tokens" in text:
+                try:
+                    reply = _create(
+                        {"max_completion_tokens": AGENT_MAX_TOKENS})
+                except Exception as e2:  # noqa: BLE001
+                    if _looks_like_tool_refusal(e2):
+                        raise NoToolSupport(str(e2)[:300]) from e2
+                    raise ProviderError(str(e2)[:300]) from e2
+            elif _looks_like_tool_refusal(e):
                 raise NoToolSupport(str(e)[:300]) from e
-            raise ProviderError(str(e)[:300]) from e
+            else:
+                raise ProviderError(str(e)[:300]) from e
 
         choices = getattr(reply, "choices", None) or []
         if not choices:

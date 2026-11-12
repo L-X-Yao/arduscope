@@ -848,7 +848,11 @@ async function post(url) {{
   return data;
 }}
 async function saveSettings() {{
-  try {{ await post('/api/settings'); show(I18N.saved, true); }}
+  try {{
+    await post('/api/settings');
+    document.getElementById('api_key').value = '';
+    show(I18N.saved, true);
+  }}
   catch (e) {{ show(I18N.error.replace('{error}', e.message), false); }}
 }}
 async function testSettings() {{

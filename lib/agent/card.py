@@ -70,8 +70,11 @@ def _build_details(run, config: AgentConfig) -> list[str]:
 
 def _build_card(run, pipeline, config: AgentConfig) -> AnalysisResult:
     status = _worst_status(pipeline.results_by_key)
-    summary = run.submission.summary[:300] or t(
-        "agent.summary_fallback", count=len(run.submission.observations))
+    summary = (run.submission.summary[:300]
+               or t("agent.summary_fallback",
+                    count=len(run.submission.observations)))
+    if run.submission.summary_unverified:
+        summary = f"[{t('agent.unverified_mark')}] {summary}"
     return AnalysisResult(
         title=t("agent.card_title"),
         status=status,

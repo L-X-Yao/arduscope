@@ -134,3 +134,59 @@ def test_submit_spec_is_offered_with_the_tools():
     ])
     run_agent(_pipeline(), CONFIG, provider=provider)
     assert SUBMIT_SPEC["name"] in provider.seen_tools[0]
+
+
+def test_an_unverified_summary_is_marked_on_the_card():
+    from lib.agent.citations import Observation, Submission
+    from lib.agent.card import _build_card
+    from lib.agent.loop import AgentRun
+    run = AgentRun(
+        submission=Submission(summary="the peak was 99", observations=[
+            Observation(text="vibration is high", cites=[1])],
+            unverified_count=0, summary_unverified=True),
+        records=[], turns=1, input_tokens=0, output_tokens=0,
+        elapsed=0.0, provider="openai", model="m")
+    card = _build_card(run, _pipeline(), CONFIG)
+    assert "the peak was 99" in card.summary
+    assert card.summary != "the peak was 99"
+
+
+def test_an_unverified_submission_is_sent_back_once():
+    provider = _FakeProvider([
+        Turn(tool_calls=[ToolCall(id="a", name="list_results",
+                                  arguments={})]),
+        _submission(text="there are 99 results", cites=(1,)),
+        _submission(text="there is 1 result", cites=(1,)),
+    ])
+    run = run_agent(_pipeline(), CONFIG, provider=provider)
+    assert run.submission.unverified_count == 0
+    assert run.turns == 3
+
+
+def _empty_submission():
+    return Turn(tool_calls=[ToolCall(
+        id="s0", name="submit_analysis",
+        arguments={"summary": "", "observations": []})])
+
+
+def test_an_empty_submission_is_sent_back_once():
+    provider = _FakeProvider([
+        Turn(tool_calls=[ToolCall(id="a", name="list_results",
+                                  arguments={})]),
+        _empty_submission(),
+        _submission(text="there is 1 result", cites=(1,)),
+    ])
+    run = run_agent(_pipeline(), CONFIG, provider=provider)
+    assert run.submission.observations
+    assert run.turns == 3
+
+
+def test_two_empty_submissions_fall_back():
+    provider = _FakeProvider([
+        Turn(tool_calls=[ToolCall(id="a", name="list_results",
+                                  arguments={})]),
+        _empty_submission(),
+        _empty_submission(),
+    ])
+    with pytest.raises(AgentError):
+        run_agent(_pipeline(), CONFIG, provider=provider)

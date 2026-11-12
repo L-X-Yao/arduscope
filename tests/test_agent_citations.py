@@ -85,3 +85,84 @@ def test_rounded_numbers_match():
                           "kind": "observation"}],
     }, [_record()])
     assert submission.unverified_count == 0
+
+
+def test_a_difference_of_two_cited_numbers_is_verified():
+    submission = validate({
+        "summary": "ok",
+        "observations": [{"text": "the difference is 7.7", "cites": [1],
+                          "kind": "observation"}],
+    }, [_record(content={"low": 2.3, "high": 10.0})])
+    assert submission.unverified_count == 0
+
+
+def test_a_percentage_of_two_cited_numbers_is_verified():
+    submission = validate({
+        "summary": "ok",
+        "observations": [{"text": "the difference is 50 percent", "cites": [1],
+                          "kind": "observation"}],
+    }, [_record(content={"a": 10, "b": 20})])
+    assert submission.unverified_count == 0
+
+
+def test_zero_values_do_not_break_the_arithmetic_check():
+    submission = validate({
+        "summary": "ok",
+        "observations": [{"text": "the difference is 5", "cites": [1],
+                          "kind": "observation"}],
+    }, [_record(content={"a": 0, "b": 5})])
+    assert submission.unverified_count == 0
+
+
+def test_a_data_gap_needs_no_citation():
+    submission = validate({
+        "summary": "ok",
+        "observations": [{"text": "no FFT data is in the log", "cites": [],
+                          "kind": "data_gap"}],
+    }, [])
+    assert submission.unverified_count == 0
+
+
+def test_a_data_gap_may_cite_an_error():
+    submission = validate({
+        "summary": "ok",
+        "observations": [{"text": "the spectrum call failed", "cites": [1],
+                          "kind": "data_gap"}],
+    }, [_record(is_error=True)])
+    assert submission.unverified_count == 0
+
+
+def test_a_ratio_as_a_percentage_is_verified():
+    submission = validate({
+        "summary": "ok",
+        "observations": [{"text": "about 70 percent of the limit", "cites": [1],
+                          "kind": "observation"}],
+    }, [_record(content={"value": 20.9, "limit": 30.0})])
+    assert submission.unverified_count == 0
+
+
+def test_a_summary_number_outside_every_citation_is_flagged():
+    submission = validate({
+        "summary": "the peak was 99.0",
+        "observations": [{"text": "vibration is high", "cites": [1],
+                          "kind": "observation"}],
+    }, [_record()])
+    assert submission.summary_unverified is True
+
+
+def test_a_summary_number_inside_a_citation_is_verified():
+    submission = validate({
+        "summary": "the value was 12.3",
+        "observations": [{"text": "vibration is high", "cites": [1],
+                          "kind": "observation"}],
+    }, [_record()])
+    assert submission.summary_unverified is False
+
+
+def test_a_data_gap_cannot_invent_a_number():
+    submission = validate({
+        "summary": "ok",
+        "observations": [{"text": "the missing peak was 99.0", "cites": [],
+                          "kind": "data_gap"}],
+    }, [])
+    assert submission.unverified_count == 1

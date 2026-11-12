@@ -55,8 +55,8 @@ environment variable before starting.
 | `get_threshold` | Threshold value and its source note | 1 KB |
 
 Total tool output per run is capped at 120 KB. The run is capped at 20 tool
-calls and 5 minutes by default. The report card shows the tool calls, token
-usage and every unverified observation.
+calls, 5 minutes and 8192 output tokens per reply by default. The report card
+shows the tool calls, token usage and every unverified observation.
 
 ## What leaves the machine
 
@@ -86,17 +86,32 @@ environment variables take precedence.
 | Network error or timeout | single-shot summary; then rule engine |
 | Tool budget exhausted | finish with what exists; no data → single-shot |
 | Malformed submission | one retry, then single-shot |
+| Untraced numbers | the model is asked to rewrite once; whatever remains is marked unverified |
 | Tool error | error returned to the model; the loop continues |
 
 The card's status is always the worst offline status, and its verdict is
 never the model's.
+
+## Acceptance check
+
+```bash
+OPENAI_API_KEY=... python3 tools/agent_eval.py \
+  --provider openai --model deepseek-flash \
+  --base-url https://api.deepseek.com --repeats 3
+```
+
+It runs the eight scenarios in `tests/sitl/logs`, three times each, and fails
+on a run that errors, an unverified observation, or a fault scenario whose
+fault is not named. Results go to `reports/agent-eval/`.
 
 ## Limitations
 
 - No follow-up questions in v1. The web server deletes the upload when the
   analysis ends, so a conversation would need the log kept.
 - Batch, multi-log and fleet reports use the offline engine only.
-- Citations catch numbers that do not appear in the cited tool result. A
+- Citations catch numbers that do not appear in the cited tool result, or
+  follow from simple arithmetic on two cited numbers. The summary is marked
+  too when it carries a number that is in none of the tool results. A
   qualitative claim can still be wrong; the card marks only what it can check.
 - Real services have not all been tested. DeepSeek is the tested one; other
   OpenAI-compatible services and Anthropic's own service need a run with a key.

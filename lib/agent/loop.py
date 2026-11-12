@@ -136,6 +136,8 @@ def run_agent(pipeline, config: AgentConfig, provider=None,
     tools = list(TOOL_SPECS) + [SUBMIT_SPEC]
     asked_to_submit = False
     budget_hit = False
+    retried_citations = False
+    retried_empty = False
 
     for _turn in range(max(4, int(config.max_tool_calls) + 4)):
         if time.monotonic() > deadline:
@@ -157,9 +159,11 @@ def run_agent(pipeline, config: AgentConfig, provider=None,
             messages.append({"role": "assistant", "text": reply.text,
                              "tool_calls": reply.tool_calls})
             submitted = None
+            submitted_call = None
             for call in reply.tool_calls:
                 if call.name == "submit_analysis":
                     submitted = call.arguments
+                    submitted_call = call
                     continue
                 if (len(state.records) >= int(config.max_tool_calls)
                         or toolbox.exhausted):
@@ -184,8 +188,40 @@ def run_agent(pipeline, config: AgentConfig, provider=None,
                     "content": f"[call {record.seq}] {record.content}",
                 })
             if submitted is not None:
+                submission = validate(submitted, state.records)
+                if (not submission.summary and not submission.observations
+                        and not retried_empty and submitted_call):
+                    retried_empty = True
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": submitted_call.id,
+                        "name": "submit_analysis",
+                        "content": t("agent.empty_submission"),
+                    })
+                    tools = [SUBMIT_SPEC]
+                    continue
+                if not submission.summary and not submission.observations:
+                    raise AgentError(t("agent.error_no_submission"),
+                                     partial=state.records)
+                if ((submission.unverified_count
+                     or submission.summary_unverified)
+                        and not retried_citations and submitted_call):
+                    retried_citations = True
+                    bad = [o.text[:200] for o in submission.observations
+                           if o.unverified][:5]
+                    if submission.summary_unverified:
+                        bad.append(t("agent.summary_label"))
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": submitted_call.id,
+                        "name": "submit_analysis",
+                        "content": t("agent.retry_citation",
+                                     items=" | ".join(bad)),
+                    })
+                    tools = [SUBMIT_SPEC]
+                    continue
                 return AgentRun(
-                    submission=validate(submitted, state.records),
+                    submission=submission,
                     records=state.records, turns=state.turns,
                     input_tokens=state.input_tokens,
                     output_tokens=state.output_tokens,
