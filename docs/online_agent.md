@@ -39,7 +39,8 @@ wins.
 
 The settings page is served only when `--host` is a loopback address. On a LAN
 listener it returns 404; put the key in `~/.arduscope/agent.json` or an
-environment variable before starting.
+environment variable before starting. The Windows zip carries both SDKs, so
+the web switch works there without `pip install`.
 
 ## Tools the model may call
 

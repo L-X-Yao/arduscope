@@ -113,8 +113,9 @@ ANTHROPIC_API_KEY=... python3 flight_report.py --ai-agent --ai-provider anthropi
 
 The web interface has the same switch: set the provider, address, model and key
 on `/settings`, then tick "Analyze with a model" before uploading. The settings
-page is served only when the server listens on this machine. What may leave the
-machine, and the defaults, are in [docs/online_agent.md](docs/online_agent.md).
+page is served only when the server listens on this machine. The Windows zip
+already carries both SDKs, so no `pip install` is needed there. What may leave
+the machine, and the defaults, are in [docs/online_agent.md](docs/online_agent.md).
 
 ## Analyzers
 

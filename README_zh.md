@@ -107,8 +107,9 @@ ANTHROPIC_API_KEY=... python3 flight_report.py --ai-agent --ai-provider anthropi
 ```
 
 网页界面有同样的开关：在 `/settings` 填接口、地址、模型和密钥，上传前勾选
-“用模型分析”。设置页只在服务器监听本机时开放。会外发哪些数据、默认值是什么，
-见 [docs/online_agent.md](docs/online_agent.md)。
+“用模型分析”。设置页只在服务器监听本机时开放。Windows 包已经带上两个 SDK，
+不需要再 `pip install`。会外发哪些数据、默认值是什么，见
+[docs/online_agent.md](docs/online_agent.md)。
 
 ## 分析器
 
