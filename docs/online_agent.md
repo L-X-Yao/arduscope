@@ -113,8 +113,10 @@ fault is not named. Results go to `reports/agent-eval/`.
   follow from simple arithmetic on two cited numbers. The summary is marked
   too when it carries a number that is in none of the tool results. A
   qualitative claim can still be wrong; the card marks only what it can check.
-- Real services have not all been tested. DeepSeek is the tested one; other
-  OpenAI-compatible services and Anthropic's own service need a run with a key.
+- One real service has been tested: DeepSeek's OpenAI-compatible endpoint, on
+  the eight SITL scenarios, three runs each, with no unverified number.
+  Anthropic's and OpenAI's own services, and other compatible services, need a
+  run with their own key.
 - Log text can contain instructions. The system prompt treats it as data, and
   STATUSTEXT is not sent unless opted in, but prompt injection is not fully
   preventable.

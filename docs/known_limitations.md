@@ -104,11 +104,13 @@ them readable.
   reports a refusal are its own. The OpenAI request sends no ceiling on the
   reply, because the services disagree on what it is called. A call that fails
   for any reason gives the rule engine's diagnosis, and the card says why.
-- **The online agent has only been tested against stand-in services.** Its
-  tool loop, budgets, citation checks and fallbacks run in the test suite
-  against a fake provider. DeepSeek is the one real service tested by hand,
-  through the single-shot path; the agent's tool calls have not been sent to a
-  real vendor yet. Anthropic's and OpenAI's own services are also uncalled.
+- **The online agent has been tested against one real service.** DeepSeek's
+  OpenAI-compatible endpoint ran the eight SITL scenarios three times each on
+  2026-11-12: every injected fault was named, the normal runs named none, and
+  no observation or summary number went unverified. Anthropic's and OpenAI's
+  own services are uncalled, and other compatible services need a run with
+  their own key. The tool loop's fallbacks also run in the test suite against
+  a fake provider.
 - **A citation check cannot judge meaning.** The agent marks an observation
   unverified when a number is absent from the tool result it cites, or when
   the citation does not exist. A qualitative claim can still be wrong, and a
