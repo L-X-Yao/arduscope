@@ -104,8 +104,28 @@ them readable.
   reports a refusal are its own. The OpenAI request sends no ceiling on the
   reply, because the services disagree on what it is called. A call that fails
   for any reason gives the rule engine's diagnosis, and the card says why.
-- **Only `flight_report.py` has it.** The web interface, the batch and
-  multi-log reports and the Windows package use the rule engine.
+- **The online agent has only been tested against stand-in services.** Its
+  tool loop, budgets, citation checks and fallbacks run in the test suite
+  against a fake provider. DeepSeek is the one real service tested by hand,
+  through the single-shot path; the agent's tool calls have not been sent to a
+  real vendor yet. Anthropic's and OpenAI's own services are also uncalled.
+- **A citation check cannot judge meaning.** The agent marks an observation
+  unverified when a number is absent from the tool result it cites, or when
+  the citation does not exist. A qualitative claim can still be wrong, and a
+  number copied from an unrelated part of the same result passes. The card
+  shows the unverified count; it is not a guarantee.
+- **The agent is web and CLI only.** Batch, multi-log and fleet reports use
+  the rule engine. There is no follow-up conversation: the web server deletes
+  the upload when the analysis ends, so a second question would need the log
+  kept.
+- **The settings page is loopback only.** On a LAN listener `/settings`
+  returns 404. The key then has to be placed in `~/.arduscope/agent.json` or
+  an environment variable by someone at the machine.
+- **What leaves the machine is a fixed list.** GPS coordinates, the board
+  serial and STATUSTEXT are stripped unless opted in, and the raw `.BIN` is
+  never sent. The categories the run sends are on the card. A service still
+  receives the analyzer results, the parameters the agent requests and the
+  downsampled message series.
 
 ## Install
 

@@ -9,6 +9,18 @@ releases are not published.
 
 ## [Unreleased]
 
+### Added
+- Online analysis agent: `--ai-agent` on the command line and the "Analyze
+  with a model" switch in the web interface let a model check the analyzer
+  results through eight read-only tools and write an explanation whose
+  observations cite the tool calls behind them. It cannot change a status,
+  the health score, an `action_level` or a `.param` suggestion. It falls back
+  to the single-shot summary and then to the rule engine, with the reason on
+  the card. The Windows package now carries the `anthropic` and `openai`
+  SDKs; the web settings page (`/settings`) is served only on a loopback
+  address. Data-egress defaults and the tool limits are in
+  [docs/online_agent.md](docs/online_agent.md).
+
 ### Changed
 - Releases after 0.9.10 are immutable once published: their files and their
   tag cannot change. A defect found in a published package goes out as a new

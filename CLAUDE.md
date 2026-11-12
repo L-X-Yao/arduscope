@@ -34,6 +34,14 @@ lib/                 Core library
   hover.py           Rows where the lift motors carry the aircraft, level-hover thrust
   csv_safe.py        Spreadsheet-safe CSV cells
   np_helpers.py      Numpy helpers shared by analyzers and report builders
+  agent/             Optional online analysis agent (read-only tools)
+    tools.py         Bounded, read-only tool layer over the pipeline
+    loop.py          Predefined workflow, tool budgets, submit_analysis
+    providers.py     Anthropic Messages and OpenAI chat-completions adapters
+    citations.py     Checks claims against the tool calls they cite
+    config.py        ~/.arduscope/agent.json, environment key precedence
+    egress.py        GPS/serial/STATUSTEXT redaction defaults
+    card.py          AnalysisResult card and fallback chain
 locales/             i18n string files
   zh.json            Chinese (primary/fallback locale)
   en.json            English
@@ -44,6 +52,7 @@ docs/                Documentation
   convergence_criteria.md  Threshold source traceability table
   suggestion_evidence.md   Source and flight record of every suggestion
   known_limitations.md     What the tool does not do or does not get right
+  online_agent.md          Online analysis: usage, tools, egress, fallbacks
 flight_report.py     CLI entry point (single log)
 multi_report.py      Multi-log comparison CLI
 batch_report.py      Batch processing CLI

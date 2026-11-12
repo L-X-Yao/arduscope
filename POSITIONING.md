@@ -91,7 +91,7 @@ Today:
 
 ## 6. Maintenance
 
-**Feature work ended on 2026-11-10. The maintainer fixes defects and adds no features.**
+**Feature work ended on 2026-11-10. On 2026-11-12 one item was reopened: the online analysis agent (see [docs/online_agent_plan.md](docs/online_agent_plan.md)). Outside it, the maintainer fixes defects and adds no features.**
 
 Pull requests go through the gates in [CONTRIBUTING.md](CONTRIBUTING.md). One that changes analyzer logic or a threshold waits for the maintainer to run the snapshot and corpus steps, on logs that are not public.
 

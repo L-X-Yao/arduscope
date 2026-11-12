@@ -21,6 +21,7 @@ ArduScope reads ArduPilot `.BIN` logs and runs 32 analyzers to produce actionabl
 - **Multi-log comparison** — track tuning convergence across flights
 - **Fleet history** — every flight auto-archived per airframe (hardware-serial keyed); trend card in reports, `fleet_report.py` CLI (incl. `--backfill` for historical logs) + web fleet page (`/fleet`, with alias editing)
 - **Web + CLI** — browser drag-and-drop or command-line batch processing
+- **Optional online analysis** — with a model and key, it checks each warning through read-only tools and writes an explanation with citations. Offline analysis is unchanged when no model is configured
 - **Bilingual** — Chinese by default, English with `--lang en`
 
 ## Quick start
@@ -103,7 +104,17 @@ pip install .[ai]
 ANTHROPIC_API_KEY=... python3 flight_report.py --ai-provider anthropic --ai-model MODEL log.BIN
 # The same through any service that speaks the OpenAI chat completions API
 OPENAI_API_KEY=... python3 flight_report.py --ai-provider openai --ai-base-url https://api.example.com/v1 --ai-model MODEL log.BIN
+
+# Online analysis agent: the model checks the analyzer results through
+# read-only tools and must cite each observation. Falls back to the
+# single-shot summary, then to the rule engine, if the service cannot.
+ANTHROPIC_API_KEY=... python3 flight_report.py --ai-agent --ai-provider anthropic --ai-model MODEL log.BIN
 ```
+
+The web interface has the same switch: set the provider, address, model and key
+on `/settings`, then tick "Analyze with a model" before uploading. The settings
+page is served only when the server listens on this machine. What may leave the
+machine, and the defaults, are in [docs/online_agent.md](docs/online_agent.md).
 
 ## Analyzers
 
@@ -193,7 +204,7 @@ No entry-point changes needed. Automatically registered in CLI, Web, and multi-l
 
 ## Positioning
 
-ArduScope is for **ArduPilot tuning engineers**. Strictness is a feature, not a bug: finding a threshold strict is no ground for loosening it. Log data is welcome for calibrating thresholds, and so is a false alarm reported with its log. A request to lower the standard is not accepted. Feature work ended in November 2026: the maintainer fixes defects and adds no features. See [POSITIONING.md](POSITIONING.md).
+ArduScope is for **ArduPilot tuning engineers**. Strictness is a feature, not a bug: finding a threshold strict is no ground for loosening it. Log data is welcome for calibrating thresholds, and so is a false alarm reported with its log. A request to lower the standard is not accepted. Feature work ended in November 2026, with one exception: the online analysis agent, reopened on 2026-11-12. Outside it, the maintainer fixes defects and adds no features. See [POSITIONING.md](POSITIONING.md).
 
 ## Known limitations
 

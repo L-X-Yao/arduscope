@@ -25,6 +25,15 @@ packages stay on the Releases page as they were built and do not get fixes.
   counts, flight duration and health score. With `--ai-base-url` all of that
   goes to the address you give instead, and so does the key from
   `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`.
+- The online analysis agent sends more, because it asks the log questions:
+  analyzer cards, the parameters it requests and the downsampled message
+  series it requests. GPS coordinates, the board serial and STATUSTEXT are
+  stripped unless opted in, and the raw `.BIN` is never sent. The categories
+  sent are named on the report card; `docs/online_agent.md` has the table.
+- The agent's key is stored in plain text at `~/.arduscope/agent.json` (mode
+  0600) when entered on the settings page. Environment variables take
+  precedence. The settings page is served only when the server listens on a
+  loopback address; on a LAN listener it returns 404.
 - A flight log holds the GPS track of the flight and the serial number of the
   flight controller, and so does a report made from it. Think before posting
   either in a public issue.

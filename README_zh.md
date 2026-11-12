@@ -21,6 +21,7 @@ ArduScope 读取 ArduPilot `.BIN` 日志，运行 32 个分析器，生成可执
 - **多日志对比** — 跟踪调参收敛过程
 - **机队历史档案** — 每架次自动按机身归档（硬件序列号识别），报告尾部趋势卡、`fleet_report.py` 查询（含 `--backfill` 回填历史日志）+ web 机队页（`/fleet`，可改别名）
 - **Web + 命令行** — 浏览器拖拽上传或命令行批处理
+- **可选的在线分析** — 配好模型和密钥后，模型用只读工具逐条核查 warning，并写出带引用的解释；不配模型时离线分析完全不变
 - **中英双语** — 默认中文，`--lang en` 输出英文
 
 ## 快速开始
@@ -99,7 +100,15 @@ pip install .[ai]
 ANTHROPIC_API_KEY=... python3 flight_report.py --ai-provider anthropic --ai-model 模型名 log.BIN
 # 任何兼容 OpenAI chat completions 接口的服务也可以用
 OPENAI_API_KEY=... python3 flight_report.py --ai-provider openai --ai-base-url https://api.example.com/v1 --ai-model 模型名 log.BIN
+
+# 在线分析 agent：模型用只读工具核查分析器结果，每条观察必须带引用。
+# 接口不支持工具调用时退回单次总结，再失败退回规则引擎。
+ANTHROPIC_API_KEY=... python3 flight_report.py --ai-agent --ai-provider anthropic --ai-model 模型名 log.BIN
 ```
+
+网页界面有同样的开关：在 `/settings` 填接口、地址、模型和密钥，上传前勾选
+“用模型分析”。设置页只在服务器监听本机时开放。会外发哪些数据、默认值是什么，
+见 [docs/online_agent.md](docs/online_agent.md)。
 
 ## 分析器
 
@@ -167,7 +176,7 @@ OPENAI_API_KEY=... python3 flight_report.py --ai-provider openai --ai-base-url h
 
 ## 项目定位
 
-本工具面向 **ArduPilot 调参工程师**。诊断严格性是特性，不是缺陷——"觉得阈值严"不构成调松依据。社区日志数据欢迎用于阈值校准，带日志的误报报告同样欢迎，降低标准的诉求不接受。功能开发已于 2026 年 11 月结束，维护者只修缺陷，不加新功能。详见 [POSITIONING_zh.md](POSITIONING_zh.md)。
+本工具面向 **ArduPilot 调参工程师**。诊断严格性是特性，不是缺陷——"觉得阈值严"不构成调松依据。社区日志数据欢迎用于阈值校准，带日志的误报报告同样欢迎，降低标准的诉求不接受。功能开发已于 2026 年 11 月结束，只重开一项：在线分析 agent（2026-11-12）。除此之外，维护者只修缺陷，不加新功能。详见 [POSITIONING_zh.md](POSITIONING_zh.md)。
 
 ## 已知限制
 
