@@ -26,6 +26,14 @@ releases are not published.
 - The project linter collected only top-level `.py` files, so `lib/agent`
   escaped the locale and import checks. It now walks subpackages and also
   enforces the `analyzers -> lib` dependency direction.
+- The settings page reads `CONFIG_PATH` when it renders instead of a copy
+  taken at import time.
+- The settings page accepts an IPv6 loopback origin (`--host ::1`); its
+  origin check split the `Host` header on the first colon.
+- A server start deletes `upload_*` files older than an hour, which a killed
+  analysis leaves in the report directory.
+- `BaseAnalyzer.get_armed_mask` imports `numpy` for its return annotation,
+  so type introspection resolves it.
 
 ## [0.10.1] - 2026-11-13
 
