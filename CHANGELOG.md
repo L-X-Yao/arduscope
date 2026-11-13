@@ -500,7 +500,7 @@ other than wording: `log_89` now reads critical, hovering at 0.32 with
 
 A full rescan on 2026-11-05 found 129 problems, including 49 of the 102
 findings of the 2026-07-15 audit that had been recorded as closed.
-`docs/rescan-2026-11-05.md` lists them all; each commit names the items
+`docs/history/rescan-2026-11-05.md` lists them all; each commit names the items
 it closes.
 
 ### Changed: behaviour you can notice
@@ -817,7 +817,7 @@ it closes.
   run: `PM.NLoop` is logged as `NL` on the entire fleet (the long-loop
   CPU-pressure check had been silently dead since it shipped),
   `ARSP.Primary` is `Pri`, and `MOTB.BatRes` no longer exists upstream
-- Audit H-group closed (26 items, `docs/audit-2026-07-15.md` §六):
+- Audit H-group closed (26 items, `docs/history/audit-2026-07-15.md` §六):
   toolchain gates now real (ci_local runs the i18n/contract checks and
   marker-based quick selection; release.py checks staged changes and
   existing tags, pushes only its own tag; baseline_diff compares the
@@ -887,7 +887,7 @@ it closes.
 ## [0.4.1] - 2026-07-15
 
 ### Fixed
-Runtime bug hunt (`docs/bug-hunt-2026-07-15.md`): 28 diagnostic-correctness
+Runtime bug hunt (`docs/history/bug-hunt-2026-07-15.md`): 28 diagnostic-correctness
 bugs — false positives (crying wolf) and false negatives (silently dead
 checks) — found via multi-agent review + dynamic execution on 22 real logs
 + ArduPilot-source cross-check. No crashes; each fixed with a

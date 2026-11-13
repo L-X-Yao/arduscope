@@ -186,7 +186,7 @@ so a rebuild waits for it. Anything else that flies should take it too.
   aircraft. 278 of the 296 axes the old D rule flagged were under METHODIC's limit.
 - Before tightening a rule, test the true positive. The first D gate lost a real
   oscillation: that aircraft shook on the ground and never took off.
-- A ledger finding such as `docs/rescan-2026-11-05.md` is closed by a commit that
+- A ledger finding such as `docs/history/rescan-2026-11-05.md` is closed by a commit that
   names its ID in the body.
 
 ## Releasing

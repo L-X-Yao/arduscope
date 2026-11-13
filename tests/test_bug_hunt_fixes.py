@@ -1,6 +1,6 @@
 """
 Regression tests for the 2026-07-15 runtime bug-hunt fix batches
-(docs/bug-hunt-2026-07-15.md). Each test asserts the precondition (the
+(docs/history/bug-hunt-2026-07-15.md). Each test asserts the precondition (the
 scenario that used to misbehave) before the invariant, so none can pass
 vacuously. Grouped by fix batch.
 """
