@@ -1,6 +1,6 @@
 # Known limitations
 
-What ArduScope does not do, or does not get right, as of 2026-11-12, and what
+What ArduScope does not do, or does not get right, as of 2026-11-13, and what
 to do about each. What was found and fixed is in [CHANGELOG.md](../CHANGELOG.md).
 Figures are from the two log corpora the release gate scans: 561 logs, 560 of
 them readable.
