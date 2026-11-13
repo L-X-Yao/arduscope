@@ -25,7 +25,6 @@ def app(monkeypatch, tmp_path):
 
     config_path = tmp_path / "agent.json"
     monkeypatch.setattr(agent_config, "CONFIG_PATH", str(config_path))
-    monkeypatch.setattr(web_app, "CONFIG_PATH", str(config_path))
     monkeypatch.setattr(web_app, "_ALLOW_SETTINGS", True)
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -46,6 +45,14 @@ def test_settings_page_opens_on_loopback(app):
     resp = app.get("/settings")
     assert resp.status_int == 200
     assert "ArduScope" in resp.text
+
+
+def test_settings_page_names_the_configured_path(app):
+    """The page used to read a CONFIG_PATH copied at import time, so a
+    patched config still showed the real path."""
+    import lib.agent.config as agent_config
+    resp = app.get("/settings")
+    assert agent_config.CONFIG_PATH in resp.text
 
 
 def test_settings_page_is_404_when_exposed(app, monkeypatch):

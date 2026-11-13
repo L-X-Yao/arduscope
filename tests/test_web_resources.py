@@ -257,6 +257,23 @@ class TestReportRetention:
         web_app._prune_reports()
         assert report.exists()
 
+    def test_orphaned_uploads_from_a_killed_server_are_swept(
+            self, report_dir):
+        old = report_dir / "upload_dead_x.BIN"
+        fresh = report_dir / "upload_live_y.BIN"
+        report = report_dir / "00000001_a_report.html"
+        old.write_bytes(b"old")
+        fresh.write_bytes(b"new")
+        report.write_text("x")
+        stale = time.time() - web_app.ORPHAN_UPLOAD_AGE_S - 60
+        os.utime(old, (stale, stale))
+
+        web_app._sweep_orphaned_uploads()
+
+        assert not old.exists()
+        assert fresh.exists()
+        assert report.exists()
+
     def test_compare_report_counts(self, client, report_dir, monkeypatch):
         calls = []
         monkeypatch.setattr(web_app, "_prune_reports",

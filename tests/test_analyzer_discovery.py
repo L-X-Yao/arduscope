@@ -62,3 +62,12 @@ def test_sourceless_package_is_discovered(tmp_path):
 
     assert out.returncode == 0, out.stderr
     assert int(out.stdout) == len(analyzers.discover_analyzers())
+
+
+@pytest.mark.fast
+def test_the_armed_mask_annotation_resolves():
+    """BaseAnalyzer annotated a return as np.ndarray without importing np."""
+    from typing import get_type_hints
+
+    hints = get_type_hints(analyzers.BaseAnalyzer.get_armed_mask)
+    assert hints["return"] is not None

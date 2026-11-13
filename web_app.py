@@ -60,7 +60,6 @@ from lib.html_report import HtmlReportGenerator
 from lib.ai_diagnosis import generate_diagnosis
 from lib.agent import analyze_with_agent
 from lib.agent.config import ConfigError, load_config, update_config
-from lib.agent.config import CONFIG_PATH  # noqa: F401 - re-exported for tests
 from lib.agent.providers import NoProviderPackage, test_connection
 from lib.pipeline import run_analysis
 from lib.templates import get_template
@@ -226,6 +225,10 @@ _GENERATED_REPORT = re.compile(
 # The largest JSON body a route reads: the compare routes take a list of
 # at most MAX_JOBS ids of 8 characters.
 MAX_JSON_BYTES = 64 * 1024
+# An analysis deletes its upload when it ends; a kill or a crash does not.
+# A second server sharing the report directory may still be uploading, so
+# only files older than an hour are swept at startup.
+ORPHAN_UPLOAD_AGE_S = 3600
 
 _ANALYSIS_BUDGET = _MemoryBudget(ANALYSIS_MEMORY_BUDGET_BYTES)
 
@@ -381,6 +384,28 @@ def _prune_reports() -> None:
         return
     for _mtime, path in reports[:-MAX_KEPT_REPORTS]:
         _discard(path)
+
+
+def _sweep_orphaned_uploads() -> None:
+    """Delete upload files a stopped server left behind.
+
+    A normal analysis deletes its upload in a finally block; a killed
+    process leaves it. Only files older than ORPHAN_UPLOAD_AGE_S, so a
+    second server on the same report directory keeps an upload in progress.
+    """
+    cutoff = time.time() - ORPHAN_UPLOAD_AGE_S
+    try:
+        with os.scandir(REPORT_DIR) as entries:
+            for entry in entries:
+                if not entry.name.startswith("upload_"):
+                    continue
+                try:
+                    if entry.is_file() and entry.stat().st_mtime < cutoff:
+                        os.remove(entry.path)
+                except OSError:
+                    continue
+    except OSError:
+        return
 
 
 def _receive_body(path: str) -> tuple[int, str | None]:
@@ -686,10 +711,7 @@ def _settings_same_origin() -> bool:
     origin = request.headers.get("Origin", "")
     if not origin:
         return True
-    try:
-        return urlsplit(origin).hostname == request.headers.get("Host", "").split(":")[0]
-    except ValueError:
-        return False
+    return _same_origin(origin, request.headers.get("Host", ""))
 
 
 @app.route('/settings')
@@ -1201,6 +1223,7 @@ def main():
     REPORT_DIR = os.path.abspath(args.report_dir or os.path.join(
         os.path.expanduser("~"), ".arduscope", "reports"))
     os.makedirs(REPORT_DIR, exist_ok=True)
+    _sweep_orphaned_uploads()
 
     HISTORY_FILE = os.path.join(REPORT_DIR, "history.json")
     _load_history()

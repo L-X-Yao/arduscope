@@ -14,6 +14,7 @@ import os
 import pkgutil
 from typing import Optional
 
+import numpy as np
 import plotly.graph_objects as go
 
 from lib.log_reader import LogReader
@@ -198,11 +199,10 @@ class BaseAnalyzer:
         when the log cannot say: one with no arming events and no
         POWR.Safety may hold a whole flight.
         """
-        import numpy as _np
         armed = self.reader.get_armed_intervals()
         if not armed and not self.reader.never_armed():
-            return _np.ones(len(ts), dtype=bool)
-        mask = _np.zeros(len(ts), dtype=bool)
+            return np.ones(len(ts), dtype=bool)
+        mask = np.zeros(len(ts), dtype=bool)
         for s, e in armed:
             mask |= (ts >= s) & (ts <= e)
         return mask
@@ -210,11 +210,10 @@ class BaseAnalyzer:
     @staticmethod
     def safe_interp(x, xp, fp):
         """np.interp that filters NaN/Inf from source arrays first."""
-        import numpy as _np
-        good = _np.isfinite(xp) & _np.isfinite(fp)
-        if _np.sum(good) < 2:
-            return _np.full_like(x, _np.nan, dtype=float)
-        return _np.interp(x, xp[good], fp[good])
+        good = np.isfinite(xp) & np.isfinite(fp)
+        if np.sum(good) < 2:
+            return np.full_like(x, np.nan, dtype=float)
+        return np.interp(x, xp[good], fp[good])
 
     def read_primary_instance(self, msg_type: str, fields: list[str],
                               inst_col: str) -> dict:
@@ -231,18 +230,17 @@ class BaseAnalyzer:
         Falls back to the raw (unfiltered) data when the instance column
         is absent or all-NaN (old single-instance logs).
         """
-        import numpy as _np
         data = self.reader.get_messages_as_arrays(
             msg_type, [inst_col] + list(fields))
         ts = data["_timestamp"]
         inst = data.get(inst_col)
         if inst is None or len(ts) == 0:
             return data
-        valid = inst[~_np.isnan(inst)]
+        valid = inst[~np.isnan(inst)]
         if len(valid) == 0:
             return data  # old-style log without an instance field
-        primary = int(_np.min(valid))
-        mask = _np.nan_to_num(inst, nan=-1).astype(int) == primary
+        primary = int(np.min(valid))
+        mask = np.nan_to_num(inst, nan=-1).astype(int) == primary
         out = {"_timestamp": ts[mask]}
         for f in fields:
             out[f] = data[f][mask]

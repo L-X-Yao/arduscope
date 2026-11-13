@@ -141,6 +141,13 @@ class TestOriginHeader:
             expect_errors=True)
         assert resp.status_int == 400
 
+    def test_settings_origin_accepts_ipv6_loopback(self, monkeypatch):
+        class Request:
+            headers = {"Origin": "http://[::1]:8080",
+                       "Host": "[::1]:8080"}
+        monkeypatch.setattr(web_app, "request", Request())
+        assert web_app._settings_same_origin()
+
     def test_client_without_origin_works(self, client, monkeypatch):
         """curl and scripts send no Origin, and CSRF needs a browser.
 

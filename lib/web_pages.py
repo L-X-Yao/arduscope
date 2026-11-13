@@ -10,7 +10,7 @@ import html
 import json
 
 from lib import fleet_history
-from lib.agent.config import CONFIG_PATH
+from lib.agent import config as agent_config
 from lib.i18n import get_locale, t
 
 
@@ -53,7 +53,7 @@ a{{color:#58a6ff}}
 <body>
 <div class="card">
 <h1>{html.escape(t('web.settings_title'))}</h1>
-<p class="hint">{html.escape(t('web.settings_hint', path=CONFIG_PATH))}</p>
+<p class="hint">{html.escape(t('web.settings_hint', path=agent_config.CONFIG_PATH))}</p>
 <label for="provider">{html.escape(t('web.settings_provider'))}</label>
 <select id="provider">{options}</select>
 <div class="hint">{html.escape(t('web.settings_provider_hint'))}</div>
