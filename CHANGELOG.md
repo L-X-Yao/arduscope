@@ -7,6 +7,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Changed
+- The version lives in `lib/__init__.py`. The repository root no longer
+  installs a module named `__init__` into site-packages; the Windows package
+  check reads the version from the compiled library package.
+- `web_app.py` keeps the HTTP state and routes; the page builders moved to
+  `lib/web_pages.py`, and the upload-name and memory-budget helpers to
+  `lib/web_limits.py`.
+- The multi-log comparison logic moved out of `multi_report.py`: metrics to
+  `lib/multi_metrics.py`, rendering to `lib/comparison_report.py`. The CLI
+  module re-exports its old names.
+- The dated audit, bug hunt, rescan and agent-plan documents moved to
+  `docs/history/`.
+
+### Fixed
+- The project linter collected only top-level `.py` files, so `lib/agent`
+  escaped the locale and import checks. It now walks subpackages and also
+  enforces the `analyzers -> lib` dependency direction.
+
 ## [0.10.1] - 2026-11-13
 
 ### Fixed

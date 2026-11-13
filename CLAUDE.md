@@ -34,6 +34,10 @@ lib/                 Core library
   hover.py           Rows where the lift motors carry the aircraft, level-hover thrust
   csv_safe.py        Spreadsheet-safe CSV cells
   np_helpers.py      Numpy helpers shared by analyzers and report builders
+  web_pages.py       HTML pages served by web_app
+  web_limits.py      Upload-name and memory-budget helpers for the web app
+  multi_metrics.py   Per-log metrics for the multi-log comparison report
+  comparison_report.py  HTML report that compares several logs
   agent/             Optional online analysis agent (read-only tools)
     tools.py         Bounded, read-only tool layer over the pipeline
     loop.py          Predefined workflow, tool budgets, submit_analysis
@@ -49,6 +53,7 @@ tests/               pytest suite
   binlog.py          Writes real-format .BIN files, the only way CI reaches the parser
   sitl/              SITL integration test framework
 docs/                Documentation
+  history/           Point-in-time audit and rescan records
   convergence_criteria.md  Threshold source traceability table
   suggestion_evidence.md   Source and flight record of every suggestion
   known_limitations.md     What the tool does not do or does not get right
