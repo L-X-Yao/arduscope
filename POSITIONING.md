@@ -2,7 +2,7 @@
 
 [中文](POSITIONING_zh.md)
 
-**Last updated**: 2026-11-11
+**Last updated**: 2026-11-13
 **Maintainer**: L-X-Yao
 **What this document is for**: what the tool does and does not do is settled against it. To change the positioning, change this file.
 
@@ -89,9 +89,9 @@ Today:
 
 ---
 
-## 6. Maintenance
+## 6. Maintenance and development
 
-**Feature work ended on 2026-11-10. The online analysis agent was reopened on 2026-11-12 and released in v0.10.0 that day. The maintainer fixes defects and adds no features.**
+**Feature work resumed on 2026-11-13. The project is under long-term, continuous development. The online analysis agent was reopened on 2026-11-12 and released in v0.10.0 that day. The maintainer continues development and fixes defects.**
 
 Pull requests go through the gates in [CONTRIBUTING.md](CONTRIBUTING.md). One that changes analyzer logic or a threshold waits for the maintainer to run the snapshot and corpus steps, on logs that are not public.
 

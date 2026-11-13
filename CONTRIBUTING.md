@@ -1,11 +1,11 @@
 # Contributing to ArduScope
 
-Feature work ended in November 2026. The online analysis agent was reopened on
-2026-11-12 and released in v0.10.0 the same day (see
-[POSITIONING.md](POSITIONING.md)). The maintainer fixes defects and adds no
-features. A pull request goes through the gates under "Which gates a change
-has to pass". What follows describes how the code is put together, for a fix
-and for anyone who extends a copy of their own.
+The project is under long-term, continuous development. Feature work resumed on
+2026-11-13. The online analysis agent was reopened on 2026-11-12 and released in
+v0.10.0 the same day (see [POSITIONING.md](POSITIONING.md)). The maintainer
+continues development and fixes defects. A pull request goes through the gates
+under "Which gates a change has to pass". What follows describes how the code is
+put together, for a change and for anyone who extends a copy of their own.
 
 ## Adding a new analyzer
 

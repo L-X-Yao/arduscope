@@ -10,6 +10,9 @@ releases are not published.
 ## [Unreleased]
 
 ### Changed
+- Positioning: the project is under long-term, continuous development;
+  feature work resumed on 2026-11-13. `POSITIONING.md`, `POSITIONING_zh.md`,
+  both READMEs and `CONTRIBUTING.md` say so.
 - The version lives in `lib/__init__.py`. The repository root no longer
   installs a module named `__init__` into site-packages; the Windows package
   check reads the version from the compiled library package.
