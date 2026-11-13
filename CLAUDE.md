@@ -53,6 +53,7 @@ tests/               pytest suite
   binlog.py          Writes real-format .BIN files, the only way CI reaches the parser
   sitl/              SITL integration test framework
 docs/                Documentation
+  architecture.md    Layers, dependency rules, extension points, known debt
   history/           Point-in-time audit and rescan records
   convergence_criteria.md  Threshold source traceability table
   suggestion_evidence.md   Source and flight record of every suggestion
