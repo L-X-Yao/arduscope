@@ -27,8 +27,12 @@ ALL_LOGS = _find_logs()
 LOG_IDS = [os.path.basename(p)[:40] for p in ALL_LOGS]
 
 
-@pytest.mark.parametrize("log_path", ALL_LOGS, ids=LOG_IDS)
+# log_path is the bottom decorator, so it is the outer loop: all analyzers
+# for one log run before the next log is loaded. The conftest cache keeps
+# only the most recent logs, so the decoded arrays of the whole corpus are
+# never alive at once.
 @pytest.mark.parametrize("analyzer_key,analyzer_cls", ANALYZERS, ids=ANALYZER_IDS)
+@pytest.mark.parametrize("log_path", ALL_LOGS, ids=LOG_IDS)
 def test_no_crash(analyzer_key, analyzer_cls, log_path):
     """Every analyzer must not crash on any real log file."""
     if not os.path.isfile(log_path):

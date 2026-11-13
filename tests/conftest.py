@@ -5,8 +5,10 @@ Provides pre-loaded LogReader + VehicleInfo + Thresholds for each test log,
 cached per session so the expensive log parsing happens only once.
 """
 
+import gc
 import os
 import sys
+from collections import OrderedDict
 from dataclasses import dataclass
 
 import pytest
@@ -57,18 +59,29 @@ class LogFixture:
     path: str
 
 
-_cache: dict[str, LogFixture] = {}
+# The smoke test walks every log in the corpus. LogReader(disk_cache=True)
+# restores the decoded message arrays, about 0.6 GB for the 281 MB log;
+# keeping every reader alive reached 18 GB and OOM-killed WSL. The most
+# recent few are enough: the smoke test finishes one log before the next.
+_CACHE_MAX = 4
+_cache: OrderedDict[str, LogFixture] = OrderedDict()
 
 
 def _load(path: str) -> LogFixture:
-    """Load a log file. Cached for metadata (vehicle/thresholds) only."""
-    if path not in _cache:
-        if not os.path.isfile(path):
-            pytest.skip(f"Log file not found: {path}")
-        reader = LogReader(path, disk_cache=True)
-        vehicle = detect_vehicle(reader)
-        thresholds = Thresholds.from_params(reader.params, reader.vehicle_type)
-        _cache[path] = LogFixture(reader, vehicle, thresholds, path)
+    """Load a log file, keeping the most recent few readers alive."""
+    cached = _cache.get(path)
+    if cached is not None:
+        _cache.move_to_end(path)
+        return cached
+    if not os.path.isfile(path):
+        pytest.skip(f"Log file not found: {path}")
+    reader = LogReader(path, disk_cache=True)
+    vehicle = detect_vehicle(reader)
+    thresholds = Thresholds.from_params(reader.params, reader.vehicle_type)
+    _cache[path] = LogFixture(reader, vehicle, thresholds, path)
+    if len(_cache) > _CACHE_MAX:
+        _cache.popitem(last=False)
+        gc.collect()
     return _cache[path]
 
 
