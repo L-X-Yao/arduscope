@@ -86,12 +86,17 @@ them readable.
 
 ## LLM diagnosis
 
-- **It was run against one service, by hand.** On 2026-11-11 DeepSeek answered
-  through both APIs, `deepseek-flash` through the OpenAI one and
-  `deepseek-v4-pro` through the Anthropic one, with the `openai` SDK 3.49.0 and
-  the `anthropic` SDK 2.8.0. Anthropic's and OpenAI's own services have not
-  been called. The tests put a stand-in where the request goes, and no release
-  check sends one.
+- **It has been run against three services, by hand.** On 2026-11-11 DeepSeek
+  answered through both APIs, `deepseek-flash` through the OpenAI one and
+  `deepseek-v4-pro` through the Anthropic one. On 2026-11-13 Kimi for Coding
+  (`kimi-for-coding`, `https://api.kimi.com/coding`) and GLM-5.3
+  (`https://open.bigmodel.cn/api/anthropic`) answered through their
+  Anthropic-compatible endpoints. The SDKs were `openai` 3.49.0 and
+  `anthropic` 2.8.0. Anthropic's and OpenAI's own services have not been
+  called. The tests put a stand-in where the request goes, and no release
+  check sends one. A Kimi `sk-kimi-` key belongs to Kimi for Coding: the
+  Moonshot endpoints refuse it, and `https://api.kimi.com/coding` is the one
+  that answers.
 - **What the model writes is not checked.** The prompt tells it to use only
   the analyzers' figures, to leave parameters to the analyzer cards and not to
   call an aircraft airworthy. A model can still do otherwise: before those
@@ -104,13 +109,18 @@ them readable.
   reports a refusal are its own. The OpenAI request sends no ceiling on the
   reply, because the services disagree on what it is called. A call that fails
   for any reason gives the rule engine's diagnosis, and the card says why.
-- **The online agent has been tested against one real service.** DeepSeek's
-  OpenAI-compatible endpoint ran the eight SITL scenarios three times each on
-  2026-11-12: every injected fault was named, the normal runs named none, and
-  no observation or summary number went unverified. Anthropic's and OpenAI's
-  own services are uncalled, and other compatible services need a run with
-  their own key. The tool loop's fallbacks also run in the test suite against
-  a fake provider.
+- **The online agent has been tested against three real services.** On
+  2026-11-12 DeepSeek's OpenAI-compatible endpoint ran the eight SITL
+  scenarios three times each: every injected fault was named, the normal runs
+  named none, and no observation or summary number went unverified. On
+  2026-11-13 Kimi for Coding passed 18 of 24 runs: five observations cited a
+  result that does not carry their number, and one run named the injected
+  gyro noise as IMU divergence rather than motor noise. GLM-5.3 passed 23 of
+  24 runs at a 600-second budget with no unverified number; one run passed ten
+  minutes and was stopped. At the 300-second default GLM times out on the
+  heavier scenarios. Anthropic's and OpenAI's own services are uncalled, and
+  other compatible services need a run with their own key. The tool loop's
+  fallbacks also run in the test suite against a fake provider.
 - **A citation check cannot judge meaning.** The agent marks an observation
   unverified when a number is absent from the tool result it cites, or when
   the citation does not exist. A qualitative claim can still be wrong, and a

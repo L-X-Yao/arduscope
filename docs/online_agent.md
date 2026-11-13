@@ -99,6 +99,15 @@ never the model's.
 OPENAI_API_KEY=... python3 tools/agent_eval.py \
   --provider openai --model deepseek-flash \
   --base-url https://api.deepseek.com --repeats 3
+
+# Kimi for Coding, Anthropic protocol (an sk-kimi- key answers only here)
+ARDUSCOPE_AI_KEY=... python3 tools/agent_eval.py --provider anthropic \
+  --base-url https://api.kimi.com/coding --model kimi-for-coding --repeats 3
+
+# GLM, Anthropic-compatible; the heavier scenarios need the larger budget
+ARDUSCOPE_AI_KEY=... python3 tools/agent_eval.py --provider anthropic \
+  --base-url https://open.bigmodel.cn/api/anthropic --model glm-5.3 \
+  --repeats 3 --max-seconds 600
 ```
 
 It runs the eight scenarios in `tests/sitl/logs`, three times each, and fails
@@ -114,10 +123,13 @@ fault is not named. Results go to `reports/agent-eval/`.
   follow from simple arithmetic on two cited numbers. The summary is marked
   too when it carries a number that is in none of the tool results. A
   qualitative claim can still be wrong; the card marks only what it can check.
-- One real service has been tested: DeepSeek's OpenAI-compatible endpoint, on
-  the eight SITL scenarios, three runs each, with no unverified number.
-  Anthropic's and OpenAI's own services, and other compatible services, need a
-  run with their own key.
+- Three real services have been tested on the eight SITL scenarios: DeepSeek
+  through its OpenAI-compatible endpoint, and Kimi for Coding and GLM-5.3
+  through their Anthropic-compatible endpoints. DeepSeek named every injected
+  fault and left no number unverified; Kimi missed one fault and left five
+  observations unverified; GLM left no number unverified, but one run of 24
+  passed ten minutes. Anthropic's and OpenAI's own services need a run with
+  their own key.
 - Log text can contain instructions. The system prompt treats it as data, and
   STATUSTEXT is not sent unless opted in, but prompt injection is not fully
   preventable.
