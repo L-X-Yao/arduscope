@@ -9,6 +9,8 @@ Checks:
   4. Import shadowing           (t used as both i18n import and local var)
   5. Locale file symmetry       (zh.json and en.json must have same keys)
   6. param_suggestions / action_level consistency
+  7. Untranslated locale keys   (value equals key name)
+  8. Module layering            (analyzers -> lib, never upward)
 
 Usage:
     python3 tools/lint_project.py
@@ -54,15 +56,18 @@ def section(title: str) -> None:
 # Helpers
 # ---------------------------------------------------------------------------
 def collect_py_files(*paths: str) -> list[str]:
-    """Collect .py files: each path may be a directory or a single file
-    (relative to root)."""
+    """Collect .py files: each path may be a directory (searched
+    recursively) or a single file (relative to root)."""
     files: list[str] = []
     for p in paths:
         full = os.path.join(PROJECT_ROOT, p)
         if os.path.isdir(full):
-            for fname in sorted(os.listdir(full)):
-                if fname.endswith(".py"):
-                    files.append(os.path.join(full, fname))
+            for dirpath, dirnames, filenames in os.walk(full):
+                dirnames[:] = sorted(d for d in dirnames
+                                     if d != "__pycache__")
+                for fname in sorted(filenames):
+                    if fname.endswith(".py"):
+                        files.append(os.path.join(dirpath, fname))
         elif os.path.isfile(full) and p.endswith(".py"):
             files.append(full)
     return files
@@ -355,6 +360,66 @@ def check_untranslated_keys() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Check 8: Module layering
+# ---------------------------------------------------------------------------
+# analyzers -> lib is the direction. Two lib modules call discover_analyzers()
+# from inside a function to break the import cycle; those are the only
+# allowed references, and they must stay function-local.
+LAZY_ANALYZER_FILES = {"lib/pipeline.py", "lib/fleet_history.py"}
+ENTRY_MODULES = ("web_app", "flight_report", "multi_report", "batch_report",
+                 "fleet_report")
+_ANALYZER_IMPORT = re.compile(
+    r"^\s*(?:from\s+analyzers(?:\.|\s|$)|import\s+analyzers(?:\.|\s|$))")
+_ENTRY_IMPORT = re.compile(
+    r"^\s*(?:from\s+(?:%s)(?:\.|\s|$)|import\s+(?:%s)(?:\.|\s|$))"
+    % ("|".join(ENTRY_MODULES), "|".join(ENTRY_MODULES)))
+_AGENT_IMPORT = re.compile(
+    r"^\s*(?:from\s+lib\.agent(?:\.|\s|$)|import\s+lib\.agent(?:\.|\s|$)"
+    r"|from\s+lib\s+import\s+agent(?:\.|\s|$))")
+
+
+def check_dependency_direction() -> list[str]:
+    section("8. Module layering")
+    errors: list[str] = []
+
+    def report(relpath: str, lineno: int, rule: str) -> None:
+        msg = f"{relpath}:{lineno}: {rule}"
+        fail(msg)
+        errors.append(msg)
+
+    for fpath in collect_py_files("lib"):
+        relpath = os.path.relpath(fpath, PROJECT_ROOT)
+        with open(fpath, encoding="utf-8") as f:
+            for lineno, line in enumerate(f, 1):
+                if _ANALYZER_IMPORT.match(line):
+                    if relpath not in LAZY_ANALYZER_FILES:
+                        report(relpath, lineno,
+                               "lib must not import analyzers")
+                    elif not line[:1].isspace():
+                        report(relpath, lineno,
+                               "the analyzers import must stay inside a function")
+                if _ENTRY_IMPORT.match(line):
+                    report(relpath, lineno,
+                           "lib must not import an entry module")
+
+    for fpath in collect_py_files("analyzers"):
+        relpath = os.path.relpath(fpath, PROJECT_ROOT)
+        with open(fpath, encoding="utf-8") as f:
+            for lineno, line in enumerate(f, 1):
+                if _AGENT_IMPORT.match(line):
+                    report(relpath, lineno,
+                           "analyzers must not import the online agent")
+                if _ENTRY_IMPORT.match(line):
+                    report(relpath, lineno,
+                           "analyzers must not import an entry module")
+
+    if not errors:
+        ok("lib and analyzers only import downward")
+
+    return errors
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main() -> int:
@@ -369,6 +434,7 @@ def main() -> int:
     all_errors.extend(check_locale_symmetry())
     all_errors.extend(check_param_action_consistency())
     all_errors.extend(check_untranslated_keys())
+    all_errors.extend(check_dependency_direction())
 
     print()
     if all_errors:
