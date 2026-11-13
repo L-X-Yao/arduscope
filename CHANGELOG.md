@@ -13,6 +13,9 @@ releases are not published.
 - Positioning: the project is under long-term, continuous development;
   feature work resumed on 2026-11-13. `POSITIONING.md`, `POSITIONING_zh.md`,
   both READMEs and `CONTRIBUTING.md` say so.
+- The test cache keeps four decoded logs and the smoke test loads one log at
+  a time. The suite's peak fell from 18+ GB, which OOM-killed WSL, to 6.6 GB
+  under the 12 GB cap used to verify it.
 - The version lives in `lib/__init__.py`. The repository root no longer
   installs a module named `__init__` into site-packages; the Windows package
   check reads the version from the compiled library package.
