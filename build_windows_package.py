@@ -61,7 +61,6 @@ INCLUDE_FILES = [
     "multi_report.py",
     "batch_report.py",
     "fleet_report.py",
-    "__init__.py",
 ]
 # Files needed during build but NOT shipped in the package
 _BUILD_ONLY_FILES: list[str] = []

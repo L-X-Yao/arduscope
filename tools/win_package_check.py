@@ -214,7 +214,12 @@ def fetch_release(tag: str, into: str) -> str:
 def check_zip(path: str, version: str) -> list[dict]:
     with zipfile.ZipFile(path) as z:
         names = z.namelist()
-        init = z.read("arduscope/log_analysis/__init__.pyc")
+        # 0.10.1 and earlier had the version in the top-level __init__;
+        # 0.11.0 moved it into the lib package.
+        init_name = "arduscope/log_analysis/lib/__init__.pyc"
+        if init_name not in names:
+            init_name = "arduscope/log_analysis/__init__.pyc"
+        init = z.read(init_name)
     missing = sorted(source_modules() - package_modules(names))
     pins = builder.read_requirements(os.path.join(REPO_ROOT, builder.REQUIREMENTS))
     differ = pin_differences(bundled_libraries(names), pins)

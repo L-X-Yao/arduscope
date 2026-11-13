@@ -57,13 +57,13 @@ arduscope-web = "web_app:main"
 arduscope-fleet = "fleet_report:main"
 
 [tool.setuptools.dynamic]
-version = { attr = "__init__.__version__" }
+version = { attr = "lib.__version__" }
 
 [tool.setuptools.packages.find]
 include = ["lib", "lib.*", "analyzers", "analyzers.*", "locales", "locales.*"]
 
 [tool.setuptools]
-py-modules = ["flight_report", "multi_report", "batch_report", "fleet_report", "web_app", "__init__"]
+py-modules = ["flight_report", "multi_report", "batch_report", "fleet_report", "web_app"]
 
 [tool.setuptools.package-data]
 lib = ["vendor/leaflet/*"]

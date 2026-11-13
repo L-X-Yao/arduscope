@@ -122,7 +122,7 @@ tests that don't need `.BIN` files.
 
 ## Releasing
 
-Version is in `__init__.py`. Notes go under `## [Unreleased]` in
+Version is in `lib/__init__.py`. Notes go under `## [Unreleased]` in
 `CHANGELOG.md` as changes land.
 
 ```

@@ -141,9 +141,9 @@ them readable.
 
 ## Install
 
-- **Top-level module names are generic.** `lib`, `analyzers`, `locales`, the
-  five entry scripts and an `__init__.py` install at the root of site-packages.
-  Give ArduScope a virtual environment of its own, or use the Windows package.
+- **Top-level module names are generic.** `lib`, `analyzers`, `locales` and
+  the five entry scripts install at the root of site-packages. Give ArduScope
+  a virtual environment of its own, or use the Windows package.
 - **The Windows package carries its own Python**, 3.14.10 since 0.9.10, and
   pinned libraries. A fix in either reaches it only with a new ArduScope
   release. Once a Python version takes security fixes only, its releases are

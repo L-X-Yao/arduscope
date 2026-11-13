@@ -94,6 +94,16 @@ def test_declared_python_matches_the_ci_matrix():
     assert f'requires-python = ">={oldest}"' in PYPROJECT
 
 
+def test_the_version_lives_in_the_library_package():
+    """The root __init__ was an importable module named __init__ in
+    site-packages; the version now lives with the package it describes."""
+    assert 'version = { attr = "lib.__version__" }' in PYPROJECT
+    py_modules = re.search(r"py-modules = \[(.*?)\]", PYPROJECT).group(1)
+    assert '"__init__"' not in py_modules
+    from lib import __version__
+    assert re.fullmatch(r"\d+\.\d+\.\d+", __version__)
+
+
 def test_the_package_check_sees_subpackages():
     """v0.10.0 shipped without lib/agent because both scans were top-level."""
     import sys
