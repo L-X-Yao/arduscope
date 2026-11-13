@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
+from lib.i18n import t
+
 from .config import AgentConfig
 
 # A tool-calling reply is a short explanation, not a page. The cap also
@@ -139,6 +141,10 @@ class AnthropicAdapter(_Adapter):
                     name=str(getattr(block, "name", "")),
                     arguments=dict(getattr(block, "input", {}) or {}),
                 ))
+        if turn.stop_reason == "max_tokens":
+            # A cut reply can carry a half-written tool call. Running it
+            # would act on arguments the model never finished.
+            raise ProviderError(t("agent.error_cut_reply"))
         return turn
 
 
@@ -235,6 +241,10 @@ class OpenAIAdapter(_Adapter):
                 name=str(getattr(function, "name", "")),
                 arguments=arguments if isinstance(arguments, dict) else {},
             ))
+        if turn.stop_reason == "length":
+            # OpenAI-compatible services name the output cap "length"; the
+            # same rule as the Anthropic adapter applies.
+            raise ProviderError(t("agent.error_cut_reply"))
         return turn
 
 

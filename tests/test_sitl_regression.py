@@ -201,7 +201,13 @@ class TestSitlPipeline:
                 f"{name}={suggested[name]} outside {low} to {high}"
 
     def test_param_file_generation(self, scenario, tmp_path):
-        """If analyzers suggest params, the .param export should work."""
+        """Every scenario runs the export, with or without suggestions.
+
+        A flight that legitimately suggests nothing (plane_tecs_tuning:
+        speed RMS 2.78 under the 3.0 warning line) checks the empty case
+        instead of skipping. A skip made the gate's test count move with
+        flight-to-flight variation and hid that the export had not run.
+        """
         result = _run_pipeline(scenario["_log_path"])
 
         all_suggestions = []
@@ -210,15 +216,18 @@ class TestSitlPipeline:
             for sub in r.sub_results:
                 all_suggestions.extend(sub.param_suggestions)
 
-        if not all_suggestions:
-            pytest.skip("No param suggestions in this scenario")
-
         from flight_report import _export_param_file
         out_html = tmp_path / "report.html"
         out_html.write_text("<html></html>")
-        _export_param_file(result.results_by_key, str(out_html))
-
         param_file = tmp_path / "report.param"
+
+        if not all_suggestions:
+            _export_param_file(result.results_by_key, str(out_html))
+            assert not param_file.exists(), \
+                "no suggestions, so no .param file may be written"
+            return
+
+        _export_param_file(result.results_by_key, str(out_html))
         assert param_file.exists()
         content = param_file.read_text()
         assert "Auto-generated" in content

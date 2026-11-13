@@ -101,6 +101,33 @@ def test_anthropic_tool_refusal_is_its_own_error(monkeypatch):
         AnthropicAdapter(CONFIG).complete("s", [], TOOLS)
 
 
+def test_a_cut_anthropic_reply_is_a_provider_error(monkeypatch):
+    reply = SimpleNamespace(
+        content=[SimpleNamespace(type="text", text="a long answer")],
+        stop_reason="max_tokens", usage=None)
+    messages = _FakeMessages(reply=reply)
+    fake = SimpleNamespace(Anthropic=lambda **kw: SimpleNamespace(
+        messages=messages))
+    monkeypatch.setitem(sys.modules, "anthropic", fake)
+    with pytest.raises(ProviderError):
+        AnthropicAdapter(CONFIG).complete("s", [], TOOLS)
+
+
+def test_a_cut_openai_reply_is_a_provider_error(monkeypatch):
+    reply = SimpleNamespace(
+        choices=[SimpleNamespace(
+            finish_reason="length",
+            message=SimpleNamespace(content="a long answer",
+                                    tool_calls=None))],
+        usage=None)
+    messages = _FakeMessages(reply=reply)
+    fake = SimpleNamespace(OpenAI=lambda **kw: SimpleNamespace(
+        chat=SimpleNamespace(completions=messages)))
+    monkeypatch.setitem(sys.modules, "openai", fake)
+    with pytest.raises(ProviderError):
+        OpenAIAdapter(CONFIG).complete("s", [], TOOLS)
+
+
 def test_openai_adapter_converts_tools_and_reply(monkeypatch):
     reply = SimpleNamespace(
         choices=[SimpleNamespace(

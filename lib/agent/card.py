@@ -127,4 +127,12 @@ def analyze_with_agent(pipeline, config: AgentConfig,
                          on_event)
     except AgentError as e:
         return _fallback(pipeline, config, e.reason, on_event)
+    except Exception as e:  # noqa: BLE001 - the agent must never break a report
+        # A defect anywhere in the loop must cost the model narrative, not
+        # the whole report: the offline card is still there to fall back to.
+        return _fallback(
+            pipeline, config,
+            t("agent.fallback_unexpected",
+              error=f"{type(e).__name__}: {str(e)[:200]}"),
+            on_event)
     return _build_card(run, pipeline, config)

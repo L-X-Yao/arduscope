@@ -28,6 +28,22 @@ MAX_ROWS = 200
 MAX_FIELDS = 20
 
 
+def _text_snippets(reader, limit: int = 200, min_len: int = 6) -> list[str]:
+    """STATUSTEXT strings, normalized as the detail lines carry them.
+
+    One analyzer (``summary``) quotes the first few STATUSTEXT messages in
+    its details. Those lines are free text, so they follow the same opt-in
+    as ``get_events(kind="text")``: see ``_tool_get_result``.
+    """
+    snippets = []
+    for message in (getattr(reader, "text_messages", None) or [])[:limit]:
+        raw = _html.unescape(str(getattr(message, "text", "") or ""))
+        text = re.sub(r"\s+", " ", raw).strip()
+        if len(text) >= min_len:
+            snippets.append(text)
+    return snippets
+
+
 def _num(value, digits: int = 6):
     """A JSON-safe number: NaN and infinity become null."""
     try:
@@ -241,7 +257,15 @@ class ToolBox:
                 details.append(redact_text(
                     text, allow_serial=self.config.allow_serial,
                     allow_text=True))
-        return {
+        redacted = 0
+        if not self.config.allow_text:
+            snippets = _text_snippets(self.pipeline.reader)
+            if snippets:
+                kept = [line for line in details
+                        if not any(s in line for s in snippets)]
+                redacted = len(details) - len(kept)
+                details = kept
+        payload = {
             "key": key,
             "title": result.title,
             "status": result.status,
@@ -254,6 +278,10 @@ class ToolBox:
             "action_level": result.action_level,
             "failed": bool(result.failed),
         }
+        if redacted:
+            payload["redacted_text_lines"] = redacted
+            payload["egress_note"] = t("agent.note_text_redacted")
+        return payload
 
     def _tool_get_messages(self, msg_type: str, fields: list | None = None,
                            t0: float | None = None,

@@ -49,6 +49,26 @@ def test_an_unknown_citation_is_unverified():
     assert submission.observations[0].reason == "unknown_citation"
 
 
+def test_a_bare_number_is_a_citation_not_a_crash():
+    submission = validate({
+        "summary": "ok",
+        "observations": [{"text": "vibration is 12.3", "cites": 1,
+                          "kind": "observation"}],
+    }, [_record()])
+    assert submission.unverified_count == 0
+    assert submission.observations[0].cites == [1]
+
+
+def test_an_integral_float_citation_is_accepted():
+    submission = validate({
+        "summary": "ok",
+        "observations": [{"text": "vibration is 12.3", "cites": [1.0],
+                          "kind": "observation"}],
+    }, [_record()])
+    assert submission.unverified_count == 0
+    assert submission.observations[0].cites == [1]
+
+
 def test_an_error_citation_is_unverified():
     submission = validate({
         "summary": "ok",

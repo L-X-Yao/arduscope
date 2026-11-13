@@ -124,6 +124,30 @@ def test_statustext_stays_local_until_allowed():
     assert result["rows"][0]["text"] == "CubeOrange [serial]"
 
 
+def test_statustext_quoted_in_details_follows_the_text_opt_in():
+    pipeline = _pipeline(results={
+        "summary": AnalysisResult(
+            title="Summary", status="good", summary="log",
+            details=["系统消息: 1 条", "[5.0s] EKF3 IMU0 is using GPS"],
+            evidence_source="src"),
+    })
+    pipeline.reader.text_messages = [
+        SimpleNamespace(timestamp=5.0, text="EKF3 IMU0 is using GPS"),
+    ]
+    payload = ToolBox(pipeline, AgentConfig(
+        provider="openai", model="m", api_key="k")).call(
+            "get_result", {"key": "summary"})
+    assert payload["details"] == ["系统消息: 1 条"]
+    assert payload["redacted_text_lines"] == 1
+    assert payload["egress_note"]
+
+    allowed = ToolBox(pipeline, AgentConfig(
+        provider="openai", model="m", api_key="k", allow_text=True))
+    payload = allowed.call("get_result", {"key": "summary"})
+    assert len(payload["details"]) == 2
+    assert "redacted_text_lines" not in payload
+
+
 def test_spectrum_finds_the_injected_frequency():
     box = _box()
     result = box.call("get_spectrum",

@@ -7,6 +7,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Fixed
+- The online agent sent the STATUSTEXT lines the summary card quotes: they
+  sit in the analyzer details and went out even with the text opt-in off.
+  They now follow the same setting as `get_events`, and the tool result
+  says when it withheld lines.
+- A reply cut at the output cap now raises and falls back, instead of
+  running a tool call the model never finished. Both adapters check it.
+- A failure the agent did not foresee falls back to the rule engine rather
+  than failing the report; the card names the error.
+- A `cites` value sent as one number instead of a list is read as a
+  citation. It used to stop the run.
+- The SITL `.param` export test runs for every scenario and asserts that a
+  flight with no suggestion writes no file, instead of skipping. The skip
+  had let the gate's test count move with flight-to-flight variation.
+
 ## [0.10.0] - 2026-11-12
 
 ### Added

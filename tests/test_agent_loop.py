@@ -126,6 +126,19 @@ def test_no_tool_support_falls_back_to_single_shot(monkeypatch):
     assert "no tools here" in card.details[0]
 
 
+def test_an_unexpected_failure_falls_back_instead_of_breaking(monkeypatch):
+    fallback = AnalysisResult(title="rule", status="warning",
+                              evidence_source="src")
+    monkeypatch.setattr(card_mod, "run_agent",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            TypeError("bad payload")))
+    monkeypatch.setattr(card_mod, "generate_diagnosis",
+                        lambda *a, **k: fallback)
+    card = analyze_with_agent(_pipeline(), CONFIG)
+    assert card is fallback
+    assert "TypeError" in card.details[0]
+
+
 def test_submit_spec_is_offered_with_the_tools():
     provider = _FakeProvider([
         Turn(tool_calls=[ToolCall(id="a", name="list_results",

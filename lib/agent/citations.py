@@ -129,7 +129,16 @@ def validate(raw: dict, records: list[ToolRecord]) -> Submission:
         is_gap = kind == "data_gap"
         cites: list[int] = []
         reason = ""
-        for cite in row.get("cites") or []:
+        # A model may send one number instead of a list, or 3.0 for 3.
+        # Neither is a wrong citation, and a bare number must not crash.
+        raw_cites = row.get("cites")
+        if type(raw_cites) in (int, float):  # bool is an int subclass
+            raw_cites = [raw_cites]
+        if not isinstance(raw_cites, list):
+            raw_cites = []
+        for cite in raw_cites:
+            if isinstance(cite, float) and cite.is_integer():
+                cite = int(cite)
             if isinstance(cite, bool) or not isinstance(cite, int):
                 if not is_gap:
                     reason = "bad_citation"

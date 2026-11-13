@@ -85,6 +85,7 @@ environment variables take precedence.
 | No key, model or SDK | rule engine, card says why |
 | Service does not support tool calls | single-shot LLM summary, card says so |
 | Network error or timeout | single-shot summary; then rule engine |
+| A reply cut at the output cap | single-shot summary; then rule engine |
 | Tool budget exhausted | finish with what exists; no data → single-shot |
 | Malformed submission | one retry, then single-shot |
 | Untraced numbers | the model is asked to rewrite once; whatever remains is marked unverified |
