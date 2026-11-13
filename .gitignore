@@ -35,6 +35,8 @@ tools/baselines/
 .log_cache/
 tests/sitl/logs/
 python-*.zip
+# Local log corpus kept in the checkout
+探索鹰的日志/
 
 # fleet history archive
 fleet.db
