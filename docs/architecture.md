@@ -75,8 +75,9 @@ uses `lib/fleet_history.py`; both are entry points, not library layers.
   analyzer imports are the visible exception.
 - `web_app.py` still holds the stateful HTTP core; presentation was moved out,
   not the job/upload/history state.
-- `tests/` is flat. With long-term iteration, grouping it by source area is
-  the next maintenance task.
+- `tests/` mirrors the source area (`analyzers/`, `lib/`, `web/`, `agent/`,
+  `cli/`, `tools/`, `integration/`, `sitl/`); shared helpers stay at the
+  root. Put a new test in the folder of the code it exercises.
 - `analyzers/notch_tuning.py` and `lib/html_report.py` are large because their
   domains are; check the layer before adding to them.
 

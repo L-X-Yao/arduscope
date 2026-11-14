@@ -49,7 +49,8 @@ lib/                 Core library
 locales/             i18n string files
   zh.json            Chinese (primary/fallback locale)
   en.json            English
-tests/               pytest suite
+tests/               pytest suite, grouped by the code each test exercises
+  analyzers/ lib/ web/ agent/ cli/ tools/ integration/  test folders
   binlog.py          Writes real-format .BIN files, the only way CI reaches the parser
   sitl/              SITL integration test framework
 docs/                Documentation
