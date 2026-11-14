@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.12.0] - 2026-11-14
 
 ### Changed
 - The settings page offers the services the project tested (Kimi for
