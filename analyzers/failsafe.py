@@ -16,8 +16,12 @@ from __future__ import annotations
 import numpy as np
 import plotly.graph_objects as go
 
+from lib.ekf_failsafe import (
+    PLANE_VTOL_POSVEL_MODES, TRIGGER_SECONDS, in_modes, over_threshold,
+    sustained)
 from lib.ekf_lanes import primary_lane_rows
 from lib.i18n import t
+from lib.np_helpers import safe_nanmax
 from . import AnalysisResult, BaseAnalyzer
 
 
@@ -69,6 +73,7 @@ class FailsafeAnalyzer(BaseAnalyzer):
         details = []
         figures = []
         margin_statuses = []
+        self._ekf_single_over = False
 
         # -----------------------------------------------------------
         # 1. Check triggered failsafes from ERR messages
@@ -180,6 +185,11 @@ class FailsafeAnalyzer(BaseAnalyzer):
             plain_summary = t("failsafe.plain_warning")
             action_text = t("failsafe.action_warning")
             action_level = "physical_check"
+        elif self._ekf_single_over:
+            summary = t("failsafe.summary_good_ekf")
+            plain_summary = t("failsafe.plain_good_ekf")
+            action_text = ""
+            action_level = "ok"
         else:
             summary = t("failsafe.summary_good")
             plain_summary = t("failsafe.plain_good")
@@ -384,7 +394,7 @@ class FailsafeAnalyzer(BaseAnalyzer):
     def _ekf_margin(
         self, kf4_type: str, details: list[str]
     ) -> tuple[go.Figure | None, str]:
-        """Compute EKF variance margin to FS_EKF_THRESH."""
+        """Evaluate ArduPilot's EKF failsafe on the logged variances."""
         kf4 = self.reader.get_messages_as_arrays(kf4_type, [
             "C", "SV", "SP", "SH", "SM", "PI",
         ])
@@ -403,52 +413,79 @@ class FailsafeAnalyzer(BaseAnalyzer):
                 kf4[_k] = kf4[_k][core_mask]
 
         ekf_thresh = self.thresholds.ekf_variance_crit
+        if self.reader.get_param("FS_EKF_THRESH", 0.8) <= 0:
+            details.append(t("failsafe.ekf_disabled"))
+            return None, "good"
 
-        # Combined max variance at each timestamp
-        sv = kf4["SV"]
-        sp = kf4["SP"]
-        sh = kf4["SH"]
-        sm = kf4["SM"]
+        # Combined max variance, for the figure only: ArduPilot's test is
+        # not a per-sensor threshold (see lib/ekf_failsafe.py).
+        sv = np.asarray(kf4["SV"], dtype=float)
+        sp = np.asarray(kf4["SP"], dtype=float)
+        sh = np.asarray(kf4["SH"], dtype=float)
+        sm = np.asarray(kf4["SM"], dtype=float)
         max_var = np.maximum(np.maximum(sv, sp), np.maximum(sh, sm))
+        if all(np.all(np.isnan(a)) for a in (sv, sp, sh, sm)):
+            details.append(t("failsafe.ekf_all_nan"))
+            return None, "info"
 
         # Filter to armed flight only (pre-arm EKF initialization noise
         # would otherwise make every log look bad).
-        armed = self.reader.get_armed_intervals()
-        max_var_for_margin = max_var
+        active = np.ones(len(ts), dtype=bool)
         have_armed = False
+        armed = self.reader.get_armed_intervals()
         if armed:
             armed_mask = np.zeros(len(ts), dtype=bool)
             for s, e in armed:
                 armed_mask |= (ts >= s) & (ts <= e)
             if np.sum(armed_mask) > 10:
-                max_var_for_margin = max_var[armed_mask]
+                active = armed_mask
                 have_armed = True
 
-        margin = ekf_thresh - max_var_for_margin
-        if np.all(np.isnan(margin)):
-            details.append(t("failsafe.ekf_all_nan"))
-            return None, "info"
+        over = over_threshold(sv, sp, sm, ekf_thresh)
+        plane_disabled = (self.vehicle.is_plane
+                          and not self.vehicle.is_quadplane)
+        gate = None
+        if self.vehicle.is_quadplane:
+            gate = in_modes(self.reader.mode_list, ts,
+                            PLANE_VTOL_POSVEL_MODES)
+        gated = over & active
+        if gate is not None:
+            gated = gated & gate
+        if plane_disabled:
+            gated = np.zeros_like(gated)
+        held = sustained(gated, ts)
+        triggered = bool(held.any())
 
-        min_margin = float(np.nanmin(margin))
+        max_sv = safe_nanmax(sv[active], default=0.0)
+        max_sp = safe_nanmax(sp[active], default=0.0)
+        max_sh = safe_nanmax(sh[active], default=0.0)
+        max_sm = safe_nanmax(sm[active], default=0.0)
+        single_over = max(max_sv, max_sp, max_sm) >= ekf_thresh
+        self._ekf_single_over = single_over
 
-        details.append(
-            t("failsafe.ekf_margin",
-              min_margin=f"{min_margin:.3f}",
-              ekf_thresh=f"{ekf_thresh:.2f}")
-        )
-
-        # Diagnostic semantics:
-        #   - critical: variance crossed FS_EKF_THRESH during armed flight
-        #     (authoritative: ArduPilot triggers EKF failsafe at this
-        #     exact threshold)
-        #   - good: stayed below threshold
-        # Without a known armed window, pre-arm EKF convergence spikes
-        # would falsely trip this, so only escalate inside an armed window.
-        status = "good"
-        if min_margin < 0 and have_armed:
-            status = "critical"
-        elif min_margin < 0:
+        details.append(t(
+            "failsafe.ekf_maxima",
+            sv=f"{max_sv:.3f}", sp=f"{max_sp:.3f}", sh=f"{max_sh:.3f}",
+            sm=f"{max_sm:.3f}", thresh=f"{ekf_thresh:.2f}"))
+        if triggered:
+            details.append(t("failsafe.ekf_triggered",
+                             seconds=f"{TRIGGER_SECONDS:g}"))
+        elif single_over:
+            details.append(t("failsafe.ekf_not_triggered"))
+        if plane_disabled:
+            details.append(t("failsafe.ekf_plane_disabled"))
+        elif gate is not None:
+            inside = over & active & gate
+            if (over & active).any() and not inside.any():
+                details.append(t("failsafe.ekf_mode_gate"))
+        if not have_armed and (over.any() or single_over):
             details.append(t("failsafe.margin_unarmed"))
+
+        # Critical only when ArduPilot's own test would have fired: the
+        # combination held for about a second, in the modes where the
+        # vehicle runs it. A single variance over the threshold is a
+        # health signal for the EKF and compass analyzers, not a failsafe.
+        status = "critical" if triggered else "good"
 
         fig = self.make_figure(
             title=t("failsafe.fig_ekf_margin"),

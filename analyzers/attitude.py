@@ -19,6 +19,10 @@ from lib.i18n import t
 
 from . import AnalysisResult, BaseAnalyzer
 
+# AC_ATTITUDE_THRUST_ERROR_ANGLE in ArduPilot's AC_AttitudeControl.h: the
+# attitude error at which the controller's thrust allocation fails.
+_THRUST_ERROR_ANGLE_DEG = 30.0
+
 
 class AttitudeAnalyzer(BaseAnalyzer):
     """
@@ -359,7 +363,12 @@ class AttitudeAnalyzer(BaseAnalyzer):
 
         # Evidence source
         if status in ("warning", "critical"):
-            if peak_severe:
+            if max_peak_err >= _THRUST_ERROR_ANGLE_DEG:
+                # "1/2 of the hard limit" understates a peak that has
+                # already reached the limit itself.
+                evidence_source = t("attitude.evidence_peak_over_limit",
+                                    peak=f"{max_peak_err:.1f}")
+            elif peak_severe:
                 evidence_source = t("attitude.evidence_peak_severe",
                                     peak=f"{max_peak_err:.1f}")
             elif peak_beyond_command:

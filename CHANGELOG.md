@@ -7,6 +7,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Changed
+- The settings page offers the services the project tested (Kimi for
+  Coding, the Kimi API platform, DeepSeek, Zhipu GLM). Choosing one fills
+  in the API type, address and model; both stay editable under "Advanced".
+  A first-time user no longer has to find the address in the provider's
+  documentation, which the Kimi keys made easy to get wrong.
+- The report's GPS panel draws the track without an online basemap and
+  says so. OpenStreetMap blocked a client that did not follow its tile
+  policy (a 403 in place of every tile), and a tile request also sent the
+  flight's coordinates to a third party.
+- The EKF failsafe card and the EKF card now follow ArduPilot's
+  combination rule: two indicators over `FS_EKF_THRESH` (velocity at
+  twice the threshold counts twice), or position with another indicator,
+  held for about a second; Plane runs the check only in VTOL position
+  modes. One compass variance is a warning, not a safety stop. The
+  2025-07-29 QuadPlane log (SM 1.81, SV 0.26, SP 0.45, in AUTO) had no
+  ERR event for exactly this reason.
+- The agent card appends the analyzers' worst action level after the
+  model's summary, so a `safety_stop` cannot be softened to "inspect and
+  retune". The snapshot baseline moves for `pusher_fault` and
+  `link_loss` where one variance was previously called a failsafe.
+
+### Fixed
+- The attitude analyzer called a peak above
+  `AC_ATTITUDE_THRUST_ERROR_ANGLE` (30°) "half of the hard limit", which
+  understates it; a 47.6° peak was reported as half of 30°. The online
+  agent copied the sentence into its summary. A peak at or above 30° now
+  says it reached the limit; 15–30° keeps the half wording.
+- The settings page showed the literal `{error}` after a failed connection
+  test, with the message prepended to it: the JavaScript placeholder sat
+  inside an f-string and was substituted at render time.
+- The failsafe card's "no failsafe event" line read as "no protection
+  triggered", which the online agent read as a contradiction with a
+  negative EKF variance margin. It now names the ERR record.
+- The settings API returned field labels as 400 error messages
+  ("接口类型", "模型名", the address label). It now returns real
+  messages, and refuses a plain http address unless the host is loopback:
+  the key would otherwise travel in the clear.
+
 ## [0.11.0] - 2026-11-13
 
 ### Changed

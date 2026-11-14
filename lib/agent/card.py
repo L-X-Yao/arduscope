@@ -5,8 +5,9 @@ from __future__ import annotations
 import html as _html
 
 from lib.ai_diagnosis import generate_diagnosis
+from lib.executive_summary import get_level_display
 from lib.i18n import t
-from lib.results import AnalysisResult
+from lib.results import ACTION_OK, AnalysisResult, worst_action_level
 
 from .config import AgentConfig
 from .egress import egress_categories
@@ -19,6 +20,24 @@ def _worst_status(results_by_key: dict) -> str:
     if "critical" in statuses:
         return "critical"
     return "warning" if "warning" in statuses else "good"
+
+
+def _worst_action(results_by_key: dict) -> tuple[str, str]:
+    """The most severe action level and the analyzer that owns it.
+
+    The model's summary is one qualitative sentence and can soften the
+    analyser's action ("inspect and retune" for a safety_stop); the card
+    states it after the summary so it cannot be lost.
+    """
+    level = worst_action_level(
+        *(result.action_level or ACTION_OK
+          for result in results_by_key.values()))
+    if level == ACTION_OK:
+        return level, ""
+    for result in results_by_key.values():
+        if result.action_level == level:
+            return level, result.title
+    return level, ""
 
 
 def _kind_label(kind: str) -> str:
@@ -75,6 +94,11 @@ def _build_card(run, pipeline, config: AgentConfig) -> AnalysisResult:
                     count=len(run.submission.observations)))
     if run.submission.summary_unverified:
         summary = f"[{t('agent.unverified_mark')}] {summary}"
+    level, source = _worst_action(pipeline.results_by_key)
+    if level != ACTION_OK and source:
+        summary = f"{summary} " + t(
+            "agent.worst_action",
+            action=get_level_display(level)["label"], source=source)
     return AnalysisResult(
         title=t("agent.card_title"),
         status=status,

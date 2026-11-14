@@ -16,6 +16,8 @@ from __future__ import annotations
 import numpy as np
 import plotly.graph_objects as go
 
+from lib.ekf_failsafe import (
+    TRIGGER_SECONDS, over_threshold, sustained)
 from lib.ekf_lanes import primary_lane_rows
 from lib.i18n import t as _t
 from lib.np_helpers import safe_nanmax
@@ -129,7 +131,24 @@ class EKFAnalyzer(BaseAnalyzer):
         max_sm = safe_nanmax(sm_stat, default=0.0)
         max_variance = max(max_sv, max_sp, max_sh, max_sm)
 
+        # ArduPilot's EKF failsafe is a combination (two indicators, or a
+        # velocity variance at twice the threshold) held for about a
+        # second; one variance over FS_EKF_THRESH does not trigger it.
+        t_stat = t[stat_mask]
+        ap_triggered = bool(sustained(
+            over_threshold(sv_stat, sp_stat, sm_stat, ekf_thresh),
+            t_stat).any())
+        ap_enabled = self.reader.get_param("FS_EKF_THRESH", 0.8) > 0
+
         details.append(_t("ekf.fs_thresh_detail", val=f"{ekf_thresh:.2f}"))
+        if not ap_enabled:
+            details.append(_t("ekf.fs_disabled"))
+        elif ap_triggered:
+            details.append(_t("ekf.ap_triggered",
+                              seconds=f"{TRIGGER_SECONDS:g}"))
+        elif max_variance >= ekf_thresh:
+            details.append(_t("ekf.ap_single_sensor",
+                              thresh=f"{ekf_thresh:.2f}"))
         details.append(_t("ekf.sv_max", val=f"{max_sv:.3f}"))
         details.append(_t("ekf.sp_max", val=f"{max_sp:.3f}"))
         details.append(_t("ekf.sh_max", val=f"{max_sh:.3f}"))
@@ -148,7 +167,7 @@ class EKFAnalyzer(BaseAnalyzer):
         # Actionable instructions:
         # critical → safety_stop (navigation unreliable, real risk)
         # warning  → physical_check (GPS placement / compass calibration)
-        if max_variance >= ekf_thresh:
+        if ap_enabled and ap_triggered:
             status = "critical"
             summary = _t("ekf.crit_summary",
                          val=f"{max_variance:.3f}",

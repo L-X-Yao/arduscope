@@ -710,6 +710,46 @@ class TestAttitudeSynthetic:
                                    _vehicle()).analyze()
         assert result.status == "critical"
 
+    def _build_peak_reader(self, peak_deg, n=300) -> SyntheticReader:
+        ts = np.linspace(0, 120, n)
+        des_roll = np.zeros(n)
+        des_roll[n // 2] = peak_deg
+        return SyntheticReader(
+            messages={
+                "ATT": {
+                    "_timestamp": ts,
+                    "DesRoll": des_roll,
+                    "Roll": np.zeros(n),
+                    "DesPitch": np.zeros(n),
+                    "Pitch": np.zeros(n),
+                    "DesYaw": np.full(n, 90.0),
+                    "Yaw": np.full(n, 90.0),
+                },
+            },
+            params={"ATC_RAT_RLL_P": 0.135},
+            armed_intervals=[(0.0, 120.0)],
+        )
+
+    def test_peak_at_the_thrust_limit_is_not_called_half_of_it(self):
+        """47.6° is past AC_ATTITUDE_THRUST_ERROR_ANGLE (30°), not half
+        of it. The evidence text is the severity source for the report
+        and for the online agent."""
+        reader = self._build_peak_reader(47.6)
+        result = AttitudeAnalyzer(reader, _thresholds(reader),
+                                  _vehicle()).analyze()
+        assert result.status == "critical"      # precondition
+        assert result.evidence_source == _t(
+            "attitude.evidence_peak_over_limit", peak="47.6")
+        assert "1/2" not in result.evidence_source
+
+    def test_peak_below_the_thrust_limit_keeps_the_half_wording(self):
+        reader = self._build_peak_reader(20.0)
+        result = AttitudeAnalyzer(reader, _thresholds(reader),
+                                  _vehicle()).analyze()
+        assert result.status == "critical"      # precondition
+        assert result.evidence_source == _t(
+            "attitude.evidence_peak_severe", peak="20.0")
+
     def test_not_armed_graceful(self):
         """No armed intervals → should not crash."""
         reader = self._build_reader(armed=[])

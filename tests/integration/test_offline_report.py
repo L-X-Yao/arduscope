@@ -94,14 +94,17 @@ class TestLeaflet:
         assert not embedded
 
     @pytest.mark.fast
-    def test_missing_tiles_are_announced(self):
-        """Tiles still need a network. Without one the track is drawn on a
-        blank panel, which must not read as a broken map."""
+    def test_the_map_loads_no_tiles(self):
+        """A public tile server can block the page (OSM did), and a tile
+        request would also send the flight's coordinates to it. The panel
+        draws the track and says there is no basemap."""
         html = _report(_TRACK)
 
+        # Plotly's and Leaflet's bundles mention OSM and tileerror
+        # themselves, so the app's own layer call is the signal.
+        assert "L.tileLayer" not in html
+        assert 'id="map-tile-notice"' not in html
         notice = re.search(
-            r'<div id="map-tile-notice"[^>]*>(.*?)</div>', html, re.S)
+            r'<div class="map-note">(.*?)</div>', html, re.S)
         assert notice is not None
-        assert notice.group(1).strip() == t("report.map_tiles_offline")
-        handled = "'tileerror'" in html
-        assert handled
+        assert notice.group(1).strip() == t("report.map_no_basemap")

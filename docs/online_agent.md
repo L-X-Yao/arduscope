@@ -32,8 +32,10 @@ wins.
 ## Web interface
 
 1. Start the server on a loopback address (the default `127.0.0.1`).
-2. Open `/settings` and fill in the API type, address, model and key.
-   "Test connection" sends one tiny request.
+2. Open `/settings` and choose the service whose key you have; its API
+   type, address and model fill in. Paste the key and press "Test
+   connection", which sends one tiny request. "Custom" exposes the API
+   type and address for a service the list does not carry.
 3. Tick "Analyze with a model" before uploading a log. The choice is
    remembered in the browser; the first tick lists what will be sent.
 

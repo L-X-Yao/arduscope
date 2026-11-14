@@ -1551,8 +1551,8 @@
       "param_count": 7
     },
     "ekf": {
-      "status": "critical",
-      "action_level": "safety_stop",
+      "status": "warning",
+      "action_level": "physical_check",
       "param_count": 0
     },
     "battery": {
@@ -1596,8 +1596,8 @@
       "param_count": 0
     },
     "failsafe": {
-      "status": "critical",
-      "action_level": "physical_check",
+      "status": "good",
+      "action_level": "ok",
       "param_count": 0
     },
     "clock_health": {
@@ -2017,8 +2017,8 @@
       "param_count": 7
     },
     "ekf": {
-      "status": "critical",
-      "action_level": "safety_stop",
+      "status": "warning",
+      "action_level": "physical_check",
       "param_count": 0
     },
     "battery": {
@@ -2062,8 +2062,8 @@
       "param_count": 0
     },
     "failsafe": {
-      "status": "critical",
-      "action_level": "physical_check",
+      "status": "good",
+      "action_level": "ok",
       "param_count": 0
     },
     "clock_health": {

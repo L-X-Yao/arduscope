@@ -753,11 +753,18 @@ def settings_post():
     model = str(data.get("model") or "").strip()
     base_url = str(data.get("base_url") or "").strip()
     if provider not in ("anthropic", "openai"):
-        return _json_error(400, t("web.settings_provider"))
+        return _json_error(400, t("web.settings_bad_provider"))
     if not model:
-        return _json_error(400, t("web.settings_model"))
-    if base_url and not base_url.startswith(("http://", "https://")):
-        return _json_error(400, t("web.settings_base_url"))
+        return _json_error(400, t("web.settings_bad_model"))
+    if base_url:
+        parts = urlsplit(base_url)
+        host = (parts.hostname or "").lower()
+        loopback = host in ("127.0.0.1", "::1", "localhost")
+        if parts.scheme not in ("http", "https") or not host:
+            return _json_error(400, t("web.settings_bad_base_url"))
+        # The key goes to this address in the clear on http.
+        if parts.scheme == "http" and not loopback:
+            return _json_error(400, t("web.settings_bad_base_url"))
     try:
         config = load_config()
         config = update_config(config, data)

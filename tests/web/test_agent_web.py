@@ -9,7 +9,7 @@ import tempfile
 import pytest
 from webtest import TestApp
 
-from lib.i18n import set_locale
+from lib.i18n import set_locale, t
 
 
 @pytest.fixture
@@ -55,6 +55,35 @@ def test_settings_page_names_the_configured_path(app):
     assert agent_config.CONFIG_PATH in resp.text
 
 
+def test_settings_page_fills_a_known_service(app):
+    """The service presets carry the address and model, so a first-time
+    user does not have to find them in the provider's documentation."""
+    resp = app.get("/settings")
+    assert "kimi-coding" in resp.text
+    assert "https://api.kimi.com/coding" in resp.text
+    assert "kimi-for-coding" in resp.text
+
+
+def test_settings_page_selects_the_saved_service(app):
+    app.post_json("/api/settings", {
+        "provider": "anthropic",
+        "base_url": "https://api.kimi.com/coding",
+        "model": "kimi-for-coding",
+        "api_key": "sk-secret-1234",
+    })
+    resp = app.get("/settings")
+    assert 'value="kimi-coding" selected' in resp.text
+
+
+def test_settings_page_renders_a_usable_error_placeholder(app):
+    """The JS sat inside an f-string, which ate the '{error}' literal:
+    every failure showed the placeholder itself, prepended by the
+    message it was supposed to replace."""
+    resp = app.get("/settings")
+    assert "I18N.test_failed.replace('{error}'," in resp.text
+    assert "replace('', data.error" not in resp.text
+
+
 def test_settings_page_is_404_when_exposed(app, monkeypatch):
     import web_app
     monkeypatch.setattr(web_app, "_ALLOW_SETTINGS", False)
@@ -89,6 +118,35 @@ def test_settings_post_refuses_a_bad_provider(app):
         "provider": "nope", "model": "m", "api_key": "k",
     }, expect_errors=True)
     assert resp.status_int == 400
+    # The message used to be the field label, "接口类型".
+    assert resp.json["error"] == t("web.settings_bad_provider")
+
+
+def test_settings_post_refuses_an_empty_model(app):
+    resp = app.post_json("/api/settings", {
+        "provider": "openai", "model": "", "api_key": "k",
+    }, expect_errors=True)
+    assert resp.status_int == 400
+    assert resp.json["error"] == t("web.settings_bad_model")
+
+
+def test_settings_post_refuses_plain_http_to_a_remote_host(app):
+    resp = app.post_json("/api/settings", {
+        "provider": "openai", "model": "m",
+        "base_url": "http://example.com/v1", "api_key": "k",
+    }, expect_errors=True)
+    assert resp.status_int == 400
+    assert resp.json["error"] == t("web.settings_bad_base_url")
+
+
+def test_settings_post_accepts_http_for_a_loopback_app(app):
+    """A local model server (Ollama and the like) speaks plain http and
+    never leaves the machine."""
+    resp = app.post_json("/api/settings", {
+        "provider": "openai", "model": "m",
+        "base_url": "http://127.0.0.1:11434/v1", "api_key": "k",
+    })
+    assert resp.status_int == 200
 
 
 def test_upload_with_agent_refuses_when_not_configured(app):

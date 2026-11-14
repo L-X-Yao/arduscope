@@ -11,7 +11,7 @@ from lib.agent.config import AgentConfig
 from lib.agent.loop import AgentError, SUBMIT_SPEC, run_agent
 from lib.agent.providers import NoToolSupport, ToolCall, Turn
 from lib.pipeline import PipelineResult
-from lib.results import AnalysisResult
+from lib.results import ACTION_SAFETY_STOP, AnalysisResult
 from lib.thresholds import Thresholds
 from lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
@@ -147,6 +147,34 @@ def test_submit_spec_is_offered_with_the_tools():
     ])
     run_agent(_pipeline(), CONFIG, provider=provider)
     assert SUBMIT_SPEC["name"] in provider.seen_tools[0]
+
+
+def test_the_card_states_the_worst_action_under_the_summary():
+    """The model's sentence can soften a safety_stop to "inspect and
+    retune"; the card adds the analyser's own level so it is not lost."""
+    from lib.agent.citations import Submission
+    from lib.agent.card import _build_card
+    from lib.agent.loop import AgentRun
+    from lib.executive_summary import get_level_display
+    from lib.i18n import t
+
+    pipeline = _pipeline()
+    ekf = AnalysisResult(
+        title="EKF", status="critical", summary="ekf",
+        action_level=ACTION_SAFETY_STOP, action_text="stop",
+        evidence_source="src")
+    pipeline.results.append(ekf)
+    pipeline.results_by_key["ekf"] = ekf
+    run = AgentRun(
+        submission=Submission(summary="inspect and retune", observations=[],
+                              unverified_count=0),
+        records=[], turns=1, input_tokens=0, output_tokens=0,
+        elapsed=0.0, provider="openai", model="m")
+    card = _build_card(run, pipeline, CONFIG)
+    assert card.summary.startswith("inspect and retune")
+    assert t("agent.worst_action",
+             action=get_level_display(ACTION_SAFETY_STOP)["label"],
+             source="EKF") in card.summary
 
 
 def test_an_unverified_summary_is_marked_on_the_card():

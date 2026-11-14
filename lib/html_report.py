@@ -781,8 +781,8 @@ class HtmlReportGenerator:
         <button onclick="toggleMap()" style="background:none;border:none;
                 color:#999;cursor:pointer;font-size:16px">&times;</button>
     </div>
-    <div id="flight-map" style="width:100%;height:calc(100% - 28px)"></div>
-    <div id="map-tile-notice" class="map-tile-notice">{t('report.map_tiles_offline')}</div>
+    <div id="flight-map" style="width:100%;flex:1"></div>
+    <div class="map-note">{t('report.map_no_basemap')}</div>
 </div>
 
 <script>
@@ -807,12 +807,6 @@ class HtmlReportGenerator:
             coords.push([GPS.lat[i], GPS.lng[i]]);
         }}
         map = L.map('flight-map', {{zoomControl: true}});
-        L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
-            maxZoom: 19,
-            attribution: '&copy; OpenStreetMap'
-        }}).on('tileerror', function() {{
-            document.getElementById('map-tile-notice').style.display = 'block';
-        }}).addTo(map);
         polyline = L.polyline(coords, {{
             color: '#409eff', weight: 2.5, opacity: 0.8
         }}).addTo(map);
@@ -1384,17 +1378,11 @@ body {
     box-shadow: 0 4px 20px rgba(0,0,0,0.25);
     overflow: hidden;
 }
-.map-tile-notice {
-    display: none;
-    position: absolute;
-    left: 8px;
-    right: 8px;
-    bottom: 22px;
-    z-index: 1000;
-    padding: 4px 8px;
-    border-radius: 4px;
-    background: rgba(255,255,255,0.9);
-    font-size: 12px;
+.map-note {
+    padding: 4px 10px;
+    background: #f7f8fa;
+    border-top: 1px solid #eee;
+    font-size: 11px;
     color: #666;
 }
 .map-panel-header {

@@ -13,6 +13,36 @@ from lib import fleet_history
 from lib.agent import config as agent_config
 from lib.i18n import get_locale, t
 
+# The services the project tested end to end. Picking one fills in the
+# address and model so a first-time user does not have to find them in the
+# provider's docs. A vendor that renames a model only needs the preset
+# updated; the fields stay editable.
+_SERVICE_PRESETS = (
+    {"id": "kimi-coding", "label": "web.service_kimi_coding",
+     "provider": "anthropic", "base_url": "https://api.kimi.com/coding",
+     "model": "kimi-for-coding"},
+    {"id": "moonshot", "label": "web.service_moonshot",
+     "provider": "openai", "base_url": "https://api.moonshot.cn/v1",
+     "model": "kimi-k3.1-pro"},
+    {"id": "deepseek", "label": "web.service_deepseek",
+     "provider": "openai", "base_url": "https://api.deepseek.com",
+     "model": "deepseek-chat"},
+    {"id": "glm", "label": "web.service_glm",
+     "provider": "anthropic", "base_url": "https://open.bigmodel.cn/api/anthropic",
+     "model": "glm-5.3"},
+)
+
+
+def _service_id(provider: str, base_url: str) -> str:
+    """The preset a saved configuration matches; "custom" when none does."""
+    provider = (provider or "").strip()
+    base_url = (base_url or "").strip().rstrip("/")
+    for preset in _SERVICE_PRESETS:
+        if (preset["provider"] == provider
+                and preset["base_url"].rstrip("/") == base_url):
+            return preset["id"]
+    return "custom" if (provider or base_url) else ""
+
 
 def build_settings_html(config, error: str = "") -> str:
     data = config.public_dict()
@@ -20,11 +50,38 @@ def build_settings_html(config, error: str = "") -> str:
     key_hint = (t("web.settings_key_hint", hint=data["key_hint"])
                 if data["has_key"] else "")
     checked = lambda value: " checked" if value else ""
-    options = "".join(
+    preselected = _service_id(data.get("provider", ""),
+                              data.get("base_url", ""))
+    service_options = [
+        '<option value="">'
+        + html.escape(t("web.settings_service_pick")) + '</option>'
+    ]
+    for preset in _SERVICE_PRESETS:
+        selected = " selected" if preset["id"] == preselected else ""
+        service_options.append(
+            f'<option value="{preset["id"]}"{selected}>'
+            + html.escape(t(preset["label"])) + '</option>')
+    service_options.append(
+        '<option value="custom"'
+        + (' selected' if preselected == "custom" else "")
+        + '>' + html.escape(t("web.service_custom")) + '</option>')
+    options = "".join(service_options)
+    provider_options = "".join(
         f'<option value="{p}"'
         + (' selected' if p == data.get("provider") else "")
         + f'>{p}</option>'
         for p in ("anthropic", "openai"))
+    advanced_open = " open" if preselected in ("", "custom") else ""
+    presets_json = json.dumps(
+        [{k: preset[k] for k in ("id", "provider", "base_url", "model")}
+         for preset in _SERVICE_PRESETS], ensure_ascii=False)
+    i18n_json = json.dumps({
+        "saved": t("web.settings_saved"),
+        "test_ok": t("web.settings_test_ok"),
+        "test_failed": t("web.settings_test_failed", error="{error}"),
+        "error": t("web.settings_error", error="{error}"),
+        "testing": t("web.settings_testing"),
+    }, ensure_ascii=False)
     return f"""<!DOCTYPE html>
 <html lang="{lang_code}">
 <head>
@@ -47,6 +104,9 @@ button{{padding:8px 14px;border-radius:6px;border:0;cursor:pointer;font-size:14p
 .msg{{margin-top:14px;font-size:13px;min-height:18px}}
 .err{{color:#f85149}} .ok{{color:#3fb950}} .hint{{font-size:12px;color:#8b949e;margin-top:6px}}
 .check{{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:13px}}
+details{{margin-top:16px;border-top:1px solid #30363d;padding-top:12px}}
+summary{{cursor:pointer;font-size:13px;color:#b8c0c8}}
+.section{{margin-top:18px;font-size:13px;font-weight:600;color:#b8c0c8}}
 a{{color:#58a6ff}}
 </style>
 </head>
@@ -54,23 +114,32 @@ a{{color:#58a6ff}}
 <div class="card">
 <h1>{html.escape(t('web.settings_title'))}</h1>
 <p class="hint">{html.escape(t('web.settings_hint', path=agent_config.CONFIG_PATH))}</p>
+<label for="service">{html.escape(t('web.settings_service'))}</label>
+<select id="service" onchange="applyService()">{options}</select>
+<div class="hint">{html.escape(t('web.settings_service_hint'))}</div>
+<label for="model">{html.escape(t('web.settings_model'))}</label>
+<input type="text" id="model" value="{html.escape(data.get('model', ''))}">
+<div class="hint">{html.escape(t('web.settings_model_hint'))}</div>
+<label for="api_key">{html.escape(t('web.settings_key'))}</label>
+<input type="password" id="api_key" placeholder="{html.escape(key_hint)}">
+<div class="hint">{html.escape(t('web.settings_key_note'))}</div>
+<div class="check"><input type="checkbox" id="clear_key">
+<label for="clear_key" style="margin:0">{html.escape(t('web.settings_clear_key'))}</label></div>
+<details id="advanced"{advanced_open}>
+<summary>{html.escape(t('web.settings_advanced'))}</summary>
 <label for="provider">{html.escape(t('web.settings_provider'))}</label>
-<select id="provider">{options}</select>
+<select id="provider">{provider_options}</select>
 <div class="hint">{html.escape(t('web.settings_provider_hint'))}</div>
 <label for="base_url">{html.escape(t('web.settings_base_url'))}</label>
 <input type="text" id="base_url" value="{html.escape(data.get('base_url', ''))}">
-<label for="model">{html.escape(t('web.settings_model'))}</label>
-<input type="text" id="model" value="{html.escape(data.get('model', ''))}">
-<label for="api_key">{html.escape(t('web.settings_key'))}</label>
-<input type="password" id="api_key" placeholder="{html.escape(key_hint)}">
+</details>
+<div class="section">{html.escape(t('web.settings_egress_title'))}</div>
 <div class="check"><input type="checkbox" id="allow_gps"{checked(data['allow_gps'])}>
 <label for="allow_gps" style="margin:0">{html.escape(t('web.settings_allow_gps'))}</label></div>
 <div class="check"><input type="checkbox" id="allow_serial"{checked(data['allow_serial'])}>
 <label for="allow_serial" style="margin:0">{html.escape(t('web.settings_allow_serial'))}</label></div>
 <div class="check"><input type="checkbox" id="allow_text"{checked(data['allow_text'])}>
 <label for="allow_text" style="margin:0">{html.escape(t('web.settings_allow_text'))}</label></div>
-<div class="check"><input type="checkbox" id="clear_key">
-<label for="clear_key" style="margin:0">{html.escape(t('web.settings_clear_key'))}</label></div>
 <div class="row">
 <button class="primary" onclick="saveSettings()">{html.escape(t('web.settings_save'))}</button>
 <button class="secondary" onclick="testSettings()">{html.escape(t('web.settings_test'))}</button>
@@ -79,13 +148,21 @@ a{{color:#58a6ff}}
 <div class="msg" id="msg">{html.escape(error)}</div>
 </div>
 <script>
-const I18N = {json.dumps({
-    "saved": t("web.settings_saved"),
-    "test_ok": t("web.settings_test_ok"),
-    "test_failed": t("web.settings_test_failed", error="{error}"),
-    "error": t("web.settings_error", error="{error}"),
-    "testing": t("web.settings_testing"),
-}, ensure_ascii=False)};
+const I18N = {i18n_json};
+const SERVICES = {presets_json};
+function applyService() {{
+  const id = document.getElementById('service').value;
+  const preset = SERVICES.find(function(s) {{ return s.id === id; }});
+  const advanced = document.getElementById('advanced');
+  if (preset) {{
+    document.getElementById('provider').value = preset.provider;
+    document.getElementById('base_url').value = preset.base_url;
+    document.getElementById('model').value = preset.model;
+    advanced.open = false;
+  }} else if (id === 'custom') {{
+    advanced.open = true;
+  }}
+}}
 function values() {{
   return {{
     provider: document.getElementById('provider').value,
@@ -116,14 +193,14 @@ async function saveSettings() {{
     document.getElementById('api_key').value = '';
     show(I18N.saved, true);
   }}
-  catch (e) {{ show(I18N.error.replace('{error}', e.message), false); }}
+  catch (e) {{ show(I18N.error.replace('{{error}}', e.message), false); }}
 }}
 async function testSettings() {{
   show(I18N.testing, true);
   try {{
     const data = await post('/api/settings/test');
-    show(data.ok ? I18N.test_ok : I18N.test_failed.replace('{error}', data.error || ''), data.ok);
-  }} catch (e) {{ show(I18N.test_failed.replace('{error}', e.message), false); }}
+    show(data.ok ? I18N.test_ok : I18N.test_failed.replace('{{error}}', data.error || ''), data.ok);
+  }} catch (e) {{ show(I18N.test_failed.replace('{{error}}', e.message), false); }}
 }}
 </script>
 </body>
