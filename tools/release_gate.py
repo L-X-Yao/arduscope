@@ -12,8 +12,8 @@ pass from it.
 
 Steps:
     ci_local    tools/ci_local.py
-    snapshots   tests/test_baseline_snapshots.py on the real logs
-    sitl        fly the scenarios, then tests/test_sitl_regression.py
+    snapshots   tests/integration/test_baseline_snapshots.py on the real logs
+    sitl        fly the scenarios, then tests/sitl/test_sitl_regression.py
     corpus      baseline_run.py on each corpus, against the accepted baseline,
                 then check_suggestions.py on what it suggested
 
@@ -218,7 +218,7 @@ def step_ci_local(args, log_dir: str) -> dict:
 
 def step_snapshots(args, log_dir: str) -> dict:
     code, output = _run("snapshots", [
-        sys.executable, "-m", "pytest", "tests/test_baseline_snapshots.py",
+        sys.executable, "-m", "pytest", "tests/integration/test_baseline_snapshots.py",
         "-q", "--tb=short"], log_dir)
     return judge_tests(code, output)
 
@@ -232,7 +232,7 @@ def step_sitl(args, log_dir: str) -> dict:
         return {"status": "fail",
                 "detail": flown.group(0) if flown else "no flight ran"}
     code, output = _run("sitl_regression", [
-        sys.executable, "-m", "pytest", "tests/test_sitl_regression.py",
+        sys.executable, "-m", "pytest", "tests/sitl/test_sitl_regression.py",
         "-q", "--tb=short"], log_dir)
     return judge_tests(code, output)
 

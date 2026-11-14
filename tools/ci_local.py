@@ -45,8 +45,8 @@ def main():
     # 2. Unit tests (no real logs)
     test_cmd = [
         sys.executable, "-m", "pytest", "tests/", "-q",
-        "--ignore=tests/test_baseline_snapshots.py",
-        "--ignore=tests/test_sitl_regression.py",
+        "--ignore=tests/integration/test_baseline_snapshots.py",
+        "--ignore=tests/sitl/test_sitl_regression.py",
     ]
     if quick:
         # Marker-based selection: the fast tier is the pure-logic

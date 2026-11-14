@@ -3,7 +3,7 @@
 Generate SITL log files for ArduScope regression testing.
 
 Each scenario in scenarios.json flies on the SITL binary, driven over MAVLink,
-and leaves a .BIN log for tests/test_sitl_regression.py to check. Every step
+and leaves a .BIN log for tests/sitl/test_sitl_regression.py to check. Every step
 waits on what the vehicle reports, on its own clock, so a step that does not
 happen fails the scenario instead of producing a log with no flight in it.
 

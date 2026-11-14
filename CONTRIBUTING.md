@@ -150,7 +150,7 @@ A regression test asserts its precondition before its invariant. With
 running the code it was written for as soon as an input drifts under a
 threshold. Put inputs well past a threshold, not on it.
 
-Update snapshots with `tests/test_baseline_snapshots.py --update` only after
+Update snapshots with `tests/integration/test_baseline_snapshots.py --update` only after
 reading what changed.
 
 ## Which gates a change has to pass
