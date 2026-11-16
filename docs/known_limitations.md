@@ -25,8 +25,9 @@ them readable.
   closed. Sources: Plane-4.5.1 `ArduPlane/quadplane.cpp`,
   `ArduPlane/ArduPlane.cpp` and `ArduPlane/ekf_check.cpp`.
   Audited against real logs on 2026-11-17 over the 2026-11-11 backup of the
-  gate corpora (the eagle corpus complete, 486 of the 518 test-corpus logs,
-  561 files): 49 QuadPlane logs matched, 17 flew AUTO, 16 opened AUTO VTOL
+  gate corpora (the backup holds both gate corpora complete: 43 eagle and
+  518 test logs, 561 .bin files, every one scanned): 49 QuadPlane logs
+  matched, 17 flew AUTO, 16 opened AUTO VTOL
   windows of 6-29 s at their VTOL climbs while the assist flag kept
   Q-assisted fixed-wing phases closed, and no log had a variance breach
   inside a gated window or an ERR EKF event — the trigger path still has no
