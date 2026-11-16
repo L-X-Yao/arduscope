@@ -17,7 +17,7 @@ ArduScope reads ArduPilot `.BIN` logs and runs 32 analyzers to produce actionabl
 - **Structured parameter suggestions** — concrete param names + values, exportable as `.param` files for Mission Planner
 - **METHODIC-backed thresholds** — every warning and critical cites its source. The limits that have none yet are listed in the [known limitations](docs/known_limitations.md)
 - **Cross-correlation diagnosis** — 27 rules detect multi-system fault patterns
-- **Interactive HTML reports** — Plotly charts and map code embedded, so reports work offline. Map tiles need a network; the map says so when it has none
+- **Interactive HTML reports** — Plotly charts and map code embedded, so reports work offline. No online basemap is loaded; the map shows only the track shape
 - **Multi-log comparison** — track tuning convergence across flights
 - **Fleet history** — every flight auto-archived per airframe (hardware-serial keyed); trend card in reports, `fleet_report.py` CLI (incl. `--backfill` for historical logs) + web fleet page (`/fleet`, with alias editing)
 - **Web + CLI** — browser drag-and-drop or command-line batch processing
