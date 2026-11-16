@@ -172,6 +172,22 @@ class TestFailsafeCard:
         reader = _phase_plane([(0.0, 2)], with_qtun=False)
         assert _failsafe(reader, _quadplane()).status == "good"
 
+    def test_auto_stage_with_nan_ast_stays_closed(self):
+        reader = _phase_plane([(0.0, 2)], assist=np.nan)
+        ts = reader._messages["XKF4"]["_timestamp"]
+        assert not plane_posvel_mask(reader, ts).any()
+        assert _failsafe(reader, _quadplane()).status == "good"
+
+    def test_auto_stage_with_only_distant_qtun_stays_closed(self):
+        reader = _phase_plane([(0.0, 2)])
+        reader._messages["QTUN"] = {
+            "_timestamp": np.array([100.0]),
+            "Ast": np.array([0.0]),
+        }
+        ts = reader._messages["XKF4"]["_timestamp"]
+        assert not plane_posvel_mask(reader, ts).any()
+        assert _failsafe(reader, _quadplane()).status == "good"
+
     def test_guided_qtun_is_not_enough_to_open_the_gate(self):
         reader = _phase_plane([(0.0, 2)], mode_name="GUIDED", mode_number=15)
         assert _failsafe(reader, _quadplane()).status == "good"

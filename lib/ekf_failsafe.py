@@ -14,8 +14,9 @@ AUTO needs phase evidence too: ``Plane::update_flight_stage`` logs
 ``STAT.Stage=VTOL`` both for ``in_vtol_auto()`` and for fixed-wing Q assist,
 so Stage alone is not enough. ``QTUN.Ast`` records ``assisted_flight``;
 a nearby row with its active bit clear separates the two. AUTO stays closed
-without both signals, and when assist is active (including VTOL airbrake),
-which can leave a real AUTO VTOL trigger unreported.
+without both signals or while assist is active. If assist and
+``in_vtol_auto()`` overlap, as during a takeoff transition, this conservative
+gate can miss a real AUTO VTOL trigger.
 
 GUIDED remains excluded. Its gate also needs ``auto_state.vtol_loiter`` and
 ``poscontrol.get_state() > QPOS_APPROACH``. Neither state is logged directly;
@@ -39,7 +40,9 @@ PLANE_VTOL_POSVEL_MODES = (19, 20, 21, 22)
 _PLANE_AUTO_MODE = 10                 # ArduPlane/mode.h
 _FLIGHT_STAGE_VTOL = 2               # AP_FixedWing::FlightStage::VTOL
 _QTUN_MATCH_SECONDS = 0.25           # QTUN is 25 Hz; its tail lasts 250 ms
-_QTUN_ASSIST_ACTIVE = 1              # log_assistance_flags / QTUN.Ast bit 0
+# Plane-4.5.1 writes assisted_flight as a boolean in QTUN.Ast; Plane 4.6+
+# writes log_assistance_flags. Bit 0 is the active indication in both.
+_QTUN_ASSIST_ACTIVE = 1
 
 
 def over_threshold(sv, sp, sm, thresh: float) -> np.ndarray:
@@ -127,7 +130,9 @@ def plane_posvel_mask(reader, timestamps) -> np.ndarray | None:
         stat["Stage"][stat_idx[stage_known]] == _FLIGHT_STAGE_VTOL)
 
     # Match each EKF row to the nearest QTUN sample. A missing/old Ast field
-    # is unknown, not evidence that Q assist was inactive.
+    # is unknown, not evidence that Q assist was inactive. At assist start,
+    # the previous Ast can persist for at most about one 25 Hz QTUN interval
+    # (40 ms), far below the 1 s hold, so this cannot create a false critical.
     right = np.searchsorted(qtun_ts, ts)
     left = np.clip(right - 1, 0, len(qtun_ts) - 1)
     right = np.clip(right, 0, len(qtun_ts) - 1)

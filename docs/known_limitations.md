@@ -17,12 +17,20 @@ them readable.
   `STAT.Stage=VTOL` and a nearby `QTUN.Ast` whose assist-active bit is clear:
   `Plane::update_flight_stage` uses the same STAT stage for `in_vtol_auto()`
   and fixed-wing Q assist. Missing STAT/QTUN, an unknown Ast field, or active
-  assist leaves AUTO closed; this still misses genuine VTOL segments, including
-  airbrake, where assist is active. GUIDED needs `auto_state.vtol_loiter` and
+  assist leaves AUTO closed. If assist overlaps `in_vtol_auto()`, as during a
+  takeoff transition, the gate stays closed and can miss a genuine trigger.
+  GUIDED needs `auto_state.vtol_loiter` and
   `poscontrol.get_state() > QPOS_APPROACH`; neither is logged directly and QTUN
   does not expose `guided_takeoff` or the poscontrol state, so GUIDED stays
   closed. Sources: Plane-4.5.1 `ArduPlane/quadplane.cpp`,
   `ArduPlane/ArduPlane.cpp` and `ArduPlane/ekf_check.cpp`.
+- **The failsafe and EKF cards intentionally answer different questions.** The
+  failsafe card asks whether ArduPilot would trigger its EKF failsafe, so it
+  applies the vehicle's mode gate. The EKF card asks whether the variance
+  combination itself reaches the failsafe condition, and is not downgraded by
+  mode. ArduPilot does not run that check in a fixed-wing segment, but this
+  does not make the navigation risk lower. Different verdicts from the two
+  cards are therefore a deliberate distinction, not a contradiction.
 - **`attitude` reads critical on one sample.** A single row with over 15 deg
   of roll or pitch error is critical. That 15, and the 20 and 4.0 beside it in
   `analyzers/attitude.py`, are literals with no source, outside
