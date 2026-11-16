@@ -9,6 +9,19 @@ decision. The condition must hold for about a second, ten checks at 10 Hz,
 before the failsafe fires. Plane runs the check only while the VTOL
 position controller is active (``QuadPlane::in_vtol_posvel_mode()``).
 
+QLOITER, QLAND, QRTL and QAUTOTUNE are direct evidence of that controller.
+AUTO needs phase evidence too: ``Plane::update_flight_stage`` logs
+``STAT.Stage=VTOL`` both for ``in_vtol_auto()`` and for fixed-wing Q assist,
+so Stage alone is not enough. ``QTUN.Ast`` records ``assisted_flight``;
+a nearby row with its active bit clear separates the two. AUTO stays closed
+without both signals, and when assist is active (including VTOL airbrake),
+which can leave a real AUTO VTOL trigger unreported.
+
+GUIDED remains excluded. Its gate also needs ``auto_state.vtol_loiter`` and
+``poscontrol.get_state() > QPOS_APPROACH``. Neither state is logged directly;
+even with Ast, QTUN does not expose ``guided_takeoff`` or the poscontrol state,
+so it cannot prove the conjunction.
+
 A single variance over the threshold, the compass being the common case,
 is therefore a health signal, not an ArduPilot failsafe.
 """
@@ -20,11 +33,13 @@ import numpy as np
 # Ten failed checks at 10 Hz before Plane/Copter declare the failsafe.
 TRIGGER_SECONDS = 1.0
 
-# The Plane modes for which quadplane.in_vtol_posvel_mode() is true
-# without also needing auto_state.vtol_loiter: QLOITER, QLAND, QRTL and
-# QAUTOTUNE. Guided flight is left out because the log does not say
-# whether it was loitering on the VTOL controller.
+# Direct-mode cases in QuadPlane::in_vtol_posvel_mode(): QLOITER, QLAND,
+# QRTL and QAUTOTUNE. AUTO and GUIDED need state beyond the mode number.
 PLANE_VTOL_POSVEL_MODES = (19, 20, 21, 22)
+_PLANE_AUTO_MODE = 10                 # ArduPlane/mode.h
+_FLIGHT_STAGE_VTOL = 2               # AP_FixedWing::FlightStage::VTOL
+_QTUN_MATCH_SECONDS = 0.25           # QTUN is 25 Hz; its tail lasts 250 ms
+_QTUN_ASSIST_ACTIVE = 1              # log_assistance_flags / QTUN.Ast bit 0
 
 
 def over_threshold(sv, sp, sm, thresh: float) -> np.ndarray:
@@ -74,3 +89,57 @@ def in_modes(mode_list, timestamps, modes) -> np.ndarray | None:
     valid = idx >= 0
     mask[valid] = np.isin(numbers[idx[valid]], modes)
     return mask
+
+
+def plane_posvel_mask(reader, timestamps) -> np.ndarray | None:
+    """Plane rows with positive evidence for ``in_vtol_posvel_mode()``.
+
+    Direct Q modes come from MODE. AUTO additionally requires STAT's VTOL
+    stage and a nearby QTUN row whose assist-active bit is clear. This is
+    the distinction in Plane-4.5.1 ``Plane::update_flight_stage`` and
+    ``QuadPlane::Log_Write_QControl_Tuning``. Unknown evidence fails closed.
+
+    None means the log has no usable MODE changes, as in ``in_modes``.
+    """
+    ts = np.asarray(timestamps, dtype=float)
+    direct = in_modes(reader.mode_list, ts, PLANE_VTOL_POSVEL_MODES)
+    if direct is None:
+        return None
+    auto = in_modes(reader.mode_list, ts, (_PLANE_AUTO_MODE,))
+    if not auto.any():
+        return direct
+    if not reader.has_message("STAT") or not reader.has_message("QTUN"):
+        return direct
+
+    stat = reader.get_messages_as_arrays("STAT", ["Stage"])
+    qtun = reader.get_messages_as_arrays("QTUN", ["Ast"])
+    stat_ts = stat["_timestamp"]
+    qtun_ts = qtun["_timestamp"]
+    if len(stat_ts) == 0 or len(qtun_ts) == 0:
+        return direct
+
+    # STAT is written on a stage change. Hold the last known stage, but do
+    # not back-fill the first one into an earlier, unknown interval.
+    stat_idx = np.searchsorted(stat_ts, ts, side="right") - 1
+    stage_known = stat_idx >= 0
+    stage_vtol = np.zeros(len(ts), dtype=bool)
+    stage_vtol[stage_known] = (
+        stat["Stage"][stat_idx[stage_known]] == _FLIGHT_STAGE_VTOL)
+
+    # Match each EKF row to the nearest QTUN sample. A missing/old Ast field
+    # is unknown, not evidence that Q assist was inactive.
+    right = np.searchsorted(qtun_ts, ts)
+    left = np.clip(right - 1, 0, len(qtun_ts) - 1)
+    right = np.clip(right, 0, len(qtun_ts) - 1)
+    use_left = np.abs(ts - qtun_ts[left]) <= np.abs(qtun_ts[right] - ts)
+    nearest = np.where(use_left, left, right)
+    distance = np.minimum(np.abs(ts - qtun_ts[left]),
+                          np.abs(qtun_ts[right] - ts))
+    ast = np.asarray(qtun["Ast"], dtype=float)
+    finite_ast = np.isfinite(ast)
+    ast_bits = np.zeros(len(ast), dtype=np.int64)
+    ast_bits[finite_ast] = ast[finite_ast].astype(np.int64)
+    no_assist = ((distance <= _QTUN_MATCH_SECONDS) & finite_ast[nearest]
+                 & ((ast_bits[nearest] & _QTUN_ASSIST_ACTIVE) == 0))
+
+    return direct | (auto & stage_vtol & no_assist)

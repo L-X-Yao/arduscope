@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Fixed
+- The Plane EKF failsafe gate recognises AUTO VTOL segments when STAT and
+  QTUN distinguish them from fixed-wing Q assist. Ambiguous AUTO phases and
+  GUIDED remain excluded rather than inferred; `docs/known_limitations.md`
+  records the remaining under-reporting cases.
+
 ## [0.12.0] - 2026-11-14
 
 ### Changed

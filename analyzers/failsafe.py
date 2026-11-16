@@ -17,8 +17,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 from lib.ekf_failsafe import (
-    PLANE_VTOL_POSVEL_MODES, TRIGGER_SECONDS, in_modes, over_threshold,
-    sustained)
+    TRIGGER_SECONDS, over_threshold, plane_posvel_mask, sustained)
 from lib.ekf_lanes import primary_lane_rows
 from lib.i18n import t
 from lib.np_helpers import safe_nanmax
@@ -446,8 +445,7 @@ class FailsafeAnalyzer(BaseAnalyzer):
                           and not self.vehicle.is_quadplane)
         gate = None
         if self.vehicle.is_quadplane:
-            gate = in_modes(self.reader.mode_list, ts,
-                            PLANE_VTOL_POSVEL_MODES)
+            gate = plane_posvel_mask(self.reader, ts)
         gated = over & active
         if gate is not None:
             gated = gated & gate

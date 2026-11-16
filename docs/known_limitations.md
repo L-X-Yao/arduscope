@@ -12,6 +12,17 @@ them readable.
   `notch_tuning` on 98, `vibration` on 93, `failsafe` on 88. No one has gone
   through them flight by flight. Read the figures on a card, not its badge
   alone.
+- **Plane's EKF failsafe gate is conservative in AUTO and GUIDED.** QLOITER,
+  QLAND, QRTL and QAUTOTUNE are recognised directly. AUTO also needs
+  `STAT.Stage=VTOL` and a nearby `QTUN.Ast` whose assist-active bit is clear:
+  `Plane::update_flight_stage` uses the same STAT stage for `in_vtol_auto()`
+  and fixed-wing Q assist. Missing STAT/QTUN, an unknown Ast field, or active
+  assist leaves AUTO closed; this still misses genuine VTOL segments, including
+  airbrake, where assist is active. GUIDED needs `auto_state.vtol_loiter` and
+  `poscontrol.get_state() > QPOS_APPROACH`; neither is logged directly and QTUN
+  does not expose `guided_takeoff` or the poscontrol state, so GUIDED stays
+  closed. Sources: Plane-4.5.1 `ArduPlane/quadplane.cpp`,
+  `ArduPlane/ArduPlane.cpp` and `ArduPlane/ekf_check.cpp`.
 - **`attitude` reads critical on one sample.** A single row with over 15 deg
   of roll or pitch error is critical. That 15, and the 20 and 4.0 beside it in
   `analyzers/attitude.py`, are literals with no source, outside

@@ -14,7 +14,8 @@ import pytest
 
 from analyzers.ekf import EKFAnalyzer
 from analyzers.failsafe import FailsafeAnalyzer
-from lib.ekf_failsafe import in_modes, over_threshold, sustained
+from lib.ekf_failsafe import (
+    in_modes, over_threshold, plane_posvel_mask, sustained)
 from lib.i18n import t
 from lib.log_reader import ModeChange
 from lib.vehicle_detect import VehicleInfo
@@ -61,6 +62,25 @@ def _reader(sm=0.1, sp=0.1, sv=0.1, sh=0.1, seconds=10.0, rate=10.0,
 def _failsafe(reader, vehicle=None):
     return FailsafeAnalyzer(
         reader, _thresholds(reader), vehicle or _vehicle()).analyze()
+
+
+def _phase_plane(stages, assist=0.0, with_qtun=True,
+                 mode_name="AUTO", mode_number=10):
+    """An AUTO/GUIDED QuadPlane with a two-indicator EKF breach throughout."""
+    reader = _reader(sm=1.8, sp=0.9, vehicle_type="ArduPlane")
+    reader.mode_list = [ModeChange(0.0, mode_name, mode_number)]
+    times, values = zip(*stages)
+    reader._messages["STAT"] = {
+        "_timestamp": np.asarray(times, dtype=float),
+        "Stage": np.asarray(values, dtype=float),
+    }
+    if with_qtun:
+        qtun_ts = np.arange(0.0, 10.0, 0.04)
+        reader._messages["QTUN"] = {
+            "_timestamp": qtun_ts,
+            "Ast": np.full(len(qtun_ts), assist),
+        }
+    return reader
 
 
 def _ekf(reader, vehicle=None):
@@ -120,6 +140,41 @@ class TestFailsafeCard:
         res = _failsafe(reader, _quadplane())
         assert res.status == "good"
         assert t("failsafe.ekf_mode_gate") in res.details
+
+    def test_auto_vtol_stage_runs_the_test_for_one_second(self):
+        # STAT Stage: NORMAL=3, VTOL=2. The VTOL interval is t=2.0..3.0.
+        reader = _phase_plane([(0.0, 3), (2.0, 2), (3.1, 3)])
+        res = _failsafe(reader, _quadplane())
+        assert res.status == "critical"
+        assert any(t("failsafe.ekf_triggered", seconds="1") in d
+                   for d in res.details), res.details
+
+    def test_auto_fixed_wing_stage_with_the_same_breach_does_not_run(self):
+        reader = _phase_plane([(0.0, 3)])
+        res = _failsafe(reader, _quadplane())
+        assert res.status == "good"
+        assert t("failsafe.ekf_mode_gate") in res.details
+
+    def test_auto_stage_change_breaks_the_one_second_hold(self):
+        reader = _phase_plane([(0.0, 3), (2.0, 2), (2.8, 3)])
+        ts = reader._messages["XKF4"]["_timestamp"]
+        gate = plane_posvel_mask(reader, ts)
+        assert gate[20] and gate[27]       # 0.7 s between these endpoints
+        assert not gate[19] and not gate[28]
+        assert _failsafe(reader, _quadplane()).status == "good"
+
+    def test_auto_q_assist_stage_is_not_vtol_auto(self):
+        # update_flight_stage also uses VTOL for fixed-wing Q assist.
+        reader = _phase_plane([(0.0, 2)], assist=1.0)
+        assert _failsafe(reader, _quadplane()).status == "good"
+
+    def test_auto_stage_without_qtun_assist_evidence_stays_closed(self):
+        reader = _phase_plane([(0.0, 2)], with_qtun=False)
+        assert _failsafe(reader, _quadplane()).status == "good"
+
+    def test_guided_qtun_is_not_enough_to_open_the_gate(self):
+        reader = _phase_plane([(0.0, 2)], mode_name="GUIDED", mode_number=15)
+        assert _failsafe(reader, _quadplane()).status == "good"
 
     def test_plane_in_qloiter_runs_it(self):
         reader = _reader(sm=1.8, sp=0.9, vehicle_type="ArduPlane")
