@@ -19,7 +19,8 @@ from analyzers.vtol_transition import VTOLTransitionAnalyzer
 from lib.i18n import t
 from lib.thresholds import Thresholds
 from lib.vehicle_detect import VehicleInfo
-from tests.analyzers.test_ekf_primary_lane import _SPIKE, _analyzer, _variance_log
+from tests.analyzers.test_ekf_primary_lane import (
+    _CLEAN, _SPIKE, _analyzer, _variance_log)
 from tests.analyzers.test_rescan_e import _qtun_reader
 from tests.test_synthetic_coverage import SyntheticReader, _thresholds, _vehicle
 
@@ -79,8 +80,11 @@ class TestMissionRadius:
 
 class TestEkfFailsafe:
     def _critical(self, tmp_path, limit):
+        # Clean opening rows: the replay's has_ever_passed latch needs an
+        # observed pass before the breach counts.
         reader = _variance_log(tmp_path, lambda secs: 0,
-                               lambda core, secs: _SPIKE)
+                               lambda core, secs: _SPIKE if secs >= 2.0
+                               else _CLEAN)
         reader.params["FS_EKF_THRESH"] = limit
         result = _analyzer(EKFAnalyzer, reader).analyze()
         assert result.status == "critical"

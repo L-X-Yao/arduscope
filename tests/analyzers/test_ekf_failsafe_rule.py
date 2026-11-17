@@ -143,7 +143,12 @@ class TestFailsafeCard:
         assert res.summary == t("failsafe.summary_good_ekf")
 
     def test_compass_and_position_over_is_a_failsafe(self):
-        res = _failsafe(_reader(sm=1.8, sp=0.9))
+        # One quiet second first: the firmware's has_ever_passed latch
+        # needs an observed pass before anything counts.
+        reader = _reader(seconds=11.0)
+        reader._messages["XKF4"]["SM"][10:] = 1.8
+        reader._messages["XKF4"]["SP"][10:] = 0.9
+        res = _failsafe(reader)
         assert res.status == "critical"
         assert any(t("failsafe.ekf_triggered") in d
                    for d in res.details), res.details
@@ -219,7 +224,10 @@ class TestEKFCard:
         assert res.action_level == "physical_check"
 
     def test_the_combination_is_critical(self):
-        res = _ekf(_reader(sm=1.8, sp=0.9))
+        reader = _reader(seconds=11.0)
+        reader._messages["XKF4"]["SM"][10:] = 1.8
+        reader._messages["XKF4"]["SP"][10:] = 0.9
+        res = _ekf(reader)
         assert res.status == "critical"
         assert res.action_level == "safety_stop"
 
@@ -365,6 +373,15 @@ class TestDigitalLPFReplica:
         assert out[1] == pytest.approx(out[0])
         assert np.isfinite(out).all()
 
+    def test_nan_row_advances_the_clock_for_the_next_dt(self):
+        # The row is a decode gap, not a flight state: the filter state
+        # stands still but the clock does not, so the next finite sample
+        # is applied with the dt of the whole gap.
+        out = lowpass_filtered([0.1, np.nan, 1.7], [0.0, 0.1, 0.3], 5.0)
+        assert out[1] == pytest.approx(0.1)
+        alpha = 0.2 / (0.2 + 1.0 / (2.0 * math.pi * 5.0))
+        assert out[2] == pytest.approx(0.1 + (1.7 - 0.1) * alpha)
+
 
 class TestCopterReplay:
     """Copter: counter, filter and position gate together."""
@@ -413,23 +430,44 @@ class TestCopterReplay:
         assert t("failsafe.ekf_position_gate") in res.details
 
     def test_const_pos_mode_blocks_has_position(self):
-        reader = _reader(seconds=3.0, ss=SS_ABS | SS_CONST_POS)
+        # Ten good rows first (the latch needs one), then CONST_POS_MODE
+        # with the ABS bit still set: armed position is still refused.
+        reader = _reader(seconds=4.0, ss=SS_ABS)
+        reader._messages["XKF4"]["SS"][10:] = SS_ABS | SS_CONST_POS
         assert _failsafe(reader).status == "critical"
-        windows = _replay_windows(reader, "copter")
-        assert windows[0][0] == pytest.approx(0.9)
+        assert _replay_windows(reader, "copter")[0][0] == pytest.approx(1.9)
 
     def test_disarmed_predicted_position_is_enough(self):
-        # Unarmed rows accept PRED_HORIZ_POS_ABS, so the has_ever_passed
-        # latch is set long before the armed breach begins; without that
-        # acceptance the latch would only set at the first good row
-        # after the breach and nothing would fire.
+        # Origin is proven by early ABS rows; the unarmed middle relies
+        # on PRED_HORIZ_POS_ABS for the position gate, so the latch from
+        # the opening rows survives and the armed breach at t=7.0
+        # counts. Without PRED acceptance those rows would fail the
+        # gate and the breach would start counting late.
         reader = _reader(seconds=10.0, ss=SS_PRED_ABS,
                          armed_intervals=[(7.0, 10.0)])
         reader.params["FS_EKF_FILT"] = 0.0
         kf4 = reader._messages["XKF4"]
+        kf4["SS"][:10] = SS_ABS
         kf4["SS"][70:] = SS_ABS          # position acquired at arming
         kf4["SV"][70:90] = 1.7
         assert _replay_windows(reader, "copter") == [(7.9, 9.9)]
+
+    def test_pred_abs_alone_does_not_prove_the_origin(self):
+        # PRED_HORIZ_POS_ABS only says GPS navigation is possible
+        # (AP_NavEKF2_Control.cpp:513); it does not require validOrigin,
+        # so a log that never shows HORIZ_POS_ABS or USING_GPS is held
+        # closed no matter how long the variances are over.
+        reader = _reader(seconds=6.0, ss=SS_PRED_ABS)
+        reader.params["FS_EKF_FILT"] = 0.0
+        reader._messages["XKF4"]["SV"][10:] = 1.7
+        assert _replay_windows(reader, "copter") == []
+        # Once ABS shows up the origin is proven and counting begins.
+        healed = _reader(seconds=8.0, ss=SS_PRED_ABS)
+        healed.params["FS_EKF_FILT"] = 0.0
+        kf4 = healed._messages["XKF4"]
+        kf4["SS"][30:] = SS_ABS
+        kf4["SV"][40:60] = 1.7
+        assert _replay_windows(healed, "copter") == [(4.9, 6.9)]
 
     def test_flow_type_enables_the_relative_branch(self):
         without = _reader(seconds=4.0)
@@ -466,20 +504,27 @@ class TestCopterReplay:
         kf4["SV"][40:60] = 1.7
         assert _replay_windows(reader, "copter") == [(4.9, 6.9)]
 
-    def test_log_starting_armed_counts_immediately(self):
-        # A log that opens already armed must have passed the checks
-        # before it started, so the has_ever_passed latch starts set.
-        # USING_GPS without a position bit: origin ready, checks failing.
+    def test_log_opening_in_a_bad_interval_never_fires(self):
+        # The firmware sets has_ever_passed only from an observed pass;
+        # being armed does not imply one. A log that opens with the
+        # checks already failing (USING_GPS, no position estimate, the
+        # variance over the limit from row zero) stays held closed --
+        # the ERR events decide what really happened, not the model.
         reader = _reader(seconds=3.0, ss=8192)
-        assert _replay_windows(reader, "copter") == [(0.9, None)]
-        # The same log starting disarmed never passes the checks, so the
-        # latch never sets and nothing fires.
-        boot = _reader(seconds=3.0, ss=8192,
-                       armed_intervals=[(2.0, 3.0)])
-        assert _replay_windows(boot, "copter") == []
+        reader._messages["XKF4"]["SV"][:] = 1.7
+        assert _replay_windows(reader, "copter") == []
+
+    def test_good_rows_first_let_the_counter_fire(self):
+        # The same position loss, but with ten passing rows at the
+        # opening: the latch sets, then the counter runs and fires.
+        reader = _reader(seconds=4.0, ss=8192 | SS_ABS)
+        reader._messages["XKF4"]["SS"][10:] = 8192    # position lost
+        assert _replay_windows(reader, "copter")[0][0] == pytest.approx(1.9)
 
     def test_missing_ss_keeps_variance_only_semantics(self):
-        reader = _reader(sm=1.8, sp=0.9, ss=np.nan)
+        reader = _reader(seconds=11.0, ss=np.nan)
+        reader._messages["XKF4"]["SM"][10:] = 1.8
+        reader._messages["XKF4"]["SP"][10:] = 0.9
         assert _failsafe(reader).status == "critical"
 
 
@@ -527,6 +572,17 @@ class TestPlaneReplay:
 
 
 class TestVehicleKindAndLegacy:
+    def _rover(self) -> VehicleInfo:
+        return VehicleInfo(
+            vehicle_type="ArduRover",
+            firmware_version="4.6.3",
+            board_name="synthetic",
+            frame_class=1,
+            motor_count=4,
+            imu_count=2,
+            is_quadplane=False,
+        )
+
     def test_vehicle_kind_dispatch(self):
         assert vehicle_kind(_reader()) == "copter"
         quad = _reader(vehicle_type="ArduPlane")
@@ -536,9 +592,29 @@ class TestVehicleKindAndLegacy:
         assert vehicle_kind(_reader(vehicle_type="ArduRover")) == "other"
         assert vehicle_kind(_reader(vehicle_type="Mystery")) == "other"
 
-    def test_unknown_vehicle_keeps_the_continuous_second_model(self):
-        reader = _reader(vehicle_type="Mystery", sm=1.8, sp=0.9)
-        assert _failsafe(reader).status == "critical"
+    def test_legacy_vehicle_ignores_the_leaky_counter(self):
+        # Nine bad rows, one good, repeating: the replay's leaky counter
+        # fires on this pattern, the legacy continuous-second model does
+        # not. A Rover VehicleInfo forces the legacy branch, proving the
+        # dispatch (the default ArduCopter vehicle would take the replay
+        # and read critical).
+        reader = _reader(vehicle_type="ArduRover", seconds=10.0)
+        sv = reader._messages["XKF4"]["SV"]
+        sv[:] = 1.7
+        sv[9::10] = 0.1
+        res = _failsafe(reader, self._rover())
+        assert res.status == "good"
+        assert not any(t("failsafe.ekf_triggered") in d
+                       for d in res.details)
+
+    def test_legacy_vehicle_still_fires_on_a_full_second(self):
+        reader = _reader(seconds=11.0, vehicle_type="ArduRover")
+        reader._messages["XKF4"]["SM"][10:] = 1.8
+        reader._messages["XKF4"]["SP"][10:] = 0.9
+        res = _failsafe(reader, self._rover())
+        assert res.status == "critical"
+        assert any(t("failsafe.ekf_triggered_sustained") in d
+                   for d in res.details), res.details
 
 
 class TestEKFCardReplay:
@@ -551,3 +627,61 @@ class TestEKFCardReplay:
         res = _ekf(reader)
         assert res.status == "critical"
         assert any(t("ekf.ap_triggered") in d for d in res.details)
+
+    def test_position_only_trigger_has_its_own_wording(self):
+        # Quiet variances, position lost while armed: the card must not
+        # claim the variance combination was met.
+        reader = _reader(seconds=8.0)
+        reader._messages["XKF4"]["SS"][30:50] = 0.0
+        res = _ekf(reader)
+        assert res.status == "critical"
+        assert res.summary == t("ekf.crit_pos_summary")
+        assert res.plain_summary == t("ekf.crit_pos_plain")
+        assert res.evidence_source == t("ekf.evidence_pos")
+        assert t("ekf.crit_summary", val="0.100",
+                 thresh="0.80") != res.summary
+
+    def test_quadplane_fixed_wing_trigger_says_so(self):
+        # The EKF card deliberately does not apply the Plane VTOL mode
+        # gate: an armed fixed-wing breach is critical here while the
+        # failsafe card stays good, and the trigger line must be the
+        # quadplane wording, not a firmware-trigger claim.
+        reader = _phase_plane([(0.0, 3)])
+        ekf = _ekf(reader, _quadplane())
+        assert ekf.status == "critical"
+        assert any(t("ekf.ap_triggered_quadplane") in d
+                   for d in ekf.details), ekf.details
+        assert not any(t("ekf.ap_triggered") in d
+                       for d in ekf.details), ekf.details
+        assert _failsafe(reader, _quadplane()).status == "good"
+
+    def test_transient_combination_wording(self):
+        # The combination is reached for six checks -- raw over, counter
+        # short of ten: the transient line, not the single-sensor one.
+        reader = _reader(seconds=6.0)
+        reader._messages["XKF4"]["SM"][20:26] = 1.8
+        reader._messages["XKF4"]["SP"][20:26] = 0.9
+        res = _ekf(reader)
+        assert res.status == "warning"
+        assert any(t("ekf.ap_transient") in d for d in res.details)
+        assert not any(t("ekf.ap_single_sensor", thresh="0.80") in d
+                       for d in res.details)
+
+
+class TestTransientWording:
+    def test_failsafe_card_transient_combination(self):
+        reader = _reader(seconds=6.0)
+        reader._messages["XKF4"]["SM"][20:26] = 1.8
+        reader._messages["XKF4"]["SP"][20:26] = 0.9
+        res = _failsafe(reader)
+        assert res.status == "good"
+        assert any(t("failsafe.ekf_transient") in d for d in res.details)
+        assert not any(t("failsafe.ekf_not_triggered") in d
+                       for d in res.details)
+
+    def test_single_sensor_only_keeps_the_old_line(self):
+        res = _failsafe(_reader(sm=1.8, sp=0.4, seconds=4.0))
+        assert res.status == "good"
+        assert t("failsafe.ekf_not_triggered") in res.details
+        assert not any(t("failsafe.ekf_transient") in d
+                       for d in res.details)

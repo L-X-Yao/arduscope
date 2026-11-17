@@ -145,32 +145,57 @@ class EKFAnalyzer(BaseAnalyzer):
         # variance combination (two indicators, or a velocity variance at
         # twice the threshold); one variance over FS_EKF_THRESH does not
         # trigger it. Where the firmware's shape is known (Copter,
-        # QuadPlane) the full state machine is replayed on the primary
-        # lane, and a window counts when it touches armed flight; other
-        # vehicles keep the continuous-second approximation.
+        # QuadPlane) the state machine is replayed on the primary lane,
+        # and a window counts when it touches armed flight; other
+        # vehicles keep the continuous-second approximation. This card
+        # deliberately does NOT apply Plane's VTOL mode gate -- it answers
+        # the EKF-health question, the failsafe card answers the mode
+        # question -- so a QuadPlane trigger here is the counter in armed
+        # flight, not a claim the firmware would have run the check.
         ap_enabled = self.reader.get_param("FS_EKF_THRESH", 0.8) > 0
         kind = vehicle_kind(self.reader, self.vehicle)
+        pos_only = False
         if ap_enabled and kind in ("copter", "quadplane"):
             kf4_p = {
                 "SV": sv[primary_mask], "SP": sp[primary_mask],
                 "SM": sm[primary_mask], "SS": ss[primary_mask],
             }
             t_p = t[primary_mask]
-            windows, _pos_loss, _over = ekf_failsafe_replay(
+            windows, pos_loss, _over = ekf_failsafe_replay(
                 self.reader, kf4_p, t_p, kind, ekf_thresh)
-            ap_triggered = any(
-                window_touches_armed(w, t_p, armed) for w in windows)
+            touched = [w for w in windows
+                       if window_touches_armed(w, t_p, armed)]
+            ap_triggered = bool(touched)
+            # Position-only: every armed window fired without a variance
+            # breach inside it (the Copter has_position path).
+            pos_only = bool(touched) and all(
+                pl for w, pl in zip(windows, pos_loss) if w in touched)
         else:
             t_stat = t[stat_mask]
             ap_triggered = bool(sustained(
                 over_threshold(sv_stat, sp_stat, sm_stat, ekf_thresh),
                 t_stat).any())
+        # The raw combination (what the old model scored) reached on any
+        # judged row, without the counter reaching its limit: the breach
+        # was there, but too briefly or too quietly after the filter.
+        ap_transient = bool(
+            over_threshold(sv_stat, sp_stat, sm_stat, ekf_thresh).any())
 
         details.append(_t("ekf.fs_thresh_detail", val=f"{ekf_thresh:.2f}"))
         if not ap_enabled:
             details.append(_t("ekf.fs_disabled"))
         elif ap_triggered:
-            details.append(_t("ekf.ap_triggered"))
+            if kind == "copter":
+                details.append(_t("ekf.ap_triggered"))
+            elif kind == "quadplane":
+                details.append(_t("ekf.ap_triggered_quadplane"))
+            else:
+                details.append(_t("ekf.ap_triggered_legacy"))
+        elif ap_transient:
+            if kind in ("copter", "quadplane"):
+                details.append(_t("ekf.ap_transient"))
+            else:
+                details.append(_t("ekf.ap_transient_legacy"))
         elif max_variance >= ekf_thresh:
             details.append(_t("ekf.ap_single_sensor",
                               thresh=f"{ekf_thresh:.2f}"))
@@ -194,10 +219,14 @@ class EKFAnalyzer(BaseAnalyzer):
         # warning  → physical_check (GPS placement / compass calibration)
         if ap_enabled and ap_triggered:
             status = "critical"
-            summary = _t("ekf.crit_summary",
-                         val=f"{max_variance:.3f}",
-                         thresh=f"{ekf_thresh:.2f}")
-            plain_summary = _t("ekf.crit_plain")
+            if pos_only:
+                summary = _t("ekf.crit_pos_summary")
+                plain_summary = _t("ekf.crit_pos_plain")
+            else:
+                summary = _t("ekf.crit_summary",
+                             val=f"{max_variance:.3f}",
+                             thresh=f"{ekf_thresh:.2f}")
+                plain_summary = _t("ekf.crit_plain")
             action_text = _t("ekf.crit_action")
             action_level = "safety_stop"
 
@@ -341,6 +370,8 @@ class EKFAnalyzer(BaseAnalyzer):
             # Critical came from the firmware's ERR record, not from the
             # variance recomputation.
             evidence_source = _t("ekf.fw_evidence")
+        elif status == "critical" and pos_only:
+            evidence_source = _t("ekf.evidence_pos")
         elif status == "critical":
             evidence_source = _t("ekf.evidence_crit",
                                  thresh=f"{ekf_thresh:.2f}")

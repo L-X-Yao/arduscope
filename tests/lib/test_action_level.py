@@ -176,10 +176,13 @@ class TestSafetyCriticalAnalyzersExplicit:
         from tests.test_synthetic_coverage import (
             SyntheticReader, _thresholds, _vehicle)
         n = 100
+        # Quiet opening rows: the replay's has_ever_passed latch needs an
+        # observed pass before the breach counts.
+        sv = np.concatenate([np.full(20, 0.1), np.full(n - 20, 1.5)])
         reader = SyntheticReader(messages={"XKF4": {
             "_timestamp": np.arange(n, dtype=float),
-            "SV": np.full(n, 1.5),    # sustained variance >> crit
-            "SP": np.full(n, 1.5),
+            "SV": sv,                 # sustained variance >> crit
+            "SP": sv,
             "SH": np.zeros(n),
             "SM": np.zeros(n),
             # HORIZ_POS_ABS|USING_GPS: the flying-with-GPS status whose

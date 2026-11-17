@@ -44,6 +44,13 @@ them readable.
   `ekf_variance_warn`, not that the sustained failsafe combination was met
   (`analyzers/ekf.py`). ArduPilot does not run that check in a fixed-wing
   segment, but this does not make the navigation risk lower.
+  The two cards therefore replay at different fidelities on purpose: the
+  failsafe card runs the full state machine including Plane's mode gate,
+  while the EKF card replays Copter's state machine (filter, position gate,
+  ten-check counter) as the firmware does but, for QuadPlane and Plane,
+  counts the ten checks across all armed flight without the VTOL mode gate
+  and says so in its trigger line — the card answers the EKF-health
+  question, not the mode question.
   A 2026-11-17 census used the 557 logs accepted by `run_analysis`; three of
   the 560 readable logs had no flight data and were excluded. Its records sit
   beside the local gate reports in untracked `reports/`, not in the repository.
@@ -84,9 +91,15 @@ them readable.
   another logging rate stretches the counter in time; `optflow.healthy()`
   is not in the log, so a velocity variance at twice the threshold always
   scores two, the strict reading of `ekf_check.cpp:146-158`; origin
-  readiness is the first global-position SS bit, which holds an indoor
-  no-GPS log's check closed; and a log that opens already armed treats
-  `has_ever_passed` as set. Rover and Sub run EKF failsafes of different
+  readiness is the first origin-proving SS bit — `HORIZ_POS_ABS` or
+  `USING_GPS`, both of which require a fused absolute source and
+  therefore `validOrigin` (`AP_NavEKF2_Control.cpp:389-391,513`,
+  `AP_NavEKF3_Control.cpp:594`), never the PRED flags, which only say GPS
+  navigation is possible — so an indoor no-GPS log's check stays closed;
+  and `has_ever_passed` latches only on an observed pass, so a log that
+  opens inside a bad interval holds the check closed and leaves the
+  verdict to the ERR events instead of inventing a trigger. Rover and Sub
+  run EKF failsafes of different
   shapes (Rover scores the magnetic norm and folds position into the
   score; Sub wants one indicator held for two continuous seconds) and
   keep the older continuous-second model.

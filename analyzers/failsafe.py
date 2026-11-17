@@ -469,6 +469,10 @@ class FailsafeAnalyzer(BaseAnalyzer):
             held = sustained(gated, ts)
             triggered = bool(held.any())
 
+        # The raw combination, before any filter and gate, for the
+        # transient and unarmed detail lines below.
+        raw_over = over_threshold(sv, sp, sm, ekf_thresh)
+
         max_sv = safe_nanmax(sv[active], default=0.0)
         max_sp = safe_nanmax(sp[active], default=0.0)
         max_sh = safe_nanmax(sh[active], default=0.0)
@@ -481,11 +485,28 @@ class FailsafeAnalyzer(BaseAnalyzer):
             sv=f"{max_sv:.3f}", sp=f"{max_sp:.3f}", sh=f"{max_sh:.3f}",
             sm=f"{max_sm:.3f}", thresh=f"{ekf_thresh:.2f}"))
         if triggered:
-            details.append(t("failsafe.ekf_triggered"))
+            if kind in ("copter", "quadplane"):
+                details.append(t("failsafe.ekf_triggered"))
+            else:
+                details.append(t("failsafe.ekf_triggered_sustained"))
             if pos_loss:
                 # The replay fired without any variance breach inside the
                 # window: Copter's has_position gate alone failed it.
                 details.append(t("failsafe.ekf_position_gate"))
+        elif (raw_over & active).any():
+            # The raw combination was reached without a trigger: on the
+            # replay path the counter never got to ten (too brief, or
+            # pushed back under by the filter); on the legacy path it
+            # never held for the full second.
+            met_inside = ((raw_over & active & gate).any()
+                          if gate is not None else True)
+            transient_key = ("failsafe.ekf_transient"
+                             if kind in ("copter", "quadplane")
+                             else "failsafe.ekf_transient_sustained")
+            if met_inside:
+                details.append(t(transient_key))
+            elif single_over:
+                details.append(t("failsafe.ekf_not_triggered"))
         elif single_over:
             details.append(t("failsafe.ekf_not_triggered"))
         if plane_disabled:
@@ -494,7 +515,6 @@ class FailsafeAnalyzer(BaseAnalyzer):
             inside = over & active & gate
             if (over & active).any() and not inside.any():
                 details.append(t("failsafe.ekf_mode_gate"))
-        raw_over = over_threshold(sv, sp, sm, ekf_thresh)
         if not have_armed and (raw_over.any() or single_over):
             details.append(t("failsafe.margin_unarmed"))
 

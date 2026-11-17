@@ -21,6 +21,9 @@ releases are not published.
   ones read critical, the three disarmed ones stay detail lines. Flapping
   variances (nine bad checks, one good) now fire as the firmware's leaky
   counter does, and a position loss with quiet variances fires on Copter.
+  The EKF card replays without Plane's VTOL mode gate on purpose and its
+  trigger, transient and not-triggered lines now say which fidelity and
+  which condition produced them, including a position-only trigger.
 
 ## [0.12.3] - 2026-11-18
 

@@ -74,9 +74,12 @@ class TestVarianceFollowsPrimaryLane:
         assert _analyzer(FailsafeAnalyzer, reader).analyze().status == "critical"
 
     def test_spike_before_the_switch_still_counts(self, tmp_path):
+        # Clean opening rows first: the replay's has_ever_passed latch
+        # needs an observed pass before a breach counts.
         reader = _variance_log(
             tmp_path, _switched_at_20,
-            lambda core, secs: _SPIKE if core == 0 and secs < 20 else _CLEAN)
+            lambda core, secs: _SPIKE
+            if core == 0 and 2.0 <= secs < 20 else _CLEAN)
         assert _analyzer(EKFAnalyzer, reader).analyze().status == "critical"
 
 

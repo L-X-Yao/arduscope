@@ -33,8 +33,12 @@ Known approximations, all documented in ``docs/known_limitations.md``:
 one logged XKF4 row stands for one 10 Hz check; ``optflow.healthy()`` is
 not logged, so velocity at twice the threshold always scores two (the
 strict reading of ``ekf_check.cpp:146-158``); origin readiness is
-approximated by the first global-position SS bit; a log that starts
-already armed treats ``has_ever_passed`` as set.
+approximated by the first origin-proving SS bit (``HORIZ_POS_ABS`` or
+``USING_GPS`` -- a fused absolute source, which requires ``validOrigin``
+-- never the PRED flags, which only say GPS navigation is possible);
+and ``has_ever_passed`` latches only on an observed pass, so a log that
+opens inside a bad interval holds the check closed and leaves the
+verdict to the ERR events.
 
 QLOITER, QLAND, QRTL and QAUTOTUNE are direct evidence of Plane's
 ``in_vtol_posvel_mode()``. AUTO needs phase evidence too:
@@ -251,8 +255,10 @@ def lowpass_filtered(values, timestamps, cutoff_hz: float) -> np.ndarray:
 
     One call per XKF4 row with the elapsed dt, like the firmware's
     ``apply(value, dt)`` at ekf_check.cpp:129-130. A NaN row (a decode
-    gap, not a flight state) holds the previous output and does not
-    advance the filter.
+    gap, not a flight state) holds the previous output, does not touch
+    the filter state, but still advances the clock: the next finite
+    sample's dt spans the whole gap, so the filter is fed the same
+    elapsed time the firmware would have measured.
     """
     vals = np.asarray(values, dtype=float)
     ts = np.asarray(timestamps, dtype=float)
@@ -331,13 +337,19 @@ def copter_has_position(ss, timestamps, armed_mask, reader) -> np.ndarray | None
 
 
 def _origin_ready_mask(ss) -> np.ndarray | None:
-    """Rows at and after the first global-position SS bit.
+    """Rows at and after the first origin-proving SS bit.
 
     ``ekf_check`` returns before touching the counter while
     ``ahrs.get_origin`` fails (ekf_check.cpp:35-39, both vehicles). The
-    origin cannot be read from the log; a global-position status bit is
-    the closest evidence, and holding the check closed until then can
-    only delay, never invent, a trigger. None when SS is unreadable.
+    origin cannot be read from the log. Of the status bits, only
+    ``HORIZ_POS_ABS`` (set by ``doingNormalGpsNav``) and ``USING_GPS``
+    (``PV_AidingMode == AID_ABSOLUTE``) prove a fused absolute source,
+    and GPS fusion requires ``validOrigin``
+    (AP_NavEKF2_Control.cpp:389-391, AP_NavEKF3_Control.cpp:594).
+    ``PRED_HORIZ_POS_ABS`` is only ``gpsNavPossible && filterHealthy``
+    (AP_NavEKF2_Control.cpp:513) and does not. Holding the check closed
+    until an origin-proving bit can only delay, never invent, a
+    trigger. None when SS is unreadable.
     """
     ss = np.asarray(ss, dtype=float)
     if not np.isfinite(ss).any():
@@ -346,7 +358,6 @@ def _origin_ready_mask(ss) -> np.ndarray | None:
     finite = np.isfinite(ss)
     bits[finite] = ss[finite].astype(np.int64)
     ready = (((bits & SS_HORIZ_POS_ABS) != 0)
-             | ((bits & SS_PRED_HORIZ_POS_ABS) != 0)
              | ((bits & SS_USING_GPS) != 0))
     seen = np.cumsum(ready) > 0
     return seen
@@ -471,10 +482,13 @@ def ekf_failsafe_replay(reader, kf4, timestamps, kind: str, thresh: float,
     if origin is not None:
         states[~origin] = _HOLD
     if kind == "copter":
-        # has_ever_passed (ekf_check.cpp:56-62): nothing counts until the
-        # checks have passed once. A log that opens already armed must
-        # have passed them before it started, so the latch starts set.
-        latched = bool(armed[0]) if len(armed) else False
+        # has_ever_passed (ekf_check.cpp:56-62): nothing counts until
+        # the checks have passed once. The firmware sets the latch only
+        # from an observed pass, so the replay starts unlatched too; a
+        # log that opens inside a bad interval stays held closed and the
+        # ERR events decide what really happened -- the model does not
+        # invent a trigger it never saw a pass for.
+        latched = False
         for i in range(len(states)):
             if not latched:
                 if states[i] == _RUN_GOOD:
