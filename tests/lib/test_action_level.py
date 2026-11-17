@@ -182,7 +182,9 @@ class TestSafetyCriticalAnalyzersExplicit:
             "SP": np.full(n, 1.5),
             "SH": np.zeros(n),
             "SM": np.zeros(n),
-            "SS": np.zeros(n),
+            # HORIZ_POS_ABS|USING_GPS: the flying-with-GPS status whose
+            # absence now holds the EKF failsafe replay closed.
+            "SS": np.full(n, 16 | 8192),
             "C": np.zeros(n),
         }}, params={"FS_EKF_THRESH": 0.8})
         result = EKFAnalyzer(reader, _thresholds(reader),

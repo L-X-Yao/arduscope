@@ -28,6 +28,8 @@ def _variance_log(tmp_path, primary, sv) -> LogReader:
     """Two cores for 60 s, armed throughout.
 
     primary(secs) gives XKF4.PI, sv(core, secs) gives that core's SV.
+    SS carries HORIZ_POS_ABS|USING_GPS, as a flying lane with GPS does;
+    the EKF failsafe replay holds off without a global-position bit.
     """
     log = binlog.BinLog()
     log.write("MSG", 1_000_000, "ArduCopter V4.6.3 (abc12345)")
@@ -37,7 +39,8 @@ def _variance_log(tmp_path, primary, sv) -> LogReader:
         time_us = 1_000_000 + i * _STEP_US
         for core in (0, 1):
             log.write("XKF4", time_us, core, sv(core, secs), _CLEAN, _CLEAN,
-                      _CLEAN, 0.0, 0.0, 0.0, 0.0, 0, 0, 0, 0, primary(secs))
+                      _CLEAN, 0.0, 0.0, 0.0, 0.0, 0, 0, 16 | 8192, 0,
+                      primary(secs))
     return LogReader(log.save(tmp_path / "ekf.bin"))
 
 

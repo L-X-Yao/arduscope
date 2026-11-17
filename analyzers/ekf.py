@@ -17,7 +17,8 @@ import numpy as np
 import plotly.graph_objects as go
 
 from lib.ekf_failsafe import (
-    TRIGGER_SECONDS, over_threshold, sustained)
+    ekf_failsafe_replay, over_threshold, sustained, vehicle_kind,
+    window_touches_armed)
 from lib.ekf_lanes import primary_lane_rows
 from lib.i18n import t as _t
 from lib.np_helpers import safe_nanmax
@@ -119,6 +120,7 @@ class EKFAnalyzer(BaseAnalyzer):
             stat_mask = np.ones(len(t), dtype=bool)
         else:
             stat_mask = primary_lane_rows(core_ids, kf4["PI"])
+        primary_mask = stat_mask
 
         armed = self.reader.get_armed_intervals()
         if armed:
@@ -139,21 +141,36 @@ class EKFAnalyzer(BaseAnalyzer):
         max_sm = safe_nanmax(sm_stat, default=0.0)
         max_variance = max(max_sv, max_sp, max_sh, max_sm)
 
-        # ArduPilot's EKF failsafe is a combination (two indicators, or a
-        # velocity variance at twice the threshold) held for about a
-        # second; one variance over FS_EKF_THRESH does not trigger it.
-        t_stat = t[stat_mask]
-        ap_triggered = bool(sustained(
-            over_threshold(sv_stat, sp_stat, sm_stat, ekf_thresh),
-            t_stat).any())
+        # ArduPilot's EKF failsafe is a ten-check counter fed by the
+        # variance combination (two indicators, or a velocity variance at
+        # twice the threshold); one variance over FS_EKF_THRESH does not
+        # trigger it. Where the firmware's shape is known (Copter,
+        # QuadPlane) the full state machine is replayed on the primary
+        # lane, and a window counts when it touches armed flight; other
+        # vehicles keep the continuous-second approximation.
         ap_enabled = self.reader.get_param("FS_EKF_THRESH", 0.8) > 0
+        kind = vehicle_kind(self.reader, self.vehicle)
+        if ap_enabled and kind in ("copter", "quadplane"):
+            kf4_p = {
+                "SV": sv[primary_mask], "SP": sp[primary_mask],
+                "SM": sm[primary_mask], "SS": ss[primary_mask],
+            }
+            t_p = t[primary_mask]
+            windows, _pos_loss, _over = ekf_failsafe_replay(
+                self.reader, kf4_p, t_p, kind, ekf_thresh)
+            ap_triggered = any(
+                window_touches_armed(w, t_p, armed) for w in windows)
+        else:
+            t_stat = t[stat_mask]
+            ap_triggered = bool(sustained(
+                over_threshold(sv_stat, sp_stat, sm_stat, ekf_thresh),
+                t_stat).any())
 
         details.append(_t("ekf.fs_thresh_detail", val=f"{ekf_thresh:.2f}"))
         if not ap_enabled:
             details.append(_t("ekf.fs_disabled"))
         elif ap_triggered:
-            details.append(_t("ekf.ap_triggered",
-                              seconds=f"{TRIGGER_SECONDS:g}"))
+            details.append(_t("ekf.ap_triggered"))
         elif max_variance >= ekf_thresh:
             details.append(_t("ekf.ap_single_sensor",
                               thresh=f"{ekf_thresh:.2f}"))

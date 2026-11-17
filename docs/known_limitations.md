@@ -66,13 +66,30 @@ them readable.
   The EKF card now shows the firmware's own EKF failsafe events directly:
   ERR `EKFCHECK=16` / `FAILSAFE_EKFINAV=17` trigger and clear times, armed
   or not, and a trigger inside armed flight makes the card critical on its
-  own. The variance recomputation stays a model, and three of its
-  simplifications explain the misses above: ArduPilot gates the check on
-  having a position (`has_position` in `ArduCopter/ekf_check.cpp`), so
-  losing position can fire the failsafe with quiet variances; ArduCopter
-  low-passes the variances at `FS_EKF_FILT` (default 5 Hz) before
-  comparing; and the firmware counts ten checks up and down at 10 Hz
-  (`EKF_CHECK_ITERATIONS_MAX`) instead of requiring one continuous second.
+  own. Since 2026-11-18 the variance recomputation is no longer a
+  continuous-second approximation either: it replays the firmware's state
+  machine (`lib/ekf_failsafe.py`) — the `FS_EKF_FILT` low-pass (a
+  first-order `DigitalLPF`, Copter only), the `has_position` gate from the
+  primary lane's XKF4.SS (armed flight wants `HORIZ_POS_ABS` without
+  `CONST_POS_MODE`; disarmed accepts the PRED flags; a relative position
+  needs `FLOW_TYPE`/`VISO_TYPE` or dead reckoning under `FS_DR_TIMEOUT`),
+  and the ten-check up/down counter (`EKF_CHECK_ITERATIONS_MAX`), with
+  Copter's `has_ever_passed` and origin holds and Plane's mode-gate reset.
+  Replayed on the census's five previously unreproduced Copter logs, all
+  five ERR windows now reproduce to within 0.3 s, two of them exactly: the
+  two armed ones (L_log_20 by the position gate at 301.9 s, log_22 by the
+  filtered variance at 91.0 s) go critical, and the three that fired after
+  disarm reproduce as unarmed windows and stay detail lines.
+  Four approximations remain: one XKF4 row stands for one 10 Hz check, so
+  another logging rate stretches the counter in time; `optflow.healthy()`
+  is not in the log, so a velocity variance at twice the threshold always
+  scores two, the strict reading of `ekf_check.cpp:146-158`; origin
+  readiness is the first global-position SS bit, which holds an indoor
+  no-GPS log's check closed; and a log that opens already armed treats
+  `has_ever_passed` as set. Rover and Sub run EKF failsafes of different
+  shapes (Rover scores the magnetic norm and folds position into the
+  score; Sub wants one indicator held for two continuous seconds) and
+  keep the older continuous-second model.
   Different badges are therefore a deliberate distinction, not by themselves
   evidence of a contradiction or of the Plane mode gate changing a verdict.
 - **`attitude` reads critical on one sample.** A single row with over 15 deg

@@ -17,7 +17,8 @@ import numpy as np
 import plotly.graph_objects as go
 
 from lib.ekf_failsafe import (
-    TRIGGER_SECONDS, over_threshold, plane_posvel_mask, sustained)
+    ekf_failsafe_replay, over_threshold, plane_posvel_mask, sustained,
+    vehicle_kind, window_touches_armed)
 from lib.ekf_lanes import primary_lane_rows
 from lib.i18n import t
 from lib.np_helpers import safe_nanmax
@@ -395,7 +396,7 @@ class FailsafeAnalyzer(BaseAnalyzer):
     ) -> tuple[go.Figure | None, str]:
         """Evaluate ArduPilot's EKF failsafe on the logged variances."""
         kf4 = self.reader.get_messages_as_arrays(kf4_type, [
-            "C", "SV", "SP", "SH", "SM", "PI",
+            "C", "SV", "SP", "SH", "SM", "PI", "SS",
         ])
         ts = kf4["_timestamp"]
         if len(ts) == 0:
@@ -408,7 +409,7 @@ class FailsafeAnalyzer(BaseAnalyzer):
         if core is not None and not np.all(np.isnan(core)):
             core_mask = primary_lane_rows(core, kf4["PI"])
             ts = ts[core_mask]
-            for _k in ("SV", "SP", "SH", "SM"):
+            for _k in ("SV", "SP", "SH", "SM", "SS"):
                 kf4[_k] = kf4[_k][core_mask]
 
         ekf_thresh = self.thresholds.ekf_variance_crit
@@ -440,19 +441,33 @@ class FailsafeAnalyzer(BaseAnalyzer):
                 active = armed_mask
                 have_armed = True
 
-        over = over_threshold(sv, sp, sm, ekf_thresh)
-        plane_disabled = (self.vehicle.is_plane
-                          and not self.vehicle.is_quadplane)
+        # Replay the firmware's own state machine where its shape is
+        # known: Copter (variance filter, position gate, ten-check
+        # counter) and QuadPlane (mode-gated counter). Other vehicles
+        # keep the older continuous-second model below.
+        kind = vehicle_kind(self.reader, self.vehicle)
+        plane_disabled = kind == "plane"
         gate = None
-        if self.vehicle.is_quadplane:
+        if kind == "quadplane":
             gate = plane_posvel_mask(self.reader, ts)
-        gated = over & active
-        if gate is not None:
-            gated = gated & gate
-        if plane_disabled:
-            gated = np.zeros_like(gated)
-        held = sustained(gated, ts)
-        triggered = bool(held.any())
+        over = None
+        pos_loss = False
+        if kind in ("copter", "quadplane"):
+            armed = self.reader.get_armed_intervals()
+            windows, pos_loss_list, over = ekf_failsafe_replay(
+                self.reader, kf4, ts, kind, ekf_thresh, gate)
+            triggered = False
+            for window, pl in zip(windows, pos_loss_list):
+                if window_touches_armed(window, ts, armed):
+                    triggered = True
+                    pos_loss = pos_loss or pl
+        elif plane_disabled:
+            triggered = False
+        else:
+            over = over_threshold(sv, sp, sm, ekf_thresh)
+            gated = over & active
+            held = sustained(gated, ts)
+            triggered = bool(held.any())
 
         max_sv = safe_nanmax(sv[active], default=0.0)
         max_sp = safe_nanmax(sp[active], default=0.0)
@@ -466,21 +481,25 @@ class FailsafeAnalyzer(BaseAnalyzer):
             sv=f"{max_sv:.3f}", sp=f"{max_sp:.3f}", sh=f"{max_sh:.3f}",
             sm=f"{max_sm:.3f}", thresh=f"{ekf_thresh:.2f}"))
         if triggered:
-            details.append(t("failsafe.ekf_triggered",
-                             seconds=f"{TRIGGER_SECONDS:g}"))
+            details.append(t("failsafe.ekf_triggered"))
+            if pos_loss:
+                # The replay fired without any variance breach inside the
+                # window: Copter's has_position gate alone failed it.
+                details.append(t("failsafe.ekf_position_gate"))
         elif single_over:
             details.append(t("failsafe.ekf_not_triggered"))
         if plane_disabled:
             details.append(t("failsafe.ekf_plane_disabled"))
-        elif gate is not None:
+        elif gate is not None and over is not None:
             inside = over & active & gate
             if (over & active).any() and not inside.any():
                 details.append(t("failsafe.ekf_mode_gate"))
-        if not have_armed and (over.any() or single_over):
+        raw_over = over_threshold(sv, sp, sm, ekf_thresh)
+        if not have_armed and (raw_over.any() or single_over):
             details.append(t("failsafe.margin_unarmed"))
 
         # Critical only when ArduPilot's own test would have fired: the
-        # combination held for about a second, in the modes where the
+        # ten-check counter reached its limit in the modes where the
         # vehicle runs it. A single variance over the threshold is a
         # health signal for the EKF and compass analyzers, not a failsafe.
         status = "critical" if triggered else "good"

@@ -7,6 +7,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Changed
+- The offline EKF failsafe recomputation now replays the firmware's state
+  machine instead of a continuous-second approximation: the ten-check
+  up/down counter (`EKF_CHECK_ITERATIONS_MAX`), Copter's `FS_EKF_FILT`
+  variance low-pass (a first-order `DigitalLPF`) and `has_position` gate
+  from the primary lane's XKF4.SS, Copter's `has_ever_passed` and origin
+  holds, and Plane's counter reset outside armed VTOL position control.
+  On the five census logs whose EKFCHECK events the old model could not
+  reproduce, all five windows now reproduce to within 0.3 s; the two armed
+  ones read critical, the three disarmed ones stay detail lines. Flapping
+  variances (nine bad checks, one good) now fire as the firmware's leaky
+  counter does, and a position loss with quiet variances fires on Copter.
+
 ## [0.12.3] - 2026-11-18
 
 ### Fixed
