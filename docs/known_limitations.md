@@ -32,13 +32,29 @@ them readable.
   Q-assisted fixed-wing phases closed, and no log had a variance breach
   inside a gated window or an ERR EKF event — the trigger path still has no
   real-log exercise.
-- **The failsafe and EKF cards intentionally answer different questions.** The
-  failsafe card asks whether ArduPilot would trigger its EKF failsafe, so it
-  applies the vehicle's mode gate. The EKF card asks whether the variance
-  combination itself reaches the failsafe condition, and is not downgraded by
-  mode. ArduPilot does not run that check in a fixed-wing segment, but this
-  does not make the navigation risk lower. Different verdicts from the two
-  cards are therefore a deliberate distinction, not a contradiction.
+- **The failsafe and EKF cards intentionally answer different questions.** For
+  the EKF check, the failsafe card asks whether ArduPilot would trigger its EKF
+  failsafe, so it applies the vehicle's mode gate. The card also aggregates
+  triggered ERR events, battery voltage, GPS satellite count and the EKF margin
+  (`_FS_SUBSYS_KEYS`, `_battery_margin`, `_gps_margin` and `_ekf_margin` in
+  `analyzers/failsafe.py`). A non-EKF failsafe or a battery breach can therefore
+  make it critical; low GPS satellite count is a warning. The EKF card asks
+  whether the variance combination itself reaches the failsafe condition, and
+  is not downgraded by mode. Its warning only means a variance reached
+  `ekf_variance_warn`, not that the sustained failsafe combination was met
+  (`analyzers/ekf.py`). ArduPilot does not run that check in a fixed-wing
+  segment, but this does not make the navigation risk lower.
+  A 2026-11-17 census of the 557 logs accepted by `run_analysis` found 433 with
+  the same card status and 124 (22.3%) with different statuses. None had a
+  good/warning failsafe card with a critical EKF card; all six critical EKF
+  cards were paired with a critical failsafe card. Fifty-nine had a critical
+  failsafe card with a good/warning EKF card, 55 of them Copter, and none
+  reproduced the sustained combination. Fifty-four had no EKF ERR event, so
+  their critical came from another failsafe or the battery check. The other
+  five had EKFCHECK/FAILSAFE_EKFINAV events but did not reproduce the sustained
+  combination in this scan; the reason for that mismatch was not determined.
+  Different badges are therefore a deliberate distinction, not by themselves
+  evidence of a contradiction or of the Plane mode gate changing a verdict.
 - **`attitude` reads critical on one sample.** A single row with over 15 deg
   of roll or pitch error is critical. That 15, and the 20 and 4.0 beside it in
   `analyzers/attitude.py`, are literals with no source, outside
