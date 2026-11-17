@@ -35,9 +35,10 @@ _CACHE_VERSION = 4
 # Official family name followed by a semantic-ish version token. Punctuation
 # and brackets are allowed between them; a vendor prefix/version is ignored.
 _FIRMWARE_BANNER_RE = re.compile(
-    r"\b(ArduCopter|ArduPlane|ArduRover|ArduSub)\b"
+    r"\b(ArduCopter|ArduPlane|ArduRover|ArduSub)(?![A-Za-z0-9])"
     r"[\s\]\[(){}<>:_+|,/;.=-]*"
-    r"(V?\d+\.\d+(?:\.\d+)?)(?![\d.])",
+    r"(?P<version>V?\d+\.\d+(?:\.\d+)?)"
+    r"(?P<suffix>[-+][A-Za-z0-9][A-Za-z0-9._+-]*)?(?![\d.])",
     re.IGNORECASE,
 )
 
@@ -547,6 +548,11 @@ class LogReader:
         including a dual-version vendor banner such as
         ``FC-X v1.0 (hash) [ArduCopter V4.7.0]``. Once one is found, a later
         weak legacy match cannot replace either field with the vendor version.
+        The first official family/version pair wins when a banner names more
+        than one family; ``vehicle_type`` remains the first whitespace token.
+        A single token such as ``ArduCopter-4.6.3`` therefore keeps that whole
+        token as its type but also yields a version, which the old two-token
+        fallback could not do.
         """
         if not isinstance(text, str) or not text.strip():
             return
@@ -559,7 +565,8 @@ class LogReader:
             parts = text.split()
             if parts:
                 self.vehicle_type = parts[0]
-            self.firmware_version = strong.group(2)
+            self.firmware_version = (
+                strong.group("version") + (strong.group("suffix") or ""))
             self._firmware_msg_strong = True
             return
         if getattr(self, "_firmware_msg_strong", False):

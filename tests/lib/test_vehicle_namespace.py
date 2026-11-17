@@ -146,3 +146,24 @@ class TestFirmwareBannerParsing:
         reader = _parse_banner("FC v1.2 [ArduCopter V4.7.0.1]")
         assert reader.vehicle_type == "FC"
         assert reader.firmware_version == "v1.2"
+
+    def test_version_suffix_is_preserved(self):
+        for banner, expected in (("ArduCopter V4.8.0-dev", "V4.8.0-dev"),
+                                 ("ArduCopter V4.8.0+xxx", "V4.8.0+xxx")):
+            reader = _parse_banner(banner)
+            assert reader.vehicle_type == "ArduCopter"
+            assert reader.firmware_version == expected
+
+    def test_single_token_family_and_version(self):
+        # The old len(parts)>=2 fallback left the version unset in this form.
+        for banner, expected in (("ArduCopter-4.6.3", "4.6.3"),
+                                 ("ArduCopter_V4.6.3", "V4.6.3")):
+            reader = _parse_banner(banner)
+            assert reader.vehicle_type == banner
+            assert reader.firmware_version == expected
+
+    def test_first_versioned_family_wins_in_multi_family_banner(self):
+        reader = _parse_banner(
+            "FC v0.1 [ArduPlane V4.5.1] [ArduCopter V4.7.0]")
+        assert reader.vehicle_type == "FC"
+        assert reader.firmware_version == "V4.5.1"
