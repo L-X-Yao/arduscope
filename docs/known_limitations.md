@@ -53,10 +53,21 @@ them readable.
   Fifty-nine had a critical failsafe card with a good/warning EKF card, 55
   Copter and four QuadPlane (all four battery-critical), and none reproduced
   the sustained combination. Fifty-four had no EKF ERR event, so their critical
-  came from another failsafe or the battery check. The other five, all v4.1.x
-  Copter logs, had EKFCHECK/FAILSAFE_EKFINAV events but did not reproduce the
+  came from another failsafe or the battery check. The other five — Copter
+  logs with a vendor v4.1.x banner that are actually ArduCopter 4.7.0 — had
+  EKFCHECK/FAILSAFE_EKFINAV events but did not reproduce the
   sustained combination in this scan; the reason for that mismatch within this
   old-firmware group was not determined.
+  The EKF card now shows the firmware's own EKF failsafe events directly:
+  ERR `EKFCHECK=16` / `FAILSAFE_EKFINAV=17` trigger and clear times, armed
+  or not, and a trigger inside armed flight makes the card critical on its
+  own. The variance recomputation stays a model, and three of its
+  simplifications matter for Copter logs: ArduPilot gates the check on
+  having a position (`has_position` in `ArduCopter/ekf_check.cpp`), so
+  losing position can fire the failsafe with quiet variances; ArduCopter
+  low-passes the variances at `FS_EKF_FILT` (default 5 Hz) before
+  comparing; and the firmware counts ten checks up and down at 10 Hz
+  (`EKF_CHECK_ITERATIONS_MAX`) instead of requiring one continuous second.
   Different badges are therefore a deliberate distinction, not by themselves
   evidence of a contradiction or of the Plane mode gate changing a verdict.
 - **`attitude` reads critical on one sample.** A single row with over 15 deg

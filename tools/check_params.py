@@ -61,6 +61,7 @@ NOT_PARAMS = {
     "ALT_HOLD": "flight mode name",
     "PIT_P": "written as a suffix of {prefix}_PIT_P in the same string",
     "MAX_CM": "written as RNGFND1_TYPE/MAX_CM — a shared-prefix shorthand",
+    "FAILSAFE_EKFINAV": "LogErrorSubsystem name (AP_Logger.h), not a param",
 }
 
 # Parameters an older firmware generation defined and the current tree

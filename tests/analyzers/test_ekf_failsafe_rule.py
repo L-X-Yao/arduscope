@@ -17,7 +17,7 @@ from analyzers.failsafe import FailsafeAnalyzer
 from lib.ekf_failsafe import (
     in_modes, over_threshold, plane_posvel_mask, sustained)
 from lib.i18n import t
-from lib.log_reader import ModeChange
+from lib.log_reader import ErrorEvent, ModeChange
 from lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import (
     SyntheticReader, _thresholds, _vehicle)
@@ -38,7 +38,8 @@ def _quadplane() -> VehicleInfo:
 
 
 def _reader(sm=0.1, sp=0.1, sv=0.1, sh=0.1, seconds=10.0, rate=10.0,
-            vehicle_type="ArduCopter") -> SyntheticReader:
+            vehicle_type="ArduCopter",
+            armed_intervals=None) -> SyntheticReader:
     n = int(seconds * rate)
     ts = np.arange(n, dtype=float) / rate
     kf4 = {
@@ -54,7 +55,8 @@ def _reader(sm=0.1, sp=0.1, sv=0.1, sh=0.1, seconds=10.0, rate=10.0,
     return SyntheticReader(
         messages={"XKF4": kf4},
         params={"FS_EKF_THRESH": 0.8},
-        armed_intervals=[(0.0, seconds)],
+        armed_intervals=([(0.0, seconds)] if armed_intervals is None
+                         else armed_intervals),
         vehicle_type=vehicle_type,
     )
 
@@ -221,3 +223,49 @@ class TestEKFCard:
         kf4["SP"][20:25] = 0.9
         res = _failsafe(reader)
         assert res.status == "good"
+
+    def test_armed_firmware_event_pair_is_critical(self):
+        # The firmware records its decision in both ERR streams a few
+        # microseconds apart: EKFCHECK(16,2) + FAILSAFE_EKFINAV(17,1),
+        # then the matching clears.
+        reader = _reader()
+        reader.errors = [
+            ErrorEvent(2.0, 16, 2), ErrorEvent(2.0, 17, 1),
+            ErrorEvent(5.0, 16, 0), ErrorEvent(5.0, 17, 0),
+        ]
+        res = _ekf(reader)
+        assert res.status == "critical"
+        assert res.action_level == "safety_stop"
+        line = t("ekf.fw_event", start="2.0 s", end="5.0 s",
+                 state=t("ekf.fw_state_armed"))
+        assert any(line in d for d in res.details), res.details
+        assert t("ekf.fw_note") in "".join(res.details)
+
+    def test_unarmed_firmware_events_stay_detail_lines(self):
+        # Armed only after the events (SyntheticReader falls back to
+        # always-armed on an empty list, so use a real later window).
+        reader = _reader(armed_intervals=[(8.0, 10.0)])
+        reader.errors = [
+            ErrorEvent(2.0, 16, 2), ErrorEvent(2.0, 17, 1),
+            ErrorEvent(5.0, 16, 0), ErrorEvent(5.0, 17, 0),
+        ]
+        res = _ekf(reader)
+        assert res.status == "good"
+        line = t("ekf.fw_event", start="2.0 s", end="5.0 s",
+                 state=t("ekf.fw_state_unarmed"))
+        assert any(line in d for d in res.details), res.details
+
+    def test_uncleared_armed_trigger_lists_with_open_end(self):
+        reader = _reader()
+        reader.errors = [ErrorEvent(3.0, 17, 1)]
+        res = _ekf(reader)
+        assert res.status == "critical"
+        line = t("ekf.fw_event", start="3.0 s", end="-",
+                 state=t("ekf.fw_state_armed"))
+        assert any(line in d for d in res.details), res.details
+
+    def test_without_events_the_card_is_unchanged(self):
+        res = _ekf(_reader())
+        assert res.status == "good"
+        assert not any("ekf.fw_event" in str(d) or "ERR" in str(d)
+                       for d in res.details)

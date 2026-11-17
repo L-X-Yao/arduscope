@@ -23,6 +23,14 @@ from lib.i18n import t as _t
 from lib.np_helpers import safe_nanmax
 from . import AnalysisResult, BaseAnalyzer
 
+# ERR subsystems carrying the firmware's own EKF failsafe decision
+# (AP_Logger.h: LogErrorSubsystem EKFCHECK=16, FAILSAFE_EKFINAV=17).
+# Trigger codes are EKFCHECK_BAD_VARIANCE=2 and FAILSAFE_OCCURRED=1;
+# code 0 clears either stream. The firmware writes one row per stream
+# a few microseconds apart, so adjacent equal transitions are one event.
+_EKF_ERR_SUBSYS = (16, 17)
+_EKF_ERR_TRIGGER_CODES = {16: 2, 17: 1}
+
 
 class EKFAnalyzer(BaseAnalyzer):
     """
@@ -199,6 +207,35 @@ class EKFAnalyzer(BaseAnalyzer):
             action_level = "ok"
 
         # -----------------------------------------------------------
+        # 4b. The firmware's own EKF failsafe decision, from ERR
+        # -----------------------------------------------------------
+        # The variance recomputation above is an approximation: ArduPilot
+        # low-passes the variances (FS_EKF_FILT), counts ten checks up
+        # and down instead of requiring one continuous second, and a
+        # position loss alone can trip the check with quiet variances.
+        # A trigger the flight controller itself recorded is therefore
+        # authoritative: it escalates to critical when it happened in
+        # armed flight. Unarmed events stay detail lines.
+        fw_events = self._firmware_ekf_events()
+        fw_armed_trigger = False
+        for ev in fw_events:
+            end = f"{ev['end']:.1f} s" if ev["end"] is not None else "-"
+            details.append(_t("ekf.fw_event",
+                              start=f"{ev['start']:.1f} s", end=end,
+                              state=_t("ekf.fw_state_armed" if ev["armed"]
+                                       else "ekf.fw_state_unarmed")))
+        if fw_events:
+            fw_armed_trigger = any(ev["armed"] for ev in fw_events)
+        if fw_armed_trigger:
+            details.append(_t("ekf.fw_note"))
+            if status != "critical":
+                status = "critical"
+                summary = _t("ekf.fw_crit_summary")
+                plain_summary = _t("ekf.fw_crit_plain")
+                action_text = _t("ekf.fw_crit_action")
+                action_level = "safety_stop"
+
+        # -----------------------------------------------------------
         # 5. Figure: Variance time series (per core)
         # -----------------------------------------------------------
         core_colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
@@ -280,7 +317,11 @@ class EKFAnalyzer(BaseAnalyzer):
             figures.extend(innov_figs)
 
         # Evidence source
-        if status == "critical":
+        if status == "critical" and fw_armed_trigger and not ap_triggered:
+            # Critical came from the firmware's ERR record, not from the
+            # variance recomputation.
+            evidence_source = _t("ekf.fw_evidence")
+        elif status == "critical":
             evidence_source = _t("ekf.evidence_crit",
                                  thresh=f"{ekf_thresh:.2f}")
         elif status == "warning":
@@ -304,6 +345,52 @@ class EKFAnalyzer(BaseAnalyzer):
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _firmware_ekf_events(self) -> list[dict]:
+        """Trigger/clear windows of the firmware EKF failsafe, from ERR.
+
+        Rows are walked in time order. Each firmware decision appears in
+        both ERR streams (EKFCHECK and FAILSAFE_EKFINAV) microseconds
+        apart, so adjacent equal transitions collapse into one. A trigger
+        without a following clear stays open (end is None); a clear
+        without a preceding trigger is dropped -- that failsafe started
+        before this log did, and its trigger row is not ours to invent.
+        """
+        transitions = []  # (timestamp, "trigger" | "clear")
+        for err in sorted(self.reader.errors,
+                          key=lambda e: e.timestamp):
+            if err.subsys not in _EKF_ERR_SUBSYS:
+                continue
+            code = _EKF_ERR_TRIGGER_CODES.get(err.subsys)
+            if err.ecode == code:
+                kind = "trigger"
+            elif err.ecode == 0:
+                kind = "clear"
+            else:
+                continue
+            if (transitions and transitions[-1][1] == kind
+                    and err.timestamp - transitions[-1][0] <= 1.0):
+                continue
+            transitions.append((err.timestamp, kind))
+
+        events, open_t = [], None
+        for ts, kind in transitions:
+            if kind == "trigger":
+                if open_t is None:
+                    open_t = ts
+            elif open_t is not None:
+                events.append((open_t, ts))
+                open_t = None
+        if open_t is not None:
+            events.append((open_t, None))
+
+        armed = self.reader.get_armed_intervals()
+
+        def _armed_at(ts: float) -> bool:
+            return any(s <= ts <= e for s, e in armed)
+
+        return [{"start": s, "end": e, "armed": _armed_at(s)}
+                for s, e in events]
 
     def _innovation_plots(
         self, kf3_type: str, core_ids_expected: list[int],
