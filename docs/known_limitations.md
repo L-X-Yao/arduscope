@@ -44,15 +44,19 @@ them readable.
   `ekf_variance_warn`, not that the sustained failsafe combination was met
   (`analyzers/ekf.py`). ArduPilot does not run that check in a fixed-wing
   segment, but this does not make the navigation risk lower.
-  A 2026-11-17 census of the 557 logs accepted by `run_analysis` found 433 with
-  the same card status and 124 (22.3%) with different statuses. None had a
-  good/warning failsafe card with a critical EKF card; all six critical EKF
-  cards were paired with a critical failsafe card. Fifty-nine had a critical
-  failsafe card with a good/warning EKF card, 55 of them Copter, and none
-  reproduced the sustained combination. Fifty-four had no EKF ERR event, so
-  their critical came from another failsafe or the battery check. The other
-  five had EKFCHECK/FAILSAFE_EKFINAV events but did not reproduce the sustained
-  combination in this scan; the reason for that mismatch was not determined.
+  A 2026-11-17 census used the 557 logs accepted by `run_analysis`; three of
+  the 560 readable logs had no flight data and were excluded. Its records sit
+  beside the local gate reports in untracked `reports/`, not in the repository.
+  The census found 433 logs with the same card status and 124 (22.3%) with
+  different statuses. None had a good/warning failsafe card with a critical EKF
+  card; all six critical EKF cards were paired with a critical failsafe card.
+  Fifty-nine had a critical failsafe card with a good/warning EKF card, 55
+  Copter and four QuadPlane (all four battery-critical), and none reproduced
+  the sustained combination. Fifty-four had no EKF ERR event, so their critical
+  came from another failsafe or the battery check. The other five, all v4.1.x
+  Copter logs, had EKFCHECK/FAILSAFE_EKFINAV events but did not reproduce the
+  sustained combination in this scan; the reason for that mismatch within this
+  old-firmware group was not determined.
   Different badges are therefore a deliberate distinction, not by themselves
   evidence of a contradiction or of the Plane mode gate changing a verdict.
 - **`attitude` reads critical on one sample.** A single row with over 15 deg
