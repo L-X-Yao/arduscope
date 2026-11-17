@@ -220,10 +220,13 @@ class EKFAnalyzer(BaseAnalyzer):
         fw_armed_trigger = False
         for ev in fw_events:
             end = f"{ev['end']:.1f} s" if ev["end"] is not None else "-"
+            if ev["armed"]:
+                state = _t("ekf.fw_state_armed")
+            else:
+                state = _t("ekf.fw_state_unarmed")
             details.append(_t("ekf.fw_event",
                               start=f"{ev['start']:.1f} s", end=end,
-                              state=_t("ekf.fw_state_armed" if ev["armed"]
-                                       else "ekf.fw_state_unarmed")))
+                              state=state))
         if fw_events:
             fw_armed_trigger = any(ev["armed"] for ev in fw_events)
         if fw_armed_trigger:

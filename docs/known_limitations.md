@@ -56,13 +56,18 @@ them readable.
   came from another failsafe or the battery check. The other five — Copter
   logs with a vendor v4.1.x banner that are actually ArduCopter 4.7.0 — had
   EKFCHECK/FAILSAFE_EKFINAV events but did not reproduce the
-  sustained combination in this scan; the reason for that mismatch within this
-  old-firmware group was not determined.
+  sustained combination: three fired outside armed flight; in L_log_20 the
+  primary lane carried no horizontal position for about nine seconds across
+  its event (XKF4.SS HORIZ_POS_REL and HORIZ_POS_ABS clear) while the
+  variances stayed below the threshold, so only the position gate can have
+  fired it; and in log_22 the 5 Hz-filtered SV held at or above twice
+  FS_EKF_THRESH for the ten consecutive checks the counter needs (raw SV
+  peak 2.32).
   The EKF card now shows the firmware's own EKF failsafe events directly:
   ERR `EKFCHECK=16` / `FAILSAFE_EKFINAV=17` trigger and clear times, armed
   or not, and a trigger inside armed flight makes the card critical on its
   own. The variance recomputation stays a model, and three of its
-  simplifications matter for Copter logs: ArduPilot gates the check on
+  simplifications explain the misses above: ArduPilot gates the check on
   having a position (`has_position` in `ArduCopter/ekf_check.cpp`), so
   losing position can fire the failsafe with quiet variances; ArduCopter
   low-passes the variances at `FS_EKF_FILT` (default 5 Hz) before

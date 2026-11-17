@@ -239,6 +239,10 @@ class TestEKFCard:
         line = t("ekf.fw_event", start="2.0 s", end="5.0 s",
                  state=t("ekf.fw_state_armed"))
         assert any(line in d for d in res.details), res.details
+        # Exactly one event line: the dual ERR streams must collapse.
+        event_lines = [d for d in res.details
+                       if "EKFCHECK/FAILSAFE_EKFINAV" in str(d)]
+        assert len(event_lines) == 1, res.details
         assert t("ekf.fw_note") in "".join(res.details)
 
     def test_unarmed_firmware_events_stay_detail_lines(self):
@@ -269,3 +273,49 @@ class TestEKFCard:
         assert res.status == "good"
         assert not any("ekf.fw_event" in str(d) or "ERR" in str(d)
                        for d in res.details)
+
+    def test_retrigger_within_a_second_of_the_clear_stays_two_events(self):
+        # trigger 2.0, clear 3.0, re-trigger 3.5, clear 5.0: the second
+        # trigger is a different transition, so nothing collapses.
+        reader = _reader()
+        reader.errors = [
+            ErrorEvent(2.0, 16, 2), ErrorEvent(2.0, 17, 1),
+            ErrorEvent(3.0, 16, 0), ErrorEvent(3.0, 17, 0),
+            ErrorEvent(3.5, 16, 2), ErrorEvent(3.5, 17, 1),
+            ErrorEvent(5.0, 16, 0), ErrorEvent(5.0, 17, 0),
+        ]
+        res = _ekf(reader)
+        assert res.status == "critical"
+        lines = [d for d in res.details
+                 if "EKFCHECK/FAILSAFE_EKFINAV" in str(d)]
+        assert len(lines) == 2, res.details
+        assert any(t("ekf.fw_event", start="2.0 s", end="3.0 s",
+                     state=t("ekf.fw_state_armed")) in d
+                   for d in lines)
+        assert any(t("ekf.fw_event", start="3.5 s", end="5.0 s",
+                     state=t("ekf.fw_state_armed")) in d
+                   for d in lines)
+
+    def test_open_event_spanning_arming_stays_unarmed(self):
+        # Armed state is read at the trigger: an event that starts
+        # disarmed does not escalate, even if the vehicle arms while it
+        # is still open (the real firmware cannot fire disarmed).
+        reader = _reader(armed_intervals=[(4.0, 10.0)])
+        reader.errors = [ErrorEvent(2.0, 16, 2), ErrorEvent(2.0, 17, 1)]
+        res = _ekf(reader)
+        assert res.status == "good"
+        line = t("ekf.fw_event", start="2.0 s", end="-",
+                 state=t("ekf.fw_state_unarmed"))
+        assert any(line in d for d in res.details), res.details
+
+    def test_clear_then_later_retrigger_lists_two_windows(self):
+        reader = _reader()
+        reader.errors = [
+            ErrorEvent(2.0, 17, 1), ErrorEvent(4.0, 17, 0),
+            ErrorEvent(6.0, 16, 2), ErrorEvent(8.0, 16, 0),
+        ]
+        res = _ekf(reader)
+        assert res.status == "critical"
+        lines = [d for d in res.details
+                 if "EKFCHECK/FAILSAFE_EKFINAV" in str(d)]
+        assert len(lines) == 2, res.details
