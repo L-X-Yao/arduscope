@@ -174,6 +174,31 @@ class TestFailsafeCard:
         assert res.status == "good"
         assert t("failsafe.ekf_mode_gate") in res.details
 
+    def test_fixed_wing_plane_does_not_get_counter_wording(self):
+        # Q_ENABLE=0: the firmware never runs the check, so neither the
+        # counter nor the continuous-second lines may appear; only the
+        # disabled line explains the good badge.
+        plane = VehicleInfo(
+            vehicle_type="ArduPlane",
+            firmware_version="4.6.3",
+            board_name="synthetic",
+            frame_class=1,
+            motor_count=0,
+            imu_count=2,
+            is_quadplane=False,
+        )
+        reader = _reader(seconds=11.0, vehicle_type="ArduPlane")
+        reader._messages["XKF4"]["SM"][10:] = 1.8
+        reader._messages["XKF4"]["SP"][10:] = 0.9
+        res = _failsafe(reader, plane)
+        assert res.status == "good"
+        assert t("failsafe.ekf_plane_disabled") in res.details
+        assert not any(
+            t("failsafe.ekf_transient_sustained") in d
+            or t("failsafe.ekf_not_triggered") in d
+            or t("failsafe.ekf_triggered_sustained") in d
+            for d in res.details)
+
     def test_auto_stage_change_breaks_the_one_second_hold(self):
         reader = _phase_plane([(0.0, 3), (2.0, 2), (2.8, 3)])
         ts = reader._messages["XKF4"]["_timestamp"]

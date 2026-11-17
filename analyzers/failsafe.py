@@ -493,6 +493,10 @@ class FailsafeAnalyzer(BaseAnalyzer):
                 # The replay fired without any variance breach inside the
                 # window: Copter's has_position gate alone failed it.
                 details.append(t("failsafe.ekf_position_gate"))
+        elif plane_disabled:
+            # A fixed-wing does not run the check at all; the line below
+            # says so, and counter wording would only mislead.
+            pass
         elif (raw_over & active).any():
             # The raw combination was reached without a trigger: on the
             # replay path the counter never got to ten (too brief, or
