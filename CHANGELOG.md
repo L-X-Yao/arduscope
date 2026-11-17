@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.12.2] - 2026-11-17
 
 ### Added
 - The EKF card shows the firmware's own EKF failsafe events from ERR
