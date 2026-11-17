@@ -7,6 +7,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Added
+- The EKF card shows the firmware's own EKF failsafe events from ERR
+  (`EKFCHECK=16`, `FAILSAFE_EKFINAV=17`): trigger and clear times, and
+  whether the aircraft was armed. A trigger inside armed flight makes the
+  card critical on its own, because the offline variance model cannot
+  reproduce every decision the firmware made (a lost position estimate,
+  the `FS_EKF_FILT` low-pass, the ten-count counter). Unarmed events stay
+  detail lines.
+
+### Changed
+- Documentation: the README no longer says map tiles need a network, and
+  `docs/known_limitations.md` explains the failsafe/EKF card differences
+  with the 2026-11-17 census and the five vendor-firmware EKF events.
+
 ## [0.12.1] - 2026-11-16
 
 ### Fixed
