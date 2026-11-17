@@ -95,3 +95,54 @@ class TestFromParamsUsesCanonicalType:
         t = Thresholds.from_params(
             {"Q_M_SPIN_MIN": 0.12}, "Acme-FC (ArduPlane)")
         assert t.mot_spin_min == 0.12
+
+
+def _parse_banner(*messages) -> LogReader:
+    reader = LogReader.__new__(LogReader)
+    reader.vehicle_type = "Unknown"
+    reader.firmware_version = "Unknown"
+    for message in messages:
+        reader._parse_firmware_msg(message)
+    return reader
+
+
+class TestFirmwareBannerParsing:
+    def test_standard_banner(self):
+        reader = _parse_banner("ArduCopter V4.6.3")
+        assert reader.vehicle_type == "ArduCopter"
+        assert reader.firmware_version == "V4.6.3"
+
+    def test_dual_version_vendor_banner_uses_upstream_version(self):
+        reader = _parse_banner(
+            "FC-FPV-Rocket v4.1.0 (e6553238) [ArduCopter V4.7.0]")
+        assert reader.vehicle_type == "FC-FPV-Rocket"
+        assert reader.firmware_version == "V4.7.0"
+
+    def test_brackets_and_punctuation_are_allowed(self):
+        reader = _parse_banner("FC [ArduPlane(V4.5.1)]")
+        assert reader.vehicle_type == "FC"
+        assert reader.firmware_version == "V4.5.1"
+
+    def test_family_and_version_matching_is_case_insensitive(self):
+        reader = _parse_banner("fc [aRdUcOpTeR: v4.7.0]")
+        assert reader.vehicle_type == "fc"
+        assert reader.firmware_version == "v4.7.0"
+
+    def test_later_weak_match_cannot_replace_strong_match(self):
+        reader = _parse_banner(
+            "FC-FPV-Rocket v4.1.0 (e6553238) [ArduCopter V4.7.0]",
+            "FC-Other v9.9 [ArduCopter]",
+        )
+        assert reader.vehicle_type == "FC-FPV-Rocket"
+        assert reader.firmware_version == "V4.7.0"
+
+    def test_missing_version_and_invalid_text_do_not_raise(self):
+        reader = _parse_banner("", None, 42, "ArduCopter")
+        assert reader.vehicle_type == "Unknown"
+        assert reader.firmware_version == "Unknown"
+
+        # Four numeric components are outside the accepted version shape;
+        # without a strong match the legacy first-two-token fallback remains.
+        reader = _parse_banner("FC v1.2 [ArduCopter V4.7.0.1]")
+        assert reader.vehicle_type == "FC"
+        assert reader.firmware_version == "v1.2"

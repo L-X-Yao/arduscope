@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Fixed
+- Dual-version vendor banners now use the official ArduPilot version rather
+  than the vendor's own version, while preserving the vendor vehicle type and
+  the legacy fallback. The log cache version moves forward so old identifications
+  cannot mask the fix.
+
 ## [0.12.2] - 2026-11-17
 
 ### Added

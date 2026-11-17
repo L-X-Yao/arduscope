@@ -10,6 +10,7 @@ Single-pass architecture:
 import hashlib
 import os
 import pickle  # noqa: S403 - cache is self-generated from local .BIN files
+import re
 from array import array
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -29,7 +30,16 @@ _CACHE_DIR = os.environ.get(
 
 # Bump whenever parsing changes what ends up in the cache. Part of the
 # cache key, so a stale entry can never mask a parser regression.
-_CACHE_VERSION = 3
+_CACHE_VERSION = 4
+
+# Official family name followed by a semantic-ish version token. Punctuation
+# and brackets are allowed between them; a vendor prefix/version is ignored.
+_FIRMWARE_BANNER_RE = re.compile(
+    r"\b(ArduCopter|ArduPlane|ArduRover|ArduSub)\b"
+    r"[\s\]\[(){}<>:_+|,/;.=-]*"
+    r"(V?\d+\.\d+(?:\.\d+)?)(?![\d.])",
+    re.IGNORECASE,
+)
 
 # Set while armed in POWR.Safety (AP_Logger::Write_Power).
 _POWR_ARMED_BIT = 4
@@ -531,14 +541,33 @@ class LogReader:
             self._fully_cached.add(msg_type)
 
     def _parse_firmware_msg(self, text: str):
-        """Extract vehicle type and version from firmware MSG lines."""
+        """Extract vehicle type and version from firmware MSG lines.
+
+        A strong match is an official family name with a version after it,
+        including a dual-version vendor banner such as
+        ``FC-X v1.0 (hash) [ArduCopter V4.7.0]``. Once one is found, a later
+        weak legacy match cannot replace either field with the vendor version.
+        """
+        if not isinstance(text, str) or not text.strip():
+            return
         text_lower = text.lower()
-        if 'arducopter' in text_lower or 'arduplane' in text_lower or \
-           'ardurover' in text_lower or 'ardusub' in text_lower:
+        if not any(name in text_lower for name in
+                   ("arducopter", "arduplane", "ardurover", "ardusub")):
+            return
+        strong = _FIRMWARE_BANNER_RE.search(text)
+        if strong is not None:
             parts = text.split()
-            if len(parts) >= 2:
+            if parts:
                 self.vehicle_type = parts[0]
-                self.firmware_version = parts[1]
+            self.firmware_version = strong.group(2)
+            self._firmware_msg_strong = True
+            return
+        if getattr(self, "_firmware_msg_strong", False):
+            return
+        parts = text.split()
+        if len(parts) >= 2:
+            self.vehicle_type = parts[0]
+            self.firmware_version = parts[1]
 
     @staticmethod
     def _relative_ts(absolute_ts: Optional[float],
