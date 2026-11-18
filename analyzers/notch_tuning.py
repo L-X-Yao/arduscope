@@ -341,7 +341,7 @@ class NotchTuningAnalyzer(BaseAnalyzer):
 
         # With INS_LOG_BAT_OPT possibly mixing pre- and post-filter
         # batches, the post ones carry instance + gyro_count (Write_ISBH),
-        # so the two can be separated — when the instance span matches the
+        # so the two can be separated — each instance judged against the
         # real IMU count from the log's IMU rows.
         self._gyro_spectrum_pre = None
         self._gyro_spectrum_post = None
@@ -451,29 +451,30 @@ class NotchTuningAnalyzer(BaseAnalyzer):
         or None when the log does not show the split.
 
         Write_ISBH logs post-filter batches as instance + _gyro_count and
-        pre-filter ones unchanged, so a mixed log's gyro instances run
-        0..2*gyro_count-1. The set alone cannot prove the split: under
-        sensor-rate options with the runtime flag off, or with more than
-        one IMU and post-only logging, an identical 0..n-1 span is all
-        post-filter with no offset at all. So the instance span is checked
-        against the real gyro_count from the log's IMU rows: the split is
-        accepted only when every instance 0..max appears, max+1 is even,
-        each instance owns at least two batches (two full sampler rounds),
-        and the implied boundary equals gyro_count. Anything else stays
-        unseparated; no guessing.
+        pre-filter ones unchanged, so with gyro_count known from the log's
+        IMU rows the split reads straight off each instance: below it is
+        pre-filter, at or above it post-filter. INS_LOG_BAT_MASK may log
+        only some IMUs, so the instances are neither assumed contiguous
+        nor assumed to span 2*gyro_count. The split is accepted only when
+        both sides are present — an identical instance set also comes from
+        more IMUs logged post-only, and there nothing post-filter exists
+        to measure against — every instance owns at least two batches (the
+        sampler rotates per batch), and no instance reaches 2*gyro_count,
+        where the encoding ends. Anything else stays unseparated; no
+        guessing.
         """
         counts: dict[int, int] = {}
         for b in gyro_batches.values():
             counts[b["instance"]] = counts.get(b["instance"], 0) + 1
-        instances = sorted(counts)
-        n = len(instances)
-        if n == 0 or instances != list(range(n)) or n % 2:
+        if not counts or max(counts) >= 2 * gyro_count:
             return None
-        if min(counts[i] for i in instances) < 2:
+        pre = [i for i in counts if i < gyro_count]
+        post = [i for i in counts if i >= gyro_count]
+        if not pre or not post:
             return None
-        if n // 2 != gyro_count:
+        if min(counts.values()) < 2:
             return None
-        return n // 2
+        return gyro_count
 
     def _imu_instance_count(self) -> int | None:
         """How many IMU instances the log itself shows.

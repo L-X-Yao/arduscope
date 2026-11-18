@@ -440,13 +440,25 @@ class TestInstanceSplit:
         batches = self._batches((0, 1))
         assert NotchTuningAnalyzer._gyro_instance_split(batches, 1) is None
 
-    def test_a_gap_in_the_instances_stays_unseparated(self):
-        batches = self._batches((0, 1, 3, 0, 1, 3))
-        assert NotchTuningAnalyzer._gyro_instance_split(batches, 2) is None
+    def test_a_masked_subset_splits_without_contiguity(self):
+        """INS_LOG_BAT_MASK may log only some IMUs: the real three-IMU log
+        that opened this showed gyro instances 0 (pre) and 3 (post) only,
+        3 = 0 + gyro_count."""
+        batches = self._batches((0, 3, 0, 3))
+        assert NotchTuningAnalyzer._gyro_instance_split(batches, 3) == 3
 
-    def test_an_odd_span_stays_unseparated(self):
-        batches = self._batches((0, 1, 2, 0, 1, 2))
-        assert NotchTuningAnalyzer._gyro_instance_split(batches, 2) is None
+    def test_a_gap_in_the_instances_still_splits_against_the_count(self):
+        """Without contiguity, a gap only means some IMUs were masked."""
+        batches = self._batches((0, 1, 3, 0, 1, 3))
+        assert NotchTuningAnalyzer._gyro_instance_split(batches, 2) == 2
+
+    def test_an_instance_at_or_past_twice_the_count_is_refused(self):
+        """Past 2*gyro_count the encoding ends; such an instance is not a
+        pre/post pair but something else entirely."""
+        assert NotchTuningAnalyzer._gyro_instance_split(
+            self._batches((0, 6, 0, 6)), 3) is None
+        assert NotchTuningAnalyzer._gyro_instance_split(
+            self._batches((0, 3, 7, 0, 3, 7)), 3) is None
 
 
 class TestPrePostSplit:
@@ -591,6 +603,30 @@ class TestPrePostSplit:
         peak, _figs, _details = analyzer._fft_from_batch()
         assert analyzer._gyro_spectrum is not None
         assert len(analyzer._gyro_spectrum[0]) > 0
+
+    def test_masked_single_imu_pairs_split(self, tmp_path):
+        """The real log that opened this: three IMUs, INS_LOG_BAT_MASK=1
+        logging only IMU0, so the gyro instances are 0 (pre) and 3 (post),
+        3 = 0 + gyro_count. options=5 is pre+post with sensor rate."""
+        log = binlog.flight_log("copter", batches=0,
+                                imu_instances=(0, 1, 2),
+                                params={**self.NOTCH,
+                                        "INS_LOG_BAT_OPT": 5})
+        seq = 0
+        for _ in range(2):
+            for instance, amp in ((0, 2000.0), (3, 200.0)):
+                _write_batch(log, seq, 5_000_000 + seq * 1_000_000, 120.0,
+                             1024, amplitude=amp, instance=instance)
+                seq += 1
+        path = log.save(tmp_path / "masked.bin")
+        analyzer = _analyzer(path)
+        assert analyzer._imu_instance_count() == 3
+        analyzer._fft_from_batch()
+        assert analyzer._gyro_spectrum_pre is not None
+        assert analyzer._gyro_spectrum_post is not None
+        atten = analyzer._measure_notch_attenuation(120, 40)
+        assert atten["method"] == "pre/post batch"
+        assert atten["atten_db"] == pytest.approx(20.0, abs=3.0)
 
     def test_imu_instance_count_reads_the_log(self, tmp_path):
         path = self._mixed_log(tmp_path, 4)
