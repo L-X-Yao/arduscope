@@ -376,7 +376,7 @@
   "attitude.evidence_osc": "统计事实：P99/RMS={ratio} 超 4.0 (Gaussian 噪声应为 2.58) = 重尾分布，P99={p99}° > warn 阈值 {warn}° × 1.5",
   "attitude.evidence_peak_beyond": "ArduPilot 源码 AC_AutoTune.cpp: AUTOTUNE_LEVEL_ANGLE_CD ×2 松弛上限 = {crit}°（本机型）。峰值 {peak}° 在平缓指令 (±{half}°) 下超此阈值 = 震荡征兆",
   "attitude.evidence_peak_over_limit": "ArduPilot 源码 AC_AttitudeControl.h: AC_ATTITUDE_THRUST_ERROR_ANGLE=30° 是推力角误差硬限，超过后偏航修正受限；峰值 {peak}° 已越过该硬限",
-  "attitude.evidence_peak_severe": "工程警告：15° 峰值线是无权威来源的既有筛查值，峰值 {peak}° 超过该线；critical 改用 ArduPilot 源码 AC_AttitudeControl.h 的 AC_ATTITUDE_THRUST_ERROR_ANGLE=30° 推力角误差硬限（超过后偏航修正受限）",
+  "attitude.evidence_peak_severe": "工程警告：15° 峰值线是无权威来源的既有筛查值，峰值 {peak}° 超过该线；严重级判据改用 ArduPilot 源码 AC_AttitudeControl.h 的 AC_ATTITUDE_THRUST_ERROR_ANGLE=30° 推力角误差硬限（超过后偏航修正受限）",
   "attitude.evidence_rms": "ArduPilot 源码 AC_AutoTune.cpp: AUTOTUNE_LEVEL_ANGLE_CD Copter 2.5°/Plane 5° 是 ArduPilot 本身判定'姿态足够 level' 的阈值 (warn={warn}° / crit={crit}° = 该阈值及其 2× 松弛上限)",
   "attitude.fig_hist_title": "姿态误差分布 (解锁期间)",
   "attitude.fig_hist_xaxis": "误差 (deg)",
