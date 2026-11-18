@@ -250,17 +250,19 @@ class TestCompassVectorInterference:
     def test_body_fixed_vector_is_detected_with_rcou_only(self):
         impact = np.array([250.0, 180.0, 200.0])
         result = _vector_result(_vector_log((impact,)))
-        expected = np.linalg.norm(impact) / 530.0 * 100.0
+        reader = _vector_log((impact,))
+        throttle = (reader._messages["RCOU"]["C1"] - 1000.0) / 1000.0
+        expected = (np.linalg.norm(impact) * np.percentile(throttle, 95)
+                    / 530.0 * 100.0)
         assert result.vector_pct == pytest.approx(expected, rel=1e-6)
         assert result.vector_driver == "RCOU"
-        reader = _vector_log((impact,))
         res = CompassAnalyzer(reader, Thresholds(),
                               _info(4, False, "ArduCopter")).analyze()
         assert res.status == "critical"
         assert res.evidence[0]["value"] == pytest.approx(expected, rel=1e-6)
 
     def test_vector_crosses_threshold_when_scalar_does_not(self):
-        result = _vector_result(_vector_log((np.array([100.0, 100.0, 100.0]),)))
+        result = _vector_result(_vector_log((np.array([110.0, 110.0, 110.0]),)))
         assert result.scalar_pct < 30.0 < result.vector_pct
 
     def test_pure_attitude_rotation_has_no_vector_impact(self):
@@ -277,16 +279,21 @@ class TestCompassVectorInterference:
 
     def test_worst_compass_instance_wins(self):
         impact = np.array([250.0, 180.0, 200.0])
-        result = _vector_result(_vector_log((None, impact)))
+        reader = _vector_log((None, impact))
+        result = _vector_result(reader)
+        throttle = (reader._messages["RCOU"]["C1"] - 1000.0) / 1000.0
         assert result.vector_label == "MAG1"
         assert result.vector_pct == pytest.approx(
-            np.linalg.norm(impact) / 530.0 * 100.0, rel=1e-6)
+            np.linalg.norm(impact) * np.percentile(throttle, 95)
+            / 530.0 * 100.0, rel=1e-6)
 
     def test_primary_current_is_normalized_like_compassmot(self):
         reader = _vector_log((np.array([7.0, 7.0, 7.0]),), current=True)
         result = _vector_result(reader)
-        # current=40*throttle, so current_max/throttle_max is 40 A.
-        expected = 7.0 * np.sqrt(3.0) * 40.0 / 530.0 * 100.0
+        # No full-throttle extrapolation: use the observed 95th-percentile current.
+        current = reader._messages["BAT"]["Curr"]
+        expected = (7.0 * np.sqrt(3.0) * np.percentile(current, 95)
+                    / 530.0 * 100.0)
         assert result.vector_driver == "BAT.Curr"
         assert result.vector_pct == pytest.approx(expected, rel=1e-6)
 
@@ -297,6 +304,38 @@ class TestCompassVectorInterference:
                                    _info(4, False, "ArduCopter"))
         assert analyzer._primary_current() is None
         assert _vector_result(reader).vector_driver == "RCOU"
+    def test_missing_bat_instance_falls_back_to_rcou(self):
+        reader = _vector_log((np.array([7.0, 7.0, 7.0]),), current=True)
+        del reader._messages["BAT"]["Inst"]
+        analyzer = CompassAnalyzer(reader, Thresholds(),
+                                   _info(4, False, "ArduCopter"))
+        assert analyzer._primary_current() is None
+        assert _vector_result(reader).vector_driver == "RCOU"
+
+    def test_driver_spikes_and_field_transients_do_not_dominate(self):
+        impact = np.array([110.0, 110.0, 110.0])
+        clean = _vector_result(_vector_log((impact,))).vector_pct
+        reader = _vector_log((impact,))
+        rcou = reader._messages["RCOU"]
+        mag = reader._messages["MAG"]
+        spike_rows = np.arange(0, 600, 100)
+        for channel in range(1, 5):
+            rcou[f"C{channel}"][spike_rows] = 2000.0
+        mag["MagX"][50:56] += 1000.0
+        mag["MagY"][50:56] -= 800.0
+        mag["MagZ"][50:56] += 600.0
+        result = _vector_result(reader)
+        assert result.vector_pct == pytest.approx(clean, rel=0.05)
+
+    def test_implausible_or_noise_dominated_fit_returns_none(self):
+        huge = _vector_result(_vector_log((np.array([2000.0, 2000.0, 2000.0]),)))
+        assert huge.vector_pct is None
+        reader = _vector_log((np.array([110.0, 110.0, 110.0]),))
+        rng = np.random.default_rng(42)
+        noise = rng.normal(0.0, 150.0, size=(600, 3))
+        for axis, name in enumerate(("MagX", "MagY", "MagZ")):
+            reader._messages["MAG"][name] += noise[:, axis]
+        assert _vector_result(reader).vector_pct is None
 
 
 def test_pure_plane_aileron_dither_does_not_suggest_spin_min():

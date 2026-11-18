@@ -117,29 +117,29 @@ them readable.
 - **A hover throttle parameter over 0.12 from the measured hover reads
   critical.** In SITL a parameter of 0.20 on an aircraft that hovers at 0.36
   flew the same as the right one, within 6%. The limits are marked E.
-- **`compass` vector interference is an offline fit, not a controlled
-  CompassMot calibration.** The scalar field-strength contrast remains, and a
-  second metric fits each corrected MAG axis against throttle plus the nine ATT
-  rotation-matrix terms; the throttle coefficient is the full-throttle impact
-  vector, following `ArduCopter/compassmot.cpp`. With usable primary BAT current
-  (at least 3 A), current replaces throttle and the result is scaled by
-  `current_max/throttle_max`, as CompassMot does. Firmware takes throttle from
-  the RC stick (`compassmot.cpp:160-165`), while this offline driver is
-  normalized motor PWM. On a throttle-limited aircraft whose PWM ceiling is
-  below stick-full, the current/PWM extrapolation is higher than the value at
-  stick-full, biasing the result strict. Firmware also updates compensation only
-  from samples at or above 3 A (`compassmot.cpp:197-203`), while the offline fit
-  uses all valid current rows; the estimator differs but has more samples with
-  which to stabilize its slope. The worst compass instance is
-  reported and the higher of scalar/vector drives severity, so this change can
-  only raise a verdict. The existing SITL scenario with
-  `SIM_MAG_MOT_X/Y/Z=7.0` read 14.6% by the scalar method and 126.1% by the
-  current-normalized vector method (109.0% with throttle only); a normal SITL
-  control read 0.25% and stayed good. Missing ATT, insufficient low/high
-  throttle support, or driver variation that attitude explains leave the vector
-  metric unavailable rather than inferring it. The linear model still cannot
-  distinguish motor current from an external magnetic disturbance that happens
-  to correlate with it.
+- **`compass` vector interference is an offline robust fit, not a controlled
+  CompassMot calibration.** The scalar field-strength contrast remains. A second
+  metric fits each corrected MAG axis against the driver plus nine ATT
+  rotation-matrix terms, downweights driver outliers outside a 1.5×IQR fence to
+  25% weight, and applies Huber IRLS to three-axis field residuals. The
+  coefficient is evaluated at the observed 95th-percentile driver, never
+  extrapolated to full throttle. A fit is rejected when its observed impact
+  exceeds the entire 530 mGauss reference field or its median residual is at
+  least half the impact; no conclusion is better than a false attribution.
+  With usable primary BAT current (maximum at least 3 A), current replaces
+  throttle without any full-throttle scaling. Firmware updates compensation only
+  from samples at or above 3 A (`compassmot.cpp:197-203`), while this fit uses
+  all valid current rows to stabilize the slope. Firmware reads throttle from
+  the RC stick (`compassmot.cpp:160-165`), so normalized motor PWM remains a
+  proxy rather than a reproduction of the calibration input.
+  The worst compass instance is reported and the higher of scalar/vector drives
+  severity, so adding the metric can only raise a verdict. The existing SITL
+  scenario with `SIM_MAG_MOT_X/Y/Z=7.0` read 14.1% by the scalar method and
+  66.7% by the observed-current vector method (64.9% with RCOU only); a normal
+  control produced no vector conclusion and stayed good. Missing ATT, insufficient low/high support,
+  attitude-confounded drivers, and the validity guards leave the vector metric
+  unavailable. The linear model still cannot distinguish motor current from an
+  external magnetic disturbance that happens to correlate with it.
 
 ## Notch advice
 

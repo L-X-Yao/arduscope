@@ -26,6 +26,11 @@ from . import AnalysisResult, BaseAnalyzer
 # AP_Arming.cpp: AP_ARMING_COMPASS_MAGFIELD_EXPECTED, the denominator used
 # by CompassMot's interference_pct (ArduCopter/compassmot.cpp:206-216).
 _COMPASS_EXPECTED_FIELD_MGAUSS = 530.0
+# Model-validity guards, not severity thresholds. A fitted motor component
+# larger than the entire reference field is not a diagnosable linear fit;
+# typical model residual at half the fitted impact likewise gives no conclusion.
+_MAX_PLAUSIBLE_IMPACT_RATIO = 1.0
+_MAX_NOISE_TO_IMPACT = 0.5
 
 
 @dataclass
@@ -422,16 +427,16 @@ class CompassAnalyzer(BaseAnalyzer):
         unique_instances: list[int],
         all_nan_inst: bool = False,
     ) -> _InterferenceResult | None:
-        """Measure scalar contrast and CompassMot's full-throttle vector.
+        """Measure scalar contrast and robust observed-load vector impact.
 
-        CompassMot subtracts a zero-throttle vector, divides the three-axis
-        impact by throttle or current, and reports its norm at full throttle
-        (ArduCopter/compassmot.cpp:172-216). Here a regression on the nine
-        body-to-earth DCM entries removes attitude rotation without assuming
-        the compass's installation orientation. The driver coefficient is
-        therefore the vector impact after orthogonalising attitude. Low- and
-        high-throttle support are still required; an unidentifiable driver
-        returns no vector metric rather than guessing.
+        CompassMot subtracts a zero-throttle vector and divides the three-axis
+        impact by throttle or current (ArduCopter/compassmot.cpp:172-215).
+        Here a robust regression on the nine body-to-earth DCM entries removes
+        attitude rotation without assuming the compass's installation
+        orientation. The coefficient is evaluated at the observed 95th
+        percentile driver, never extrapolated to a full-throttle calibration
+        the flight did not perform. Low/high support are required; an
+        unidentifiable, implausibly large or noise-dominated fit returns None.
         """
         channels = self.motor_channels()
         rcou = read_outputs(self.reader, channels)
@@ -461,7 +466,6 @@ class CompassAnalyzer(BaseAnalyzer):
         attitude = self._attitude_design(t_mag)
         driver = throttle
         driver_name = "RCOU"
-        current_based = False
         if attitude is not None:
             primary_current = self._primary_current()
             if primary_current is not None:
@@ -472,7 +476,6 @@ class CompassAnalyzer(BaseAnalyzer):
                     # provides it (compassmot.cpp:80-85,194-216).
                     driver = current
                     driver_name = "BAT.Curr"
-                    current_based = True
 
         scalar_worst = None
         vector_worst = None
@@ -497,8 +500,7 @@ class CompassAnalyzer(BaseAnalyzer):
             vector_pct = None
             if attitude is not None:
                 vector_pct = self._vector_motor_impact(
-                    driver[mask], throttle_inst, field_xyz, attitude[mask],
-                    current_based)
+                    driver[mask], throttle_inst, field_xyz, attitude[mask])
             label = "MAG" if inst_id is None else f"MAG{inst_id}"
             if vector_pct is not None and (
                     vector_worst is None or vector_pct > vector_worst[0]):
@@ -595,9 +597,8 @@ class CompassAnalyzer(BaseAnalyzer):
         throttle: np.ndarray,
         field_xyz: np.ndarray,
         attitude: np.ndarray,
-        current_based: bool,
     ) -> float | None:
-        """Full-throttle vector impact in percent of the expected 530 mG."""
+        """Robust impact at the observed 95th-percentile driver, in percent."""
         valid = (np.isfinite(driver) & np.isfinite(throttle)
                  & np.all(np.isfinite(field_xyz), axis=1)
                  & np.all(np.isfinite(attitude), axis=1))
@@ -616,29 +617,72 @@ class CompassAnalyzer(BaseAnalyzer):
 
         drv = driver[valid]
         design = attitude[valid]
+        fields = field_xyz[valid]
+        # Tukey's 1.5*IQR fence identifies high-leverage driver spikes.
+        # Downweight rather than delete them: a sustained takeoff/RTL excursion
+        # is real evidence, and deleting it would leave only the cruise plateau.
+        q1, q3 = np.percentile(drv, [25, 75])
+        iqr = float(q3 - q1)
+        if iqr > 1e-12:
+            outlier = (drv < q1 - 1.5 * iqr) | (drv > q3 + 1.5 * iqr)
+        else:
+            outlier = np.abs(drv - np.median(drv)) > 1e-12
+        leverage_weight = np.where(outlier, 0.25, 1.0)
+
         # Without driver variation orthogonal to attitude, a motor effect
         # and an attitude effect are not separately identifiable.
         driver_span = float(np.std(drv))
-        residual = drv - design @ np.linalg.lstsq(design, drv, rcond=None)[0]
-        if driver_span <= 1e-9 or np.std(residual) < 0.05 * driver_span:
+        residual_driver = drv - design @ np.linalg.lstsq(
+            design, drv, rcond=None)[0]
+        if driver_span <= 1e-9 \
+                or np.std(residual_driver) < 0.05 * driver_span:
             return None
 
         regressors = np.column_stack([design, drv])
-        coefficients = np.linalg.lstsq(
-            regressors, field_xyz[valid], rcond=None)[0]
-        impact = coefficients[-1]
-        if not np.all(np.isfinite(impact)):
+        weights = leverage_weight.copy()
+        coefficients = None
+        residual_norm = None
+        for _ in range(10):
+            root_w = np.sqrt(weights)
+            updated = np.linalg.lstsq(
+                regressors * root_w[:, None], fields * root_w[:, None],
+                rcond=None)[0]
+            residuals = fields - regressors @ updated
+            residual_norm = np.linalg.norm(residuals, axis=1)
+            # A common three-axis Huber weight rejects a magnetic transient
+            # on any axis. Per-axis MAD sets the scale; 0.53 mG (0.1% of the
+            # reference field) is only a numerical floor for exact-fit data.
+            center = np.median(residuals, axis=0)
+            mad = np.median(np.abs(residuals - center), axis=0)
+            scale = max(float(np.linalg.norm(1.4826 * mad)),
+                        0.001 * _COMPASS_EXPECTED_FIELD_MGAUSS)
+            huber = leverage_weight.copy()
+            large = residual_norm > 1.345 * scale
+            huber[large] *= 1.345 * scale / residual_norm[large]
+            converged = (coefficients is not None
+                         and np.max(np.abs(updated - coefficients))
+                         <= 1e-6 * (1.0 + np.max(np.abs(coefficients)))
+                         and np.max(np.abs(huber - weights)) < 1e-3)
+            coefficients = updated
+            weights = huber
+            if converged:
+                break
+
+        impact_per_unit = coefficients[-1]
+        if not np.all(np.isfinite(impact_per_unit)):
             return None
-        full_scale = 1.0
-        if current_based:
-            # compassmot.cpp:214-215: impact/amp at the observed current,
-            # expressed at full throttle via current_max/throttle_max.
-            throttle_max = float(np.max(thr))
-            if throttle_max <= 0:
-                return None
-            full_scale = float(np.max(drv)) / throttle_max
-        return float(np.linalg.norm(impact) * full_scale
-                     / _COMPASS_EXPECTED_FIELD_MGAUSS * 100.0)
+        observed_driver = float(np.percentile(drv, 95))
+        if observed_driver <= 0:
+            return None
+        impact = float(np.linalg.norm(impact_per_unit) * observed_driver)
+        noise = float(np.median(residual_norm))
+        if impact <= 1e-9 * _COMPASS_EXPECTED_FIELD_MGAUSS:
+            return 0.0
+        if (impact > _MAX_PLAUSIBLE_IMPACT_RATIO
+                * _COMPASS_EXPECTED_FIELD_MGAUSS
+                or noise >= _MAX_NOISE_TO_IMPACT * impact):
+            return None
+        return impact / _COMPASS_EXPECTED_FIELD_MGAUSS * 100.0
 
     @staticmethod
     def _throttle_field_contrast(throttle: np.ndarray,
