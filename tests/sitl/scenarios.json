@@ -219,7 +219,7 @@
         "SIM_MAG_MOT_Z": 7.0
       },
       "expected": {
-        "analyzers_critical": [
+        "analyzers_warning_or_critical": [
           "compass"
         ]
       },

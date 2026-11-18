@@ -41,12 +41,6 @@ class _InterferenceResult:
     vector_label: str | None
     vector_driver: str | None
 
-    @property
-    def worst_pct(self) -> float | None:
-        values = [v for v in (self.scalar_pct, self.vector_pct)
-                  if v is not None]
-        return max(values) if values else None
-
 
 class CompassAnalyzer(BaseAnalyzer):
     """
@@ -309,7 +303,10 @@ class CompassAnalyzer(BaseAnalyzer):
                           label=interf_result.vector_label,
                           driver=interf_result.vector_driver)
                     )
-                interf_pct = interf_result.worst_pct
+                # A flight log is not a controlled CompassMot run: the vector
+                # fit is observational detail only. Severity, calibration
+                # guidance and cross-rule evidence remain on the scalar path.
+                interf_pct = interf_result.scalar_pct
                 if interf_pct is not None:
                     if interf_pct > self.thresholds.compass_interference_crit:
                         overall_status = self.worst_status(
@@ -338,8 +335,8 @@ class CompassAnalyzer(BaseAnalyzer):
             # forever and shipped a no-op line in the user's .param file.
             current_mot_comp = self.reader.get_param("COMPASS_MOTCT", 0)
             if (interf_result is not None
-                    and interf_result.worst_pct is not None
-                    and interf_result.worst_pct > self.thresholds.compass_interference_warn
+                    and interf_result.scalar_pct is not None
+                    and interf_result.scalar_pct > self.thresholds.compass_interference_warn
                     and current_mot_comp == 0):
                 # The type only selects how the vector is applied, and with
                 # a zero vector it changes nothing (AP_Compass_Backend.cpp).
@@ -404,10 +401,10 @@ class CompassAnalyzer(BaseAnalyzer):
             action_text=action_text,
             evidence_source=evidence_source,
             evidence=([{"field": "motor_interference_pct",
-                        "value": interf_result.worst_pct,
+                        "value": interf_result.scalar_pct,
                         "threshold": self.thresholds.compass_interference_warn}]
                       if interf_result is not None
-                      and interf_result.worst_pct is not None else []),
+                      and interf_result.scalar_pct is not None else []),
         )
 
     # ------------------------------------------------------------------

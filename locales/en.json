@@ -602,7 +602,7 @@
   "compass.mot_cal_needed": "Motors clearly disturb the compass, but CompassMot has not been run (COMPASS_MOT_X/Y/Z are all 0). Run it first: COMPASS_MOTCT alone has no effect.",
   "compass.mot_comp_off": "COMPASS_MOT_X/Y/Z hold a vector but COMPASS_MOTCT is 0, so compensation is off. Run CompassMot again and let it set this: ArduPilot says not to change it by hand.",
   "compass.motor_interference": "Motor interference: field strength change {pct}% between high and low throttle",
-  "compass.motor_vector_interference": "Motor vector interference: {pct}% at the observed 95th-percentile driver ({label}, robustly normalized by {driver}, ATT attitude orthogonalized)",
+  "compass.motor_vector_interference": "Motor vector interference: {pct}% at the observed 95th-percentile driver ({label}, robustly normalized by {driver}, ATT attitude orthogonalized; informational only, not graded)",
   "compass.offset_above_crit": "{label}: offset {val} exceeds critical threshold {threshold}",
   "compass.offset_above_warn": "{label}: offset {val} exceeds warning threshold {threshold}",
   "compass.offset_mgauss": "Offset (mGauss)",

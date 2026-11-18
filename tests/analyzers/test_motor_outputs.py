@@ -256,22 +256,14 @@ class TestCompassVectorInterference:
                     / 530.0 * 100.0)
         assert result.vector_pct == pytest.approx(expected, rel=1e-6)
         assert result.vector_driver == "RCOU"
-        res = CompassAnalyzer(reader, Thresholds(),
-                              _info(4, False, "ArduCopter")).analyze()
-        assert res.status == "critical"
-        assert res.evidence[0]["value"] == pytest.approx(expected, rel=1e-6)
 
     def test_vector_crosses_threshold_when_scalar_does_not(self):
         result = _vector_result(_vector_log((np.array([110.0, 110.0, 110.0]),)))
         assert result.scalar_pct < 30.0 < result.vector_pct
 
     def test_pure_attitude_rotation_has_no_vector_impact(self):
-        reader = _vector_log()
-        result = _vector_result(reader)
+        result = _vector_result(_vector_log())
         assert result.vector_pct == pytest.approx(0.0, abs=1e-8)
-        res = CompassAnalyzer(reader, Thresholds(),
-                              _info(4, False, "ArduCopter")).analyze()
-        assert res.status == "good", res.details
 
     def test_insufficient_low_throttle_baseline_returns_none(self):
         result = _vector_result(_vector_log(short_baseline=True))
@@ -297,13 +289,6 @@ class TestCompassVectorInterference:
         assert result.vector_driver == "BAT.Curr"
         assert result.vector_pct == pytest.approx(expected, rel=1e-6)
 
-    def test_missing_bat_instance_falls_back_to_rcou(self):
-        reader = _vector_log((np.array([7.0, 7.0, 7.0]),), current=True)
-        del reader._messages["BAT"]["Inst"]
-        analyzer = CompassAnalyzer(reader, Thresholds(),
-                                   _info(4, False, "ArduCopter"))
-        assert analyzer._primary_current() is None
-        assert _vector_result(reader).vector_driver == "RCOU"
     def test_missing_bat_instance_falls_back_to_rcou(self):
         reader = _vector_log((np.array([7.0, 7.0, 7.0]),), current=True)
         del reader._messages["BAT"]["Inst"]

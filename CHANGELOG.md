@@ -9,13 +9,14 @@ releases are not published.
 
 ## [Unreleased]
 
-### Fixed
-- Compass motor interference now includes a robust three-axis vector impact
-  alongside the field-strength contrast, with ATT attitude terms, throttle/
-  current normalization and per-instance worst-case selection. It is evaluated
-  at the observed 95th-percentile load without full-throttle extrapolation.
-  The existing SITL injection (`SIM_MAG_MOT_X/Y/Z=7.0`) moves from 14.1% scalar
-  to critical vector interference; a normal control stays good.
+### Added
+- Compass reports a robust three-axis motor-interference estimate as an
+  informational detail, with ATT attitude terms, throttle/current normalization
+  and per-instance worst-case selection. It uses the observed 95th-percentile
+  load without full-throttle extrapolation and does not change severity:
+  non-controlled flight cannot distinguish motors from position-related
+  magnetic disturbances. SITL detects the injected vector (14.1% scalar versus
+  66.7% observed-current vector), while a normal control stays good.
 
 ## [0.12.4] - 2026-11-18
 

@@ -132,14 +132,17 @@ them readable.
   all valid current rows to stabilize the slope. Firmware reads throttle from
   the RC stick (`compassmot.cpp:160-165`), so normalized motor PWM remains a
   proxy rather than a reproduction of the calibration input.
-  The worst compass instance is reported and the higher of scalar/vector drives
-  severity, so adding the metric can only raise a verdict. The existing SITL
-  scenario with `SIM_MAG_MOT_X/Y/Z=7.0` read 14.1% by the scalar method and
-  66.7% by the observed-current vector method (64.9% with RCOU only); a normal
-  control produced no vector conclusion and stayed good. Missing ATT, insufficient low/high support,
-  attitude-confounded drivers, and the validity guards leave the vector metric
-  unavailable. The linear model still cannot distinguish motor current from an
-  external magnetic disturbance that happens to correlate with it.
+  The worst compass instance is shown as informational detail only; the vector
+  metric does not affect severity, CompassMot guidance or cross-rule evidence.
+  Even after robust fitting, a corpus evaluation escalated 56 of 518 test logs
+  and two of 43 eagle logs. Non-controlled flight cannot separate motor impact
+  from a position-related external magnetic field, so the scalar contrast alone
+  drives severity. The existing SITL scenario with `SIM_MAG_MOT_X/Y/Z=7.0` read
+  14.1% by the scalar method and 66.7% by the observed-current vector method
+  (64.9% with RCOU only), demonstrating detection without grading it. A normal
+  control produced no vector conclusion and stayed good. Missing ATT,
+  insufficient low/high support, attitude-confounded drivers, and the validity
+  guards leave the vector metric unavailable.
 
 ## Notch advice
 

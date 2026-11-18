@@ -602,7 +602,7 @@
   "compass.mot_cal_needed": "电机对罗盘干扰明显，但未做 CompassMot 校准（COMPASS_MOT_X/Y/Z 全为 0）。先做校准，单独开启 COMPASS_MOTCT 不起作用。",
   "compass.mot_comp_off": "COMPASS_MOT_X/Y/Z 有值，但 COMPASS_MOTCT 为 0，补偿没有生效。重新运行 CompassMot，由校准设置它：ArduPilot 说明这个参数不要手动修改。",
   "compass.motor_interference": "电机干扰: 高油门相对低油门时磁场强度变化 {pct}%",
-  "compass.motor_vector_interference": "电机向量干扰: 观测 driver 95 分位处 {pct}% ({label}, 按 {driver} 稳健归一，ATT 姿态项已正交化)",
+  "compass.motor_vector_interference": "电机向量干扰: 观测 driver 95 分位处 {pct}% ({label}, 按 {driver} 稳健归一，ATT 姿态项已正交化；仅供参考，不作定级)",
   "compass.offset_above_crit": "{label}: 偏移量 {val} 超过临界阈值 {threshold}",
   "compass.offset_above_warn": "{label}: 偏移量 {val} 超过警告阈值 {threshold}",
   "compass.offset_mgauss": "偏移量 (mGauss)",
