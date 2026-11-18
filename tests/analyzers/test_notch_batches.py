@@ -598,19 +598,46 @@ class TestPrePostSplit:
         assert analyzer._imu_instance_count() == 1
 
     def test_no_imu_rows_leave_the_split_unmade(self, tmp_path):
-        """Without IMU rows there is no real gyro_count to check the span
-        against, so the caller never reaches a split."""
-        log = binlog.flight_log("copter", batches=0, imu_instances=(),
-                                params={"INS_LOG_BAT_OPT": 4})
-        path = log.save(tmp_path / "no-imu.bin")
+        """Real batches with a clean 0,1 span, but no IMU rows: there is no
+        gyro_count to check the span against, so the fail-closed path is
+        no split and no attenuation."""
+        path = self._mixed_log(tmp_path, 4, imu_instances=())
         analyzer = _analyzer(path)
         assert analyzer._imu_instance_count() is None
-        batches = {i: {"instance": inst} for i, inst in
-                   enumerate((0, 1, 0, 1))}
-        assert analyzer._gyro_instance_split(batches, 1) == 1  # span alone
-        # ... but _fft_from_batch never asks: the split stays None.
-        analyzer._fft_from_batch()
+        assert analyzer._fft_from_batch()[0] is not None  # batches ran
         assert analyzer._gyro_spectrum_pre is None
+        assert analyzer._gyro_spectrum_post is None
+        assert analyzer._measure_notch_attenuation(120, 40) == {
+            "method": "mixed", "options": 4}
+
+    @staticmethod
+    def _pair(lo, hi, step=1.0):
+        """A pre/post pair of spectra on axes [lo, hi] Hz."""
+        f = np.arange(lo, hi + step / 2, step)
+        pre = (f, np.ones(len(f)), np.ones(len(f)), np.ones(len(f)))
+        post = (f.copy(), 0.1 * np.ones(len(f)), 0.1 * np.ones(len(f)),
+                0.1 * np.ones(len(f)))
+        return pre, post
+
+    @pytest.mark.parametrize("freq, bw, outcome", [
+        (41.0, 80.0, "measured"),        # f_lo == floor: inclusive
+        (460.0, 80.0, "measured"),       # f_hi == nyquist: inclusive
+        (460.05, 80.0, "nyquist"),       # f_hi just past: refused
+        (40.95, 80.0, "none"),           # f_lo just below floor: refused
+    ])
+    def test_band_boundaries_are_inclusive_at_the_limits(self, freq, bw,
+                                                         outcome):
+        """The band may touch either end of the axes but not cross."""
+        pre, post = self._pair(1.0, 500.0)
+        atten = NotchTuningAnalyzer._atten_pre_post(pre, post, freq, bw)
+        if outcome == "measured":
+            assert atten["method"] == "pre/post batch"
+            assert atten["atten_db"] == pytest.approx(20.0, abs=0.5)
+        elif outcome == "nyquist":
+            assert atten["method"] == "nyquist_exceeded"
+            assert atten["nyquist"] == 500.0
+        else:
+            assert atten is None
 
     def test_the_method_reaches_the_report(self, tmp_path):
         """40 dB reads as good, and says it was measured pre against post."""

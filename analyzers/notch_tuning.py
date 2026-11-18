@@ -339,9 +339,10 @@ class NotchTuningAnalyzer(BaseAnalyzer):
             details.append(t("notch_tuning.no_gyro_batch"))
             return None, [], details
 
-        # With INS_LOG_BAT_OPT mixing pre- and post-filter batches, the
-        # post ones carry instance + gyro_count (Write_ISBH), so the two
-        # can be separated — when the instance set actually shows the split.
+        # With INS_LOG_BAT_OPT possibly mixing pre- and post-filter
+        # batches, the post ones carry instance + gyro_count (Write_ISBH),
+        # so the two can be separated — when the instance span matches the
+        # real IMU count from the log's IMU rows.
         self._gyro_spectrum_pre = None
         self._gyro_spectrum_post = None
         split_at = None
@@ -433,12 +434,13 @@ class NotchTuningAnalyzer(BaseAnalyzer):
         return peak_freq, [fig], details
 
     def _mixed_batch_logging(self) -> bool:
-        """Whether batch samples alternate pre- and post-filter data.
+        """Whether batch samples may alternate pre- and post-filter data.
 
         AP_InertialSensor.h batch_opt_t: bit0 sensor rate, bit1 post-filter,
-        bit2 pre+post. With bit 2, or with bits 0 and 1 together, the
-        sampler alternates the two and Write_ISBH marks the post batches by
-        an instance offset.
+        bit2 pre+post. Bit 2 always alternates; bits 0 and 1 together do
+        only when the runtime sensor-rate flag is on (BatchSampler.cpp's
+        update_doing_sensor_rate_logging), so "may" is the most this says —
+        the split itself is checked against the real IMU count.
         """
         options = int(self.reader.get_param("INS_LOG_BAT_OPT", 0))
         return bool(options & 4 or (options & 3) == 3)
@@ -499,8 +501,11 @@ class NotchTuningAnalyzer(BaseAnalyzer):
 
         Keeps the length most batches share, the longer one on a tie, and
         averages the batches whose logged rate is within tolerance of the
-        group's median rate. Returns the frequency axis, the three axes'
-        amplitudes, and how many batches made it in.
+        group's median rate. When a group holds two far-apart logging
+        rates, the median lands between the clusters and the tolerance
+        would keep nothing, so the densest rate cluster wins instead.
+        Returns the frequency axis, the three axes' amplitudes, and how
+        many batches made it in.
         """
         if not spectra:
             return None
