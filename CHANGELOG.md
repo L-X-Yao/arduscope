@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.12.8] - 2026-11-18
 
 ### Added
 - Notch attenuation is now measured on logs whose batches hold both pre- and
