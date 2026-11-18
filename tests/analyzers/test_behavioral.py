@@ -122,7 +122,11 @@ class TestMissionWPRadius:
 class TestMissionRadiusGrading:
     """Grade waypoint arrival by the aircraft's radius, not a fixed 20 m."""
 
-    def _run(self, offset_deg, radius_m):
+    def _run(self, offset_deg, radius_m=None, *, params=None, vehicle=None):
+        if params is None:
+            params = {"WP_RADIUS": radius_m}
+        if vehicle is None:
+            vehicle = _QP_VI
         ts = _make_ts(200, 0.5)
         n = len(ts)
         reader = SyntheticReader(
@@ -142,18 +146,25 @@ class TestMissionRadiusGrading:
                     "Alt": np.full(n, 50.0),
                 },
             },
-            params={"WP_RADIUS": radius_m},
-            vehicle_type="ArduPlane",
+            params=params,
+            vehicle_type=vehicle.vehicle_type,
         )
         reader.mode_list = [SimpleNamespace(mode_name="AUTO")]
         from analyzers.mission import MissionAnalyzer
-        return MissionAnalyzer(reader, Thresholds(), _QP_VI).analyze()
+        return MissionAnalyzer(reader, Thresholds(), vehicle).analyze()
 
     def test_mean_over_20m_inside_wp_radius_is_good(self):
         result = self._run(offset_deg=0.002, radius_m=300.0)
         distance_m = 0.002 * 111320
         assert 20.0 < distance_m < 300.0       # regression precondition
         assert result.status == "good"
+        accuracy_fig = result.figures[-1]
+        assert set(accuracy_fig.data[0].marker.color) == {"#5cb85c"}
+        assert len(accuracy_fig.layout.shapes) == 1
+        assert accuracy_fig.layout.shapes[0].y0 == 300.0
+        from lib.i18n import t
+        assert accuracy_fig.layout.annotations[0].text == t(
+            "mission.thresh_reached", val="300")
 
     def test_a_waypoint_outside_wp_radius_is_warning(self):
         result = self._run(offset_deg=0.003, radius_m=200.0)
@@ -161,6 +172,24 @@ class TestMissionRadiusGrading:
         assert distance_m > 200.0              # regression precondition
         assert result.status == "warning"
         assert "WP_RADIUS" in result.evidence_source
+        accuracy_fig = result.figures[-1]
+        assert set(accuracy_fig.data[0].marker.color) == {"#d9534f"}
+        assert len(accuracy_fig.layout.shapes) == 1
+        assert accuracy_fig.layout.shapes[0].y0 == 200.0
+
+    @pytest.mark.parametrize("params, vehicle, param_name", [
+        ({"WPNAV_RADIUS": 0}, _DEFAULT_VI, "WPNAV_RADIUS"),
+        ({"WP_RADIUS": 0}, _QP_VI, "WP_RADIUS"),
+    ])
+    def test_zero_radius_returns_info_but_keeps_distances(
+            self, params, vehicle, param_name):
+        from lib.i18n import t
+        result = self._run(0.002, params=params, vehicle=vehicle)
+        assert result.status == "info"
+        assert result.summary == t("mission.invalid_radius",
+                                   param=param_name, radius="0")
+        assert t("mission.wp_accuracy", mean="222.6", max="222.6") \
+            in result.details
 
 
 # ====================================================================

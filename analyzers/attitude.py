@@ -20,7 +20,7 @@ from lib.i18n import t
 from . import AnalysisResult, BaseAnalyzer
 
 # AC_ATTITUDE_THRUST_ERROR_ANGLE in ArduPilot's AC_AttitudeControl.h: the
-# attitude error at which the controller's thrust allocation fails.
+# thrust-angle error hard limit above which yaw corrections are limited.
 _THRUST_ERROR_ANGLE_DEG = 30.0
 # Legacy engineering warning screen, with no authoritative source. It must
 # never raise a transient peak to critical; the sourced hard limit above does.
@@ -380,10 +380,7 @@ class AttitudeAnalyzer(BaseAnalyzer):
                 evidence_source = t("attitude.evidence_peak_over_limit",
                                     peak=f"{max_peak_err:.1f}")
         elif status == "warning":
-            if peak_warning:
-                evidence_source = t("attitude.evidence_peak_severe",
-                                    peak=f"{max_peak_err:.1f}")
-            elif peak_beyond_command:
+            if peak_beyond_command:
                 evidence_source = t("attitude.evidence_peak_beyond",
                                     crit=crit_thresh,
                                     peak=f"{max_peak_err:.1f}",
@@ -393,9 +390,12 @@ class AttitudeAnalyzer(BaseAnalyzer):
                                     ratio=f"{p99_rms_ratio:.1f}",
                                     p99=f"{max_p99:.1f}",
                                     warn=warn_thresh)
-            else:
+            elif rms_warn:
                 evidence_source = t("attitude.evidence_rms",
                                     warn=warn_thresh, crit=crit_thresh)
+            elif peak_warning:
+                evidence_source = t("attitude.evidence_peak_severe",
+                                    peak=f"{max_peak_err:.1f}")
         else:
             evidence_source = ""
 

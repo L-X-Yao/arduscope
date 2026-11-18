@@ -189,12 +189,21 @@ class MissionAnalyzer(BaseAnalyzer):
         if len(wp_distances) > 0:
             mean_acc = float(np.mean(wp_distances))
             max_acc = float(np.max(wp_distances))
-            reached = int(np.sum(wp_distances < wp_radius))
 
             details.append(
                 t("mission.wp_accuracy",
                   mean=f"{mean_acc:.1f}", max=f"{max_acc:.1f}")
             )
+            if wp_radius <= 0:
+                return self.make_result(
+                    title=t("analyzer.mission"),
+                    status="info",
+                    summary=t("mission.invalid_radius",
+                              param=wp_param_name, radius=f"{wp_radius:g}"),
+                    details=details,
+                )
+
+            reached = int(np.sum(wp_distances < wp_radius))
             details.append(
                 t("mission.wp_reached",
                   radius=f"{wp_radius:.0f}",
@@ -266,7 +275,7 @@ class MissionAnalyzer(BaseAnalyzer):
                 height=350,
             )
             colors = [
-                '#5cb85c' if d < 10 else '#f0ad4e' if d < 30 else '#d9534f'
+                '#5cb85c' if d < wp_radius else '#d9534f'
                 for d in wp_distances
             ]
             fig_acc.add_trace(go.Bar(
@@ -275,10 +284,9 @@ class MissionAnalyzer(BaseAnalyzer):
                 name=t("mission.closest_dist_m"),
             ))
             self.add_threshold_hline(
-                fig_acc, 10, t("mission.thresh_excellent", val=10), color="#5cb85c", dash="dot",
-            )
-            self.add_threshold_hline(
-                fig_acc, 30, t("mission.thresh_reached", val=30), color="#f0ad4e", dash="dot",
+                fig_acc, wp_radius,
+                t("mission.thresh_reached", val=f"{wp_radius:g}"),
+                color="#d9534f", dash="dot",
             )
             figures.append(fig_acc)
 

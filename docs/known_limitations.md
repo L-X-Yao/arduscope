@@ -107,8 +107,9 @@ them readable.
   evidence of a contradiction or of the Plane mode gate changing a verdict.
 - **`attitude` still grades one-sample peaks.** A single roll or pitch error
   above 30 deg is critical because ArduPilot's
-  `AC_ATTITUDE_THRUST_ERROR_ANGLE=30°` is the controller's thrust-allocation
-  failure hard limit; a peak above 15 deg is now only a warning. The 15, and
+  `AC_ATTITUDE_THRUST_ERROR_ANGLE=30°` is the thrust-angle error hard limit
+  above which yaw corrections are limited; a peak above 15 deg is now only a
+  warning. The 15, and
   the 20 and 4.0 beside it in `analyzers/attitude.py`, remain engineering
   values with no source, outside `lib/thresholds.py` and its checks. The
   existing RMS criteria can still make sustained tracking error critical.

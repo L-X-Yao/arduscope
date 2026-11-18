@@ -710,7 +710,7 @@ class TestAttitudeSynthetic:
                                    _vehicle()).analyze()
         assert result.status == "critical"
 
-    def _build_peak_reader(self, peak_deg, n=300) -> SyntheticReader:
+    def _build_peak_reader(self, peak_deg, n=300, actual_roll=0.0) -> SyntheticReader:
         ts = np.linspace(0, 120, n)
         des_roll = np.zeros(n)
         des_roll[n // 2] = peak_deg
@@ -719,7 +719,7 @@ class TestAttitudeSynthetic:
                 "ATT": {
                     "_timestamp": ts,
                     "DesRoll": des_roll,
-                    "Roll": np.zeros(n),
+                    "Roll": np.full(n, actual_roll),
                     "DesPitch": np.zeros(n),
                     "Pitch": np.zeros(n),
                     "DesYaw": np.full(n, 90.0),
@@ -760,6 +760,41 @@ class TestAttitudeSynthetic:
         assert "30" in result.summary
         assert result.evidence_source == _t(
             "attitude.evidence_peak_over_limit", peak="31.0")
+
+    def test_exactly_30_does_not_trigger_peak_critical(self):
+        reader = self._build_peak_reader(30.0)
+        result = AttitudeAnalyzer(reader, _thresholds(reader),
+                                  _vehicle()).analyze()
+        assert result.status == "warning"
+
+    def test_exactly_15_does_not_trigger_peak_warning(self):
+        reader = self._build_peak_reader(15.0)
+        thresholds = _thresholds(reader)
+        result = AttitudeAnalyzer(reader, thresholds, _vehicle()).analyze()
+        assert result.status == "warning"  # peak_beyond_command still applies
+        assert _t("attitude.warn_severe_reason", peak="15.0") \
+            not in result.summary
+        assert result.evidence_source == _t(
+            "attitude.evidence_peak_beyond", crit=thresholds.att_rms_crit,
+            peak="15.0", half="7.5")
+
+    def test_rms_only_warning_uses_rms_evidence(self):
+        reader = self._build_peak_reader(0.0, actual_roll=3.0)
+        thresholds = _thresholds(reader)
+        result = AttitudeAnalyzer(reader, thresholds, _vehicle()).analyze()
+        assert result.status == "warning"
+        assert result.evidence_source == _t(
+            "attitude.evidence_rms", warn=thresholds.att_rms_warn,
+            crit=thresholds.att_rms_crit)
+
+    def test_rms_warning_outranks_unsourced_peak_evidence(self):
+        reader = self._build_peak_reader(20.0, actual_roll=3.0)
+        thresholds = _thresholds(reader)
+        result = AttitudeAnalyzer(reader, thresholds, _vehicle()).analyze()
+        assert result.status == "warning"
+        assert result.evidence_source == _t(
+            "attitude.evidence_rms", warn=thresholds.att_rms_warn,
+            crit=thresholds.att_rms_crit)
 
     def test_not_armed_graceful(self):
         """No armed intervals → should not crash."""
