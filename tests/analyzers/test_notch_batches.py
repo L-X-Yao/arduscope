@@ -391,20 +391,28 @@ class TestFltdAdvice:
         assert any("INS_GYRO_FILTER/2" in d for d in result.details)
 
 
-def test_critical_attitude_error_does_not_raise_thr_mix():
-    # The wiki raises it only after a good tune, and warns against it on an
-    # oscillating aircraft. In SITL 0.7 changed nothing.
+def test_attitude_details_do_not_return_a_severity():
     ts = np.linspace(0.0, 60.0, 500)
-    reader = SyntheticReader(messages={"ATT": {
-        "_timestamp": ts, "Roll": np.full(500, 8.0), "DesRoll": np.zeros(500),
-        "Pitch": np.zeros(500), "DesPitch": np.zeros(500),
-    }}, armed_intervals=[(0.0, 60.0)])
+    reader = SyntheticReader(messages={
+        "ATT": {
+            "_timestamp": ts, "Roll": np.full(500, 8.0),
+            "DesRoll": np.zeros(500), "Pitch": np.zeros(500),
+            "DesPitch": np.zeros(500),
+        },
+        "RATE": {
+            "_timestamp": ts, "R": np.full(500, 120.0),
+            "P": np.full(500, 120.0),
+        },
+    }, armed_intervals=[(0.0, 60.0)])
     analyzer = NotchTuningAnalyzer(reader, Thresholds(), _copter())
     analyzer._armed_intervals = reader.get_armed_intervals()
-    result_status, _details = analyzer._check_attitude_stability()
-    assert result_status == "critical"
-    # The method now hands back no recommendations at all.
-    assert len(analyzer._check_attitude_stability()) == 2
+
+    details = analyzer._check_attitude_stability()
+
+    assert t("notch_tuning.att_tracking_err",
+             roll_err="8.00", pitch_err="0.00") in details
+    assert t("notch_tuning.rate_peak",
+             roll="120.0", pitch="120.0") in details
 
 
 class TestInstanceSplit:

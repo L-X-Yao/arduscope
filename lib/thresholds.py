@@ -245,9 +245,6 @@ class Thresholds:
     notch_hover_error_crit: float = 0.12  # E: warn × 2
     notch_freq_drift_hz: float = 20.0     # E: |configured - FFT peak| tolerance
     notch_ref_error: float = 0.10         # E: |REF - actual hover throttle|
-    notch_rate_max_crit: float = 100.0    # E: max angular rate (deg/s)
-    notch_att_err_warn: float = 2.5       # E: mean |Roll-DesRoll| degrees
-    notch_att_err_crit: float = 5.0       # E: warn × 2
 
     # -- Log health --
     # MissionPlanner LogAnalyzer TestPerformance defines slow-loop

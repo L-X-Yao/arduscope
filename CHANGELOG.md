@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Fixed
+- Notch tuning no longer grades attitude through unsourced mean-error and
+  peak-rate proxies. Those measurements remain informational details while
+  attitude severity stays with the attitude card's sourced rules; notch
+  attenuation, bandwidth, frequency and hover-throttle checks are unchanged.
+
 ## [0.12.8] - 2026-11-18
 
 ### Added

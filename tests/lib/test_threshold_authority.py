@@ -55,9 +55,6 @@ E_CLASS_WAIVERS: dict[str, str] = {
     "notch_hover_error_crit": "proxy: no sourced limit",
     "notch_freq_drift_hz": "proxy: no sourced limit",
     "notch_ref_error": "proxy: no sourced limit",
-    "notch_rate_max_crit": "proxy: no sourced limit",
-    "notch_att_err_warn": "proxy: no sourced limit",
-    "notch_att_err_crit": "proxy: no sourced limit",
 
     # -- Judgments that existed as literals in the analyzers. Values kept
     # as they were; no authoritative source is known for them yet.

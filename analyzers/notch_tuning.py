@@ -68,7 +68,7 @@ class NotchTuningAnalyzer(BaseAnalyzer):
       - FFT spectrum with detected peak frequency
       - Notch filter coverage overlay
       - Hover throttle calibration check
-      - Attitude oscillation assessment
+      - Attitude tracking details (graded by the attitude analyzer)
       - Complete parameter recommendation table
     """
 
@@ -142,11 +142,9 @@ class NotchTuningAnalyzer(BaseAnalyzer):
         recommendations.extend(notch_recs)
 
         # -----------------------------------------------------------
-        # 4. Attitude stability check
+        # 4. Attitude details (graded by the attitude analyzer, not here)
         # -----------------------------------------------------------
-        att_status, att_details = self._check_attitude_stability()
-        status = self.worst_status(status, att_status)
-        details.extend(att_details)
+        details.extend(self._check_attitude_stability())
 
         # -----------------------------------------------------------
         # 5. Build recommendation table + .param text
@@ -173,8 +171,7 @@ class NotchTuningAnalyzer(BaseAnalyzer):
             action_level = "apply_param"
         elif status in ("warning", "critical"):
             # A sub-check flagged an issue but produced no auto-adjustable
-            # parameter (e.g. attitude oscillation with no usable notch
-            # source, or HNTC2 already enabled). Do NOT claim PASS — that
+            # parameter (e.g. HNTC2 already enabled). Do NOT claim PASS —
             # contradicted the status badge and dropped the card from the
             # executive action items.
             summary = t("notch_tuning.summary_issue")
@@ -967,19 +964,18 @@ class NotchTuningAnalyzer(BaseAnalyzer):
     # ==================================================================
 
     def _check_attitude_stability(self):
-        """Check attitude oscillation severity."""
+        """Return informational attitude details; never grade the notch card."""
         details = []
-        status = "good"
 
         if not self.reader.has_message("ATT"):
-            return status, details
+            return details
 
         att = self.reader.get_messages_as_arrays("ATT", [
             "Roll", "Pitch", "DesRoll", "DesPitch",
         ])
         ts = att["_timestamp"]
         if len(ts) < 100:
-            return status, details
+            return details
 
         # Filter to armed intervals only
         armed = self._armed_intervals
@@ -1035,34 +1031,7 @@ class NotchTuningAnalyzer(BaseAnalyzer):
                       pitch=f"{max_rate_p:.1f}")
                 )
 
-        # Assess severity.
-        err_crit = self.thresholds.notch_att_err_crit
-        err_warn = self.thresholds.notch_att_err_warn
-        rate_crit = self.thresholds.notch_rate_max_crit
-        max_err = max(roll_err, pitch_err)
-        rate_high = (max_rate_r > rate_crit or max_rate_p > rate_crit)
-        if max_err > err_crit:
-            status = "critical"
-            severity_reason = t("notch_tuning.severity_err_crit",
-                                err=f"{max_err:.1f}", thresh=err_crit)
-        elif max_err > err_warn and rate_high:
-            status = "critical"
-            severity_reason = t("notch_tuning.severity_err_rate",
-                                err=f"{max_err:.1f}",
-                                rate=f"{max(max_rate_r, max_rate_p):.0f}")
-        elif max_err > err_warn:
-            status = "warning"
-            severity_reason = t("notch_tuning.severity_err_warn",
-                                err=f"{max_err:.1f}", thresh=err_warn)
-        else:
-            severity_reason = ""
-
-        if severity_reason:
-            details.append(
-                t("notch_tuning.att_deviation", reason=severity_reason)
-            )
-
-        return status, details
+        return details
 
     def _suggest_second_notch(self, details, recs, configured_freq,
                               peak_freq):

@@ -113,11 +113,12 @@ them readable.
   the 20 and 4.0 beside it in `analyzers/attitude.py`, remain engineering
   values with no source, outside `lib/thresholds.py` and its checks. The
   existing RMS criteria can still make sustained tracking error critical.
-- **`notch_tuning` grades attitude by proxies.** A mean attitude error over
-  2.5 deg with a peak rate over 100 deg/s reads critical: 81 of its 98
-  criticals. A mean error over 5 deg does too: 14 more. `lib/thresholds.py`
-  marks these limits E, with no source, and a fast flight passes 100 deg/s on
-  purpose.
+- **`notch_tuning` no longer grades attitude by proxies.** Roll/pitch range,
+  mean tracking error and peak angular rate remain informational details. The
+  unsourced 2.5/5 deg and 100 deg/s severity rules were removed: attitude
+  severity belongs to the `attitude` card, which uses its sourced RMS criteria
+  and ArduPilot's 30 deg thrust-angle hard limit. A fast flight no longer makes
+  the notch card critical on its own.
 - **A hover throttle parameter over 0.12 from the measured hover reads
   critical.** In SITL a parameter of 0.20 on an aircraft that hovers at 0.36
   flew the same as the right one, within 6%. The limits are marked E.

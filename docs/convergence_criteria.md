@@ -83,9 +83,6 @@ Source key:
 | `notch_hover_error_crit` | 0.12 | E | warn x 2 |
 | `notch_freq_drift_hz` | 20.0 | E | abs(configured - FFT peak) tolerance |
 | `notch_ref_error` | 0.10 | E | abs(REF - actual hover throttle) |
-| `notch_rate_max_crit` | 100.0 | E | max angular rate (deg/s) |
-| `notch_att_err_warn` | 2.5 | E | mean abs(Roll-DesRoll) degrees |
-| `notch_att_err_crit` | 5.0 | E | warn x 2 |
 | `log_long_loop_warn` | 0.005 | D | MP 6% instant / ~12 = 0.5% sustained |
 | `log_long_loop_crit` | 0.05 | D | approx MP FAIL 10% / 2 |
 | `log_min_free_mem` | 10240 | D | 1% of STM32H743 1MB RAM floor |

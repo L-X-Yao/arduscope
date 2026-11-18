@@ -529,6 +529,34 @@ class TestHoverIsMeasuredInTheAir:
         assert result.summary == t("notch_tuning.summary_pass")
 
 
+class TestAttitudeDetailsDoNotGrade:
+    def test_large_attitude_error_keeps_a_good_notch_card_good(self):
+        reader = _hover_reader(throttle=0.34, height=10.0, params={
+            "INS_HNTCH_ENABLE": 1, "INS_HNTCH_FREQ": 138,
+            "INS_HNTCH_BW": 69, "INS_HNTCH_MODE": 1,
+            "INS_HNTCH_REF": 0.34,
+        })
+        ts = reader._messages["ATT"]["_timestamp"]
+        # Actual roll stays level for hover measurement; the 8 deg tracking
+        # error belongs to the attitude card, not to notch configuration.
+        reader._messages["ATT"]["DesRoll"] = np.full(len(ts), -8.0)
+        reader._messages["RATE"] = {
+            "_timestamp": ts, "R": np.full(len(ts), 120.0),
+            "P": np.full(len(ts), 120.0),
+        }
+
+        result = NotchTuningAnalyzer(
+            reader, Thresholds(), _vehicle()).analyze()
+
+        assert result.status == "good"
+        assert result.action_level == "ok"
+        assert result.summary == t("notch_tuning.summary_pass")
+        assert t("notch_tuning.att_tracking_err",
+                 roll_err="8.00", pitch_err="0.00") in result.details
+        assert t("notch_tuning.rate_peak",
+                 roll="120.0", pitch="120.0") in result.details
+
+
 def _flight_log(tmp_path, esc_hz=None, tone_hz=138.0):
     """A copter flight with a gyro tone, and ESC telemetry if asked."""
     log = binlog.flight_log("copter", batches=3, tone_hz=tone_hz)
