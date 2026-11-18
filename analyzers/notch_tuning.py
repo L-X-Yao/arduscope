@@ -456,9 +456,13 @@ class NotchTuningAnalyzer(BaseAnalyzer):
         pre-filter, at or above it post-filter. INS_LOG_BAT_MASK may log
         only some IMUs, so the instances are neither assumed contiguous
         nor assumed to span 2*gyro_count. The split is accepted only when
-        both sides are present — an identical instance set also comes from
-        more IMUs logged post-only, and there nothing post-filter exists
-        to measure against — every instance owns at least two batches (the
+        both sides are present and they pair up: post instance i carries
+        IMU i - gyro_count, so every post instance's pre twin must be in
+        the set too — otherwise the post side would be one IMU's filtered
+        spectrum against an average that includes others', and no
+        comparison is made. An identical instance set also comes from more
+        IMUs logged post-only, and there nothing post-filter exists to
+        measure against. Every instance must own at least two batches (the
         sampler rotates per batch), and no instance reaches 2*gyro_count,
         where the encoding ends. Anything else stays unseparated; no
         guessing.
@@ -468,9 +472,11 @@ class NotchTuningAnalyzer(BaseAnalyzer):
             counts[b["instance"]] = counts.get(b["instance"], 0) + 1
         if not counts or max(counts) >= 2 * gyro_count:
             return None
-        pre = [i for i in counts if i < gyro_count]
-        post = [i for i in counts if i >= gyro_count]
+        pre = {i for i in counts if i < gyro_count}
+        post = {i for i in counts if i >= gyro_count}
         if not pre or not post:
+            return None
+        if {i - gyro_count for i in post} != pre:
             return None
         if min(counts.values()) < 2:
             return None

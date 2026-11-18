@@ -447,10 +447,17 @@ class TestInstanceSplit:
         batches = self._batches((0, 3, 0, 3))
         assert NotchTuningAnalyzer._gyro_instance_split(batches, 3) == 3
 
-    def test_a_gap_in_the_instances_still_splits_against_the_count(self):
-        """Without contiguity, a gap only means some IMUs were masked."""
+    def test_an_unpaired_post_instance_stays_unseparated(self):
+        """G=2, instances {0,1,3}: IMU3 is IMU1's post twin, so a split
+        would pit one IMU's filtered spectrum against an average that
+        still includes IMU0's unfiltered one. Refused."""
         batches = self._batches((0, 1, 3, 0, 1, 3))
-        assert NotchTuningAnalyzer._gyro_instance_split(batches, 2) == 2
+        assert NotchTuningAnalyzer._gyro_instance_split(batches, 2) is None
+
+    def test_the_full_six_instance_span_splits_at_three(self):
+        """The complete two-IMUs-per-side span the options promise."""
+        batches = self._batches((0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5))
+        assert NotchTuningAnalyzer._gyro_instance_split(batches, 3) == 3
 
     def test_an_instance_at_or_past_twice_the_count_is_refused(self):
         """Past 2*gyro_count the encoding ends; such an instance is not a

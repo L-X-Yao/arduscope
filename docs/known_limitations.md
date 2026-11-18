@@ -158,8 +158,10 @@ them readable.
   instance set also comes from more IMUs logged post-only, so each
   instance is judged against the real IMU count from the log's IMU rows:
   below it pre-filter, at or above it post-filter. The split is accepted
-  when both sides appear, every instance owns at least two batches through
-  the sampler's rotation, and no instance reaches twice the IMU count;
+  when the two sides pair up — every post instance's pre twin (the same
+  IMU, gyro count lower) is present — every instance owns at least two
+  batches through the sampler's rotation, and no instance reaches twice
+  the IMU count;
   `INS_LOG_BAT_MASK` may log only some IMUs, so the instances need not be
   contiguous. Then the pre spectrum is the reference and the post spectrum
   the measurement, reported as method "pre/post batch", and only where the
