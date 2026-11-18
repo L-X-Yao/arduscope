@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.12.6] - 2026-11-18
 
 ### Added
 - `tools/gate_preflight.py`: the gate's prerequisites — a clean tree, the
