@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.12.5] - 2026-11-18
 
 ### Added
 - Compass reports a robust three-axis motor-interference estimate as an
