@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.12.7] - 2026-11-18
 
 ### Fixed
 - Attitude no longer makes a single peak above 15° critical: that threshold
