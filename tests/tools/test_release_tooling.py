@@ -91,6 +91,42 @@ class TestReleasePy:
         with pytest.raises(SystemExit):
             _load_release()._date_unreleased(content, "0.5.0", "2026-08-01")
 
+    def test_a_section_with_only_headings_stops_the_release(self):
+        """A section that only announces categories says nothing; date it
+        and the release notes vanish."""
+        content = ("# Changelog\n\n## [Unreleased]\n\n### Fixed\n\n"
+                   "## [0.4.0] - 2026-07-15\n")
+        mod = _load_release()
+        assert mod._unreleased_problem(content) is not None
+        with pytest.raises(SystemExit):
+            mod._date_unreleased(content, "0.5.0", "2026-08-01")
+
+    def test_an_entry_under_a_heading_passes_the_check(self):
+        content = ("# Changelog\n\n## [Unreleased]\n\n### Fixed\n- new\n\n"
+                   "## [0.4.0] - 2026-07-15\n")
+        assert _load_release()._unreleased_problem(content) is None
+
+    def test_an_empty_section_is_refused_before_anything_is_written(
+            self, tmp_path, monkeypatch):
+        """The version file used to be written first: the refusal then left
+        lib/__init__.py dirty, with no release to show for it."""
+        (tmp_path / "CHANGELOG.md").write_text(
+            "# Changelog\n\n## [Unreleased]\n\n## [0.4.0] - 2026-07-15\n",
+            encoding="utf-8")
+        mod = _load_release()
+        calls = []
+        monkeypatch.setattr(sys, "argv", ["release.py", "patch"])
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(mod.subprocess, "run", _clean_repo)
+        monkeypatch.setattr(mod.release_gate, "head_commit", lambda: "abc")
+        monkeypatch.setattr(mod.release_gate, "passed", lambda commit: True)
+        monkeypatch.setattr(mod, "_current_version", lambda: "0.9.3")
+        monkeypatch.setattr(mod, "_update_version_file", calls.append)
+        monkeypatch.setattr(mod, "_update_changelog", calls.append)
+        with pytest.raises(SystemExit, match="empty"):
+            mod.main()
+        assert not calls
+
     def test_no_passing_gate_stops_the_release(self, monkeypatch):
         """Before the version moves or anything is committed."""
         mod = _load_release()

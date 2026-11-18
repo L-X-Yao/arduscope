@@ -56,22 +56,43 @@ def _update_version_file(new_ver: str) -> None:
         f.write(content)
 
 
+def _unreleased_body(content: str) -> str:
+    """The text under `## [Unreleased]`, or "" when the section is absent."""
+    heading = "## [Unreleased]"
+    start = content.find(heading)
+    if start == -1:
+        return ""
+    end = content.find("\n## [", start + len(heading))
+    return content[start + len(heading):end if end != -1 else len(content)]
+
+
+def _unreleased_problem(content: str) -> str | None:
+    """Why the release notes cannot be dated, or None when they can.
+
+    Empty means no entry at all: a section holding only headings
+    ("### Fixed") says nothing, so it counts as empty.
+    """
+    if "## [Unreleased]" not in content:
+        return "CHANGELOG.md has no [Unreleased] section to release."
+    body = _unreleased_body(content)
+    if not any(line.strip() and not line.lstrip().startswith("#")
+               for line in body.splitlines()):
+        return "The [Unreleased] section of CHANGELOG.md is empty."
+    return None
+
+
 def _date_unreleased(content: str, new_ver: str, today: str) -> str:
     """Turn the `## [Unreleased]` section into this version's section.
 
     Notes come from whoever made the change. Generated from commit subjects
     they were not fit to publish, which is why v0.9.0 to v0.9.3 went out by
-    hand. An empty section means nobody wrote any, so stop.
+    hand. An empty section means nobody wrote any, so stop -- this check is
+    the backstop; main() refuses before it writes anything.
     """
-    heading = "## [Unreleased]"
-    start = content.find(heading)
-    if start == -1:
-        sys.exit("CHANGELOG.md has no [Unreleased] section to release.")
-    end = content.find("\n## [", start + len(heading))
-    body = content[start + len(heading):end if end != -1 else len(content)]
-    if not body.strip():
-        sys.exit("The [Unreleased] section of CHANGELOG.md is empty.")
-    return content.replace(heading, f"## [{new_ver}] - {today}", 1)
+    problem = _unreleased_problem(content)
+    if problem:
+        sys.exit(problem)
+    return content.replace("## [Unreleased]", f"## [{new_ver}] - {today}", 1)
 
 
 def _update_changelog(new_ver: str) -> None:
@@ -145,6 +166,14 @@ def main() -> None:
     if not release_gate.passed(commit):
         sys.exit(f"No passing gate for {commit[:10]}. "
                  f"Run tools/release_gate.py on this commit first.")
+
+    # The notes have to exist before anything is written: this used to bump
+    # lib/__init__.py first and only then find [Unreleased] empty, refusing
+    # the release but leaving a dirty version file behind.
+    with open("CHANGELOG.md", encoding="utf-8") as f:
+        problem = _unreleased_problem(f.read())
+    if problem:
+        sys.exit(problem)
 
     # 0. Clean dist/
     _clean_dist()

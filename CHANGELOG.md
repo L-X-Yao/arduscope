@@ -16,6 +16,12 @@ releases are not published.
   seconds at the top of `run_gate()`, and standalone. A missing item now
   fails before the gate writes anything, not twenty minutes in.
 
+### Fixed
+- `tools/release.py` checked the `[Unreleased]` notes only after writing the
+  new version into `lib/__init__.py`, so an empty section refused the
+  release but left the version file dirty. The notes are now checked before
+  anything is written, and a section holding only headings counts as empty.
+
 ## [0.12.5] - 2026-11-18
 
 ### Added
