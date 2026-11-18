@@ -204,6 +204,18 @@ class TestRunGate:
         assert gate.run_gate(self._args()) == 0
         assert gate.passed("abc")
 
+    def test_a_corpus_override_reaches_the_preflight(self, dirs, monkeypatch):
+        seen = {}
+        self._fake(monkeypatch)
+        monkeypatch.setattr(gate_preflight, "run_checks",
+                            lambda **kw: (seen.update(kw), [])[1])
+        assert gate.main(["--steps", "corpus",
+                          "--corpus", "field=/some/logs"]) == 0
+        assert seen["corpora_from_config"] is False
+        assert seen["corpora"] == {"field": "/some/logs"}
+        assert seen["steps"] == ["corpus"]
+        assert seen["repo_root"] == gate.REPO_ROOT
+
     def test_a_dirty_tree_is_refused(self, dirs, monkeypatch):
         self._fake(monkeypatch, dirty=(True,))
         assert gate.run_gate(self._args()) == 1

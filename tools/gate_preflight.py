@@ -41,7 +41,8 @@ DEFAULT_SITL_DIR = "../ardupilot"
 # A corpus scan writes its parse cache (ARDUSCOPE_LOG_CACHE, by default
 # .log_cache/ at the repository root) plus its reports; the cache alone is
 # ~56 GB. When the variable points at another disk, that is the disk that
-# fills mid-scan, so the smaller free space of the two governs.
+# fills mid-scan, so when a cache-writing step runs the smaller free space
+# of the two disks governs.
 MIN_FREE_DISK_GB = 10.0
 # The 2026-11 gate runs peaked at 7.43 GB under the operator's 12 GB cap
 # (measured then, not recorded in the repository). With much less than
@@ -54,6 +55,12 @@ MIN_AVAILABLE_MEM_GB = 8.0
 SITL_BINARIES = ("arducopter", "arduplane")
 # The globs tools/baseline_run.py scans by default (--pattern).
 CORPUS_PATTERNS = ("*.bin", "*.BIN")
+# The steps whose consumers write the parse cache: the local CI suite and
+# the snapshot tests load logs through conftest's fixtures with
+# disk_cache=True, and the corpus step passes --disk-cache. The SITL
+# flights read their logs with a plain LogReader (lib/pipeline.py) and
+# write nothing to it.
+CACHE_STEPS = ("ci_local", "snapshots", "corpus")
 
 
 def tree_dirty(repo_root: str) -> bool | None:
@@ -75,13 +82,26 @@ def _tree_state(repo_root: str) -> tuple[bool | None, str]:
                    else "uncommitted changes; a result names a commit")
 
 
-def disk_free_bytes(repo_root: str) -> int:
-    """Free bytes where the scan writes: the repo root, and the cache disk
-    when ARDUSCOPE_LOG_CACHE moves the cache off it."""
-    free = shutil.disk_usage(repo_root).free
+def disk_free_bytes(repo_root: str,
+                    cache_too: bool = True) -> tuple[int, str]:
+    """(free bytes, the path they were measured on).
+
+    The repository root always counts; cache_too also measures the disk
+    ARDUSCOPE_LOG_CACHE points at -- relative values resolved against
+    repo_root, where the gate's consumers run, at the nearest existing
+    ancestor -- and reports whichever is smaller. Raises OSError naming
+    the path that could not be measured.
+    """
+    try:
+        free = shutil.disk_usage(repo_root).free
+    except OSError as e:
+        raise OSError(f"{repo_root}: {e}") from None
+    free_path = repo_root
     cache = os.environ.get("ARDUSCOPE_LOG_CACHE")
-    if cache:
-        probe = os.path.abspath(cache)
+    if cache_too and cache:
+        probe = cache if os.path.isabs(cache) else os.path.join(repo_root,
+                                                                 cache)
+        probe = os.path.normpath(probe)
         while not os.path.exists(probe):
             parent = os.path.dirname(probe)
             if parent == probe:
@@ -89,8 +109,13 @@ def disk_free_bytes(repo_root: str) -> int:
                 break
             probe = parent
         if probe:
-            free = min(free, shutil.disk_usage(probe).free)
-    return free
+            try:
+                cached = shutil.disk_usage(probe).free
+            except OSError as e:
+                raise OSError(f"{probe}: {e}") from None
+            if cached < free:
+                free, free_path = cached, probe
+    return free, str(free_path)
 
 
 def available_memory_bytes() -> int | None:
@@ -180,10 +205,15 @@ def run_checks(sitl_dir: str, steps: list[str], corpora: dict[str, str],
                        f"no {CORPUS_PATTERNS[0]} or {CORPUS_PATTERNS[1]} "
                        f"under {root}")
 
-    free = disk_free_bytes(repo_root)
-    report(free >= MIN_FREE_DISK_GB * 1024 ** 3, "disk",
-           f"{free / 1024 ** 3:.1f} GB free at {repo_root} "
-           f"(need {MIN_FREE_DISK_GB:.0f})")
+    try:
+        free, measured_on = disk_free_bytes(
+            repo_root, cache_too=bool(set(steps) & set(CACHE_STEPS)))
+    except OSError as e:
+        report(False, "disk", f"could not measure free space: {e}")
+    else:
+        report(free >= MIN_FREE_DISK_GB * 1024 ** 3, "disk",
+               f"{free / 1024 ** 3:.1f} GB free at {measured_on} "
+               f"(need {MIN_FREE_DISK_GB:.0f})")
 
     available = available_memory_bytes()
     if available is None:

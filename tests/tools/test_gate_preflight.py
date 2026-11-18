@@ -34,7 +34,8 @@ def repo(tmp_path, monkeypatch):
     corpus.mkdir()
     (corpus / "flight.BIN").write_bytes(b"")
     monkeypatch.setattr(gp, "_tree_state", lambda root: (False, "clean"))
-    monkeypatch.setattr(gp, "disk_free_bytes", lambda root: 100 * GB)
+    monkeypatch.setattr(gp.shutil, "disk_usage",
+                        lambda path: SimpleNamespace(free=100 * GB))
     monkeypatch.setattr(gp, "available_memory_bytes", lambda: 16 * GB)
     monkeypatch.delenv("ARDUSCOPE_LOG_CACHE", raising=False)
     return tmp_path
@@ -117,6 +118,10 @@ class TestLocalPaths:
         os.remove(repo / "local_paths.json")
         assert _run(repo, steps=("sitl",)) == []
 
+    def test_a_ci_local_run_skips_it(self, repo):
+        os.remove(repo / "local_paths.json")
+        assert _run(repo, steps=("ci_local",)) == []
+
     def test_a_config_corpus_with_the_file_present_passes(self, repo):
         assert _run(repo, steps=("corpus",), from_config=True) == []
 
@@ -160,7 +165,8 @@ class TestFailClosed:
 
     def test_a_directory_that_is_not_a_repository_fails(self, tmp_path,
                                                         monkeypatch, capsys):
-        monkeypatch.setattr(gp, "disk_free_bytes", lambda root: 100 * GB)
+        monkeypatch.setattr(gp.shutil, "disk_usage",
+                            lambda path: SimpleNamespace(free=100 * GB))
         monkeypatch.setattr(gp, "available_memory_bytes", lambda: 16 * GB)
         failures = gp.run_checks(sitl_dir=str(tmp_path / "a"),
                                  steps=["ci_local"], corpora={},
@@ -169,7 +175,8 @@ class TestFailClosed:
         assert "git" in capsys.readouterr().out
 
     def test_a_missing_git_fails(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(gp, "disk_free_bytes", lambda root: 100 * GB)
+        monkeypatch.setattr(gp.shutil, "disk_usage",
+                            lambda path: SimpleNamespace(free=100 * GB))
         monkeypatch.setattr(gp, "available_memory_bytes", lambda: 16 * GB)
 
         def no_git(command, **kwargs):
@@ -185,7 +192,8 @@ class TestFailClosed:
         assert gp.tree_dirty(str(tmp_path)) is None
 
     def test_low_disk_fails(self, repo, monkeypatch):
-        monkeypatch.setattr(gp, "disk_free_bytes", lambda root: 5 * GB)
+        monkeypatch.setattr(gp.shutil, "disk_usage",
+                            lambda path: SimpleNamespace(free=5 * GB))
         assert "disk" in _run(repo)
 
     def test_low_memory_fails(self, repo, monkeypatch):
@@ -201,24 +209,61 @@ class TestFailClosed:
 
 
 class TestDisk:
-    def _fake_disk(self, monkeypatch, repo, sizes):
+    def _stub_disk(self, monkeypatch, repo, sizes):
         monkeypatch.setattr(gp.shutil, "disk_usage",
                             lambda path: SimpleNamespace(
-                                free=sizes.get(os.path.abspath(str(path)),
-                                               100 * GB)))
+                                free=sizes.get(os.path.normpath(
+                                    os.path.abspath(str(path))),
+                                    100 * GB)))
         monkeypatch.setattr(gp, "_tree_state", lambda root: (False, "clean"))
         monkeypatch.setattr(gp, "available_memory_bytes", lambda: 16 * GB)
         return repo
 
     def test_the_cache_disk_counts_when_it_is_elsewhere(self, tmp_path,
-                                                        monkeypatch):
-        repo = self._fake_disk(monkeypatch, tmp_path,
+                                                        monkeypatch, capsys):
+        repo = self._stub_disk(monkeypatch, tmp_path,
                                {str(tmp_path): 100 * GB,
                                 str(tmp_path / "data"): 5 * GB})
         (repo / "data").mkdir()  # the cache's nearest existing ancestor
         monkeypatch.setenv("ARDUSCOPE_LOG_CACHE",
                            str(repo / "data" / "cache" / "not" / "there"))
+        assert "disk" in _run(repo, steps=("corpus",))
+        assert str(repo / "data") in capsys.readouterr().out  # the binding disk
+
+    def test_a_relative_cache_path_resolves_against_the_repo_root(
+            self, tmp_path, monkeypatch, capsys):
+        """The gate runs its consumers from the repository root, so a
+        relative ARDUSCOPE_LOG_CACHE cannot follow the caller's cwd."""
+        repo = self._stub_disk(monkeypatch, tmp_path,
+                               {str(tmp_path): 100 * GB,
+                                str(tmp_path / "data"): 5 * GB})
+        (repo / "data").mkdir()
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        monkeypatch.chdir(elsewhere)
+        monkeypatch.setenv("ARDUSCOPE_LOG_CACHE", "data/cache/not/there")
+        assert "disk" in _run(repo, steps=("corpus",))
+        assert str(repo / "data") in capsys.readouterr().out
+
+    def test_a_sitl_run_ignores_the_cache_disk(self, tmp_path, monkeypatch):
+        """The SITL flights write no parse cache, so an external cache disk
+        with room to spare for nothing must not block them."""
+        repo = self._stub_disk(monkeypatch, tmp_path,
+                               {str(tmp_path): 100 * GB,
+                                str(tmp_path / "data"): 5 * GB})
+        _sitl_binaries(repo)
+        monkeypatch.setenv("ARDUSCOPE_LOG_CACHE",
+                           str(repo / "data" / "cache" / "not" / "there"))
+        assert _run(repo, steps=("sitl",)) == []
+
+    def test_an_unmeasurable_disk_fails_with_the_path(self, repo,
+                                                      monkeypatch, capsys):
+        def denied(path):
+            raise PermissionError(13, "Permission denied", str(path))
+
+        monkeypatch.setattr(gp.shutil, "disk_usage", denied)
         assert "disk" in _run(repo)
+        assert str(repo) in capsys.readouterr().out
 
     def test_without_the_variable_only_the_root_counts(self, repo):
         assert _run(repo) == []

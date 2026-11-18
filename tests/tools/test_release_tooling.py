@@ -138,6 +138,9 @@ class TestReleasePy:
         changelog = tmp_path / "CHANGELOG.md"
         content = "# Changelog\n\n## [Unreleased]\n\n## [0.4.0] - 2026-07-15\n"
         changelog.write_text(content, encoding="utf-8")
+        dist = tmp_path / "dist"
+        dist.mkdir()
+        (dist / "sentinel").write_text("keep", encoding="utf-8")
         mod = _load_release()
         monkeypatch.setattr(sys, "argv",
                             ["release.py", "patch", "--dry-run"])
@@ -146,7 +149,7 @@ class TestReleasePy:
         assert mod.main() is None
         assert "[dry-run]" in capsys.readouterr().out
         assert changelog.read_text(encoding="utf-8") == content
-        assert not (tmp_path / "dist").exists()
+        assert (dist / "sentinel").exists()
 
     def test_no_passing_gate_stops_the_release(self, monkeypatch):
         """Before the version moves or anything is committed."""
