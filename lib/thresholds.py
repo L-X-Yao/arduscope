@@ -408,8 +408,9 @@ class Thresholds:
     rangefinder_quality_pct_warn: float = 50.0  # E: percent of good readings
 
     # -- Mission --
-    mission_completion_warn: float = 50.0   # E: percent of waypoints reached
-    mission_accuracy_warn: float = 20.0     # E: mean waypoint miss distance, m
+    # Arrival grading uses each waypoint's configured radius. This legacy
+    # percentage only selects the low-completion action wording.
+    mission_completion_warn: float = 50.0   # E: completion advice split
 
     # -- Error events --
     summary_error_count_warn: int = 5       # E: ERR events in one log

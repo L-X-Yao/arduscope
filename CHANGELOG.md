@@ -7,6 +7,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Fixed
+- Attitude no longer makes a single peak above 15° critical: that threshold
+  had no authoritative source. Critical now requires the existing RMS rule or
+  a peak above ArduPilot's 30° `AC_ATTITUDE_THRUST_ERROR_ANGLE` hard limit;
+  the 15° peak remains a clearly labelled engineering warning.
+- Mission accuracy no longer warns when mean waypoint miss exceeds a fixed
+  20 m. Any waypoint whose closest approach is outside the vehicle's configured
+  `WP_RADIUS_M`/`WPNAV_RADIUS`/`WP_RADIUS` is a warning; mean miss stays visible
+  as a detail.
+
 ## [0.12.6] - 2026-11-18
 
 ### Added

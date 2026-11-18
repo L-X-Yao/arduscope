@@ -10,6 +10,8 @@ thresholds, NaN handling, etc.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
@@ -115,6 +117,50 @@ class TestMissionWPRadius:
         assert not _QP_VI.is_copter           # precondition
         expected = t("mission.wp_reached", radius="30", reached=1, total=1)
         assert expected in result.details
+
+
+class TestMissionRadiusGrading:
+    """Grade waypoint arrival by the aircraft's radius, not a fixed 20 m."""
+
+    def _run(self, offset_deg, radius_m):
+        ts = _make_ts(200, 0.5)
+        n = len(ts)
+        reader = SyntheticReader(
+            messages={
+                "CMD": {
+                    "_timestamp": np.array([0.0]),
+                    "CNum": np.array([1]),
+                    "CId": np.array([16]),
+                    "Lat": np.array([30.0]),
+                    "Lng": np.array([120.0]),
+                    "Alt": np.array([50.0]),
+                },
+                "POS": {
+                    "_timestamp": ts,
+                    "Lat": np.full(n, 30.0 + offset_deg),
+                    "Lng": np.full(n, 120.0),
+                    "Alt": np.full(n, 50.0),
+                },
+            },
+            params={"WP_RADIUS": radius_m},
+            vehicle_type="ArduPlane",
+        )
+        reader.mode_list = [SimpleNamespace(mode_name="AUTO")]
+        from analyzers.mission import MissionAnalyzer
+        return MissionAnalyzer(reader, Thresholds(), _QP_VI).analyze()
+
+    def test_mean_over_20m_inside_wp_radius_is_good(self):
+        result = self._run(offset_deg=0.002, radius_m=300.0)
+        distance_m = 0.002 * 111320
+        assert 20.0 < distance_m < 300.0       # regression precondition
+        assert result.status == "good"
+
+    def test_a_waypoint_outside_wp_radius_is_warning(self):
+        result = self._run(offset_deg=0.003, radius_m=200.0)
+        distance_m = 0.003 * 111320
+        assert distance_m > 200.0              # regression precondition
+        assert result.status == "warning"
+        assert "WP_RADIUS" in result.evidence_source
 
 
 # ====================================================================

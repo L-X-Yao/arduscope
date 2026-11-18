@@ -69,7 +69,6 @@ E_CLASS_WAIVERS: dict[str, str] = {
     "gps_high_hdop_frac_warn": "no source: duration of poor HDOP",
     "gps_low_nsats_frac_warn": "no source: duration of few satellites",
     "mission_completion_warn": "no source: waypoint completion",
-    "mission_accuracy_warn": "no source: waypoint miss distance",
     "summary_error_count_warn": "no source: ERR event count",
     "wind_gust_ratio_warn": "no source: gust ratio",
     "wind_gust_min_mean": "no source: floor for the gust ratio",

@@ -143,8 +143,7 @@ Source key:
 | `airspeed_unhealthy_pct_crit` | 50.0 | E | percent of samples unhealthy |
 | `airspeed_stuck_pct_warn` | 5.0 | E | percent of samples stuck |
 | `rangefinder_quality_pct_warn` | 50.0 | E | percent of good readings |
-| `mission_completion_warn` | 50.0 | E | percent of waypoints reached |
-| `mission_accuracy_warn` | 20.0 | E | mean waypoint miss distance, m |
+| `mission_completion_warn` | 50.0 | E | completion share selecting low-completion advice; arrival grading uses each waypoint's configured radius |
 | `summary_error_count_warn` | 5 | E | ERR events in one log |
 | `wind_speed_warn` | 10.0 | D | Beaufort 5/6 boundary, 10.8 m/s |
 | `wind_speed_crit` | 17.0 | D | Beaufort 8 starts at 17.2 m/s |

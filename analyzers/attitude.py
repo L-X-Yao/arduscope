@@ -22,6 +22,9 @@ from . import AnalysisResult, BaseAnalyzer
 # AC_ATTITUDE_THRUST_ERROR_ANGLE in ArduPilot's AC_AttitudeControl.h: the
 # attitude error at which the controller's thrust allocation fails.
 _THRUST_ERROR_ANGLE_DEG = 30.0
+# Legacy engineering warning screen, with no authoritative source. It must
+# never raise a transient peak to critical; the sourced hard limit above does.
+_PEAK_WARN_DEG = 15.0
 
 
 class AttitudeAnalyzer(BaseAnalyzer):
@@ -163,7 +166,8 @@ class AttitudeAnalyzer(BaseAnalyzer):
             des_range < 20.0
             and max_peak_err > crit_thresh
         )
-        peak_severe = max_peak_err > 15.0
+        peak_warning = max_peak_err > _PEAK_WARN_DEG
+        peak_critical = max_peak_err > _THRUST_ERROR_ANGLE_DEG
 
         p99_roll = float(np.nanpercentile(np.abs(roll_err_armed), 99))
         p99_pitch = float(np.nanpercentile(np.abs(pitch_err_armed), 99))
@@ -174,7 +178,7 @@ class AttitudeAnalyzer(BaseAnalyzer):
             and max_p99 > warn_thresh * 1.5
         )
 
-        if rms_crit or peak_severe:
+        if rms_crit or peak_critical:
             status = "critical"
             if rms_crit:
                 summary = t("attitude.crit_rms_summary",
@@ -184,13 +188,17 @@ class AttitudeAnalyzer(BaseAnalyzer):
             else:
                 summary = t("attitude.crit_peak_summary",
                             peak=f"{max_peak_err:.1f}")
-        elif rms_warn or peak_beyond_command or oscillation_burst:
+        elif rms_warn or peak_beyond_command or peak_warning or oscillation_burst:
             status = "warning"
             reasons = []
             if rms_warn:
                 reasons.append(
                     t("attitude.warn_rms_reason",
                       rms=f"{max_rp_rms:.2f}"))
+            if peak_warning:
+                reasons.append(
+                    t("attitude.warn_severe_reason",
+                      peak=f"{max_peak_err:.1f}"))
             if peak_beyond_command:
                 reasons.append(
                     t("attitude.warn_peak_reason",
@@ -361,14 +369,18 @@ class AttitudeAnalyzer(BaseAnalyzer):
             plain_summary = ""
             action_text = ""
 
-        # Evidence source
-        if status in ("warning", "critical"):
-            if max_peak_err >= _THRUST_ERROR_ANGLE_DEG:
-                # "1/2 of the hard limit" understates a peak that has
-                # already reached the limit itself.
+        # Evidence must name the rule that actually set the severity. In
+        # particular, the unsourced 15° warning must not borrow the 30°
+        # hard limit's authority, nor replace RMS evidence on an RMS critical.
+        if status == "critical":
+            if rms_crit:
+                evidence_source = t("attitude.evidence_rms",
+                                    warn=warn_thresh, crit=crit_thresh)
+            else:
                 evidence_source = t("attitude.evidence_peak_over_limit",
                                     peak=f"{max_peak_err:.1f}")
-            elif peak_severe:
+        elif status == "warning":
+            if peak_warning:
                 evidence_source = t("attitude.evidence_peak_severe",
                                     peak=f"{max_peak_err:.1f}")
             elif peak_beyond_command:

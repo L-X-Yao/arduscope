@@ -742,13 +742,24 @@ class TestAttitudeSynthetic:
             "attitude.evidence_peak_over_limit", peak="47.6")
         assert "1/2" not in result.evidence_source
 
-    def test_peak_below_the_thrust_limit_keeps_the_half_wording(self):
+    def test_peak_above_15_is_warning_not_critical(self):
+        """The legacy 15° peak is an engineering warning, not a hard limit."""
         reader = self._build_peak_reader(20.0)
         result = AttitudeAnalyzer(reader, _thresholds(reader),
                                   _vehicle()).analyze()
-        assert result.status == "critical"      # precondition
+        assert result.status == "warning"
+        assert "15" in result.summary
         assert result.evidence_source == _t(
             "attitude.evidence_peak_severe", peak="20.0")
+
+    def test_peak_above_30_is_critical_and_cites_the_hard_limit(self):
+        reader = self._build_peak_reader(31.0)
+        result = AttitudeAnalyzer(reader, _thresholds(reader),
+                                  _vehicle()).analyze()
+        assert result.status == "critical"
+        assert "30" in result.summary
+        assert result.evidence_source == _t(
+            "attitude.evidence_peak_over_limit", peak="31.0")
 
     def test_not_armed_graceful(self):
         """No armed intervals → should not crash."""

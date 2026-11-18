@@ -105,10 +105,13 @@ them readable.
   keep the older continuous-second model.
   Different badges are therefore a deliberate distinction, not by themselves
   evidence of a contradiction or of the Plane mode gate changing a verdict.
-- **`attitude` reads critical on one sample.** A single row with over 15 deg
-  of roll or pitch error is critical. That 15, and the 20 and 4.0 beside it in
-  `analyzers/attitude.py`, are literals with no source, outside
-  `lib/thresholds.py` and its checks.
+- **`attitude` still grades one-sample peaks.** A single roll or pitch error
+  above 30 deg is critical because ArduPilot's
+  `AC_ATTITUDE_THRUST_ERROR_ANGLE=30°` is the controller's thrust-allocation
+  failure hard limit; a peak above 15 deg is now only a warning. The 15, and
+  the 20 and 4.0 beside it in `analyzers/attitude.py`, remain engineering
+  values with no source, outside `lib/thresholds.py` and its checks. The
+  existing RMS criteria can still make sustained tracking error critical.
 - **`notch_tuning` grades attitude by proxies.** A mean attitude error over
   2.5 deg with a peak rate over 100 deg/s reads critical: 81 of its 98
   criticals. A mean error over 5 deg does too: 14 more. `lib/thresholds.py`

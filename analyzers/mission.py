@@ -205,14 +205,16 @@ class MissionAnalyzer(BaseAnalyzer):
                 completion_pct = reached / nav_wps * 100
                 details.append(t("mission.completion_pct", pct=f"{completion_pct:.0f}"))
 
-                if completion_pct < self.thresholds.mission_completion_warn:
-                    status = self.worst_status(status, "warning")
-                if mean_acc > self.thresholds.mission_accuracy_warn:
+                # Arrival is binary at the vehicle's own acceptance radius:
+                # one missed waypoint is a warning even when the completion
+                # percentage is high. Mean miss remains a display metric.
+                if reached < nav_wps:
                     status = self.worst_status(status, "warning")
                     details.append(t("mission.low_accuracy",
                                      mean=f"{mean_acc:.1f}",
                                      max=f"{max_acc:.1f}",
-                                     pct=f"{completion_pct:.0f}"))
+                                     pct=f"{completion_pct:.0f}",
+                                     radius=f"{wp_radius:g}"))
 
         # -----------------------------------------------------------
         # 5. Figure: Map with waypoints and track
@@ -298,8 +300,10 @@ class MissionAnalyzer(BaseAnalyzer):
         # parameter's own units (WPNAV_RADIUS cm, WP_RADIUS_M and WP_RADIUS m).
         if status == "warning":
             action_level = "physical_check"
-            low_completion = (has_auto and len(wp_distances) > 0
-                              and completion_pct < 50)
+            low_completion = (
+                has_auto and len(wp_distances) > 0
+                and completion_pct < self.thresholds.mission_completion_warn
+            )
             kind = "low_completion" if low_completion else "low_accuracy"
             plain_summary = t(f"mission.{kind}_plain")
             action_text = t(f"mission.{kind}_action", param=wp_param_name,
