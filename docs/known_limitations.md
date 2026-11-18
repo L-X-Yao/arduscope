@@ -157,8 +157,10 @@ them readable.
   by an offset on the instance (`Write_ISBH` logs post-filter batches as
   instance + gyro count), and the offset is now read — but the same
   instance set also comes from more IMUs logged post-only, so each
-  instance is judged against the real IMU count from the log's IMU rows:
-  below it pre-filter, at or above it post-filter. The split is accepted
+  instance is judged against the real IMU count from the log's IMU rows
+  (one I per physical IMU, which assumes gyro and accel instance counts
+  agree — all real builds do): below it pre-filter, at or above it
+  post-filter. The split is accepted
   when the two sides pair up — every post instance's pre twin (the same
   IMU, gyro count lower) is present — every instance owns at least two
   batches through the sampler's rotation, and no instance reaches twice

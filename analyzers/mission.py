@@ -51,7 +51,10 @@ class MissionAnalyzer(BaseAnalyzer):
         AC_WPNav moved to SI units upstream: Copter's `WPNAV_RADIUS` (cm)
         became `WP_RADIUS_M` (m). Logs arrive from both generations, so
         read the current name first and fall back. Plane's `WP_RADIUS`
-        has always been metres.
+        has always been metres. The firmware clamps WP_RADIUS_M to at
+        least 0.05 m (AC_WPNav.cpp's WP_RADIUS_M_MIN), so a zero or
+        negative value arriving here is a broken parameter, not a usable
+        radius.
         """
         if self.vehicle.is_copter:
             radius_m = self.reader.get_param("WP_RADIUS_M", 0.0)
@@ -186,47 +189,9 @@ class MissionAnalyzer(BaseAnalyzer):
 
         wp_distances = np.array(wp_distances)
 
-        if len(wp_distances) > 0:
-            mean_acc = float(np.mean(wp_distances))
-            max_acc = float(np.max(wp_distances))
-
-            details.append(
-                t("mission.wp_accuracy",
-                  mean=f"{mean_acc:.1f}", max=f"{max_acc:.1f}")
-            )
-            if wp_radius <= 0:
-                return self.make_result(
-                    title=t("analyzer.mission"),
-                    status="info",
-                    summary=t("mission.invalid_radius",
-                              param=wp_param_name, radius=f"{wp_radius:g}"),
-                    details=details,
-                )
-
-            reached = int(np.sum(wp_distances < wp_radius))
-            details.append(
-                t("mission.wp_reached",
-                  radius=f"{wp_radius:.0f}",
-                  reached=reached, total=nav_wps)
-            )
-
-            if has_auto:
-                completion_pct = reached / nav_wps * 100
-                details.append(t("mission.completion_pct", pct=f"{completion_pct:.0f}"))
-
-                # Arrival is binary at the vehicle's own acceptance radius:
-                # one missed waypoint is a warning even when the completion
-                # percentage is high. Mean miss remains a display metric.
-                if reached < nav_wps:
-                    status = self.worst_status(status, "warning")
-                    details.append(t("mission.low_accuracy",
-                                     mean=f"{mean_acc:.1f}",
-                                     max=f"{max_acc:.1f}",
-                                     pct=f"{completion_pct:.0f}",
-                                     radius=f"{wp_radius:g}"))
-
         # -----------------------------------------------------------
-        # 5. Figure: Map with waypoints and track
+        # 5. Figures: the route map stays on every result; the accuracy
+        #    chart needs a real radius for its colors and its line.
         # -----------------------------------------------------------
         fig_map = self.make_figure(
             title=t("mission.fig_map"),
@@ -264,10 +229,7 @@ class MissionAnalyzer(BaseAnalyzer):
         fig_map.update_layout(yaxis_scaleanchor="x", yaxis_scaleratio=1)
         figures.append(fig_map)
 
-        # -----------------------------------------------------------
-        # 6. Figure: Waypoint accuracy bar chart
-        # -----------------------------------------------------------
-        if len(wp_distances) > 0:
+        if wp_radius > 0:
             fig_acc = self.make_figure(
                 title=t("mission.fig_accuracy"),
                 xaxis_title=t("mission.waypoint"),
@@ -289,6 +251,50 @@ class MissionAnalyzer(BaseAnalyzer):
                 color="#d9534f", dash="dot",
             )
             figures.append(fig_acc)
+
+        # -----------------------------------------------------------
+        # 6. Grading: arrival is binary at the vehicle's own acceptance
+        #    radius. A radius that grades nothing still keeps the map.
+        # -----------------------------------------------------------
+        if len(wp_distances) > 0:
+            mean_acc = float(np.mean(wp_distances))
+            max_acc = float(np.max(wp_distances))
+
+            details.append(
+                t("mission.wp_accuracy",
+                  mean=f"{mean_acc:.1f}", max=f"{max_acc:.1f}")
+            )
+            if wp_radius <= 0:
+                return self.make_result(
+                    title=t("analyzer.mission"),
+                    status="info",
+                    summary=t("mission.invalid_radius",
+                              param=wp_param_name, radius=f"{wp_radius:g}"),
+                    details=details,
+                    figures=figures,
+                )
+
+            reached = int(np.sum(wp_distances < wp_radius))
+            details.append(
+                t("mission.wp_reached",
+                  radius=f"{wp_radius:.0f}",
+                  reached=reached, total=nav_wps)
+            )
+
+            if has_auto:
+                completion_pct = reached / nav_wps * 100
+                details.append(t("mission.completion_pct", pct=f"{completion_pct:.0f}"))
+
+                # Arrival is binary at the vehicle's own acceptance radius:
+                # one missed waypoint is a warning even when the completion
+                # percentage is high. Mean miss remains a display metric.
+                if reached < nav_wps:
+                    status = self.worst_status(status, "warning")
+                    details.append(t("mission.low_accuracy",
+                                     mean=f"{mean_acc:.1f}",
+                                     max=f"{max_acc:.1f}",
+                                     pct=f"{completion_pct:.0f}",
+                                     radius=f"{wp_radius:g}"))
 
         # -----------------------------------------------------------
         # 7. Summary + actionable advice

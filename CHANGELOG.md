@@ -10,6 +10,12 @@ releases are not published.
 ## [Unreleased]
 
 ### Fixed
+- A mission whose arrival radius is zero or negative keeps its route map on
+  the informational result (the accuracy chart needs a positive radius for
+  its colors and reference line) instead of losing both figures; the
+  summary still says the radius cannot grade arrival. The firmware's own
+  0.05 m minimum clamp on WP_RADIUS_M and the IMU-count assumption behind
+  pre/post batch separation are now noted in the docs.
 - Notch tuning no longer grades attitude through unsourced mean-error and
   peak-rate proxies. Those measurements remain informational details while
   attitude severity stays with the attitude card's sourced rules; notch

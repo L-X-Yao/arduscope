@@ -190,6 +190,41 @@ class TestMissionRadiusGrading:
                                    param=param_name, radius="0")
         assert t("mission.wp_accuracy", mean="222.6", max="222.6") \
             in result.details
+        assert result.figures  # the route map survives the refused grading
+
+    def test_mixed_waypoints_show_both_colors_and_warn(self):
+        """One waypoint inside the radius, one outside: the chart shows
+        both colors and the warning matches the arrival count."""
+        ts = _make_ts(200, 0.5)
+        n = len(ts)
+        reader = SyntheticReader(messages={
+            "CMD": {
+                "_timestamp": np.array([0.0, 1.0]),
+                "CNum": np.array([1, 2]),
+                "CId": np.array([16, 16]),
+                "Lat": np.array([30.0, 30.006]),
+                "Lng": np.array([120.0, 120.0]),
+                "Alt": np.array([50.0, 50.0]),
+            },
+            "POS": {
+                "_timestamp": ts,
+                "Lat": np.full(n, 30.0005),
+                "Lng": np.full(n, 120.0),
+                "Alt": np.full(n, 50.0),
+            },
+        }, params={"WP_RADIUS": 300.0}, vehicle_type="ArduPlane")
+        reader.mode_list = [SimpleNamespace(mode_name="AUTO")]
+        from analyzers.mission import MissionAnalyzer
+        from lib.i18n import t
+        result = MissionAnalyzer(reader, Thresholds(), _QP_VI).analyze()
+
+        assert 0.0005 * 111320 < 300.0 < 0.0055 * 111320  # preconditions
+        accuracy_fig = result.figures[-1]
+        assert set(accuracy_fig.data[0].marker.color) == \
+            {"#5cb85c", "#d9534f"}
+        assert t("mission.wp_reached",
+                 radius="300", reached=1, total=2) in result.details
+        assert result.status == "warning"
 
 
 # ====================================================================

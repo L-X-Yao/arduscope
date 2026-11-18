@@ -486,7 +486,9 @@ class NotchTuningAnalyzer(BaseAnalyzer):
         Write_ISBH adds to post-filter instances. INS_LOG_BAT_MASK only
         selects which instances log batches, and a default of one proves
         nothing, so a log without IMU rows leaves this unknown and any
-        split stays unmade.
+        split stays unmade. IMU rows carry one I per physical IMU, so
+        this assumes gyro and accel instance counts agree; a hypothetical
+        build that split them would skew the count, and no real one does.
         """
         if not self.reader.has_message("IMU"):
             return None

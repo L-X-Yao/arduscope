@@ -476,6 +476,21 @@ class TestInstanceSplit:
             self._batches((0, 3, 7, 0, 3, 7)), 3) is None
 
 
+class TestGroupSpectrum:
+    def test_equal_rate_clusters_take_the_lower_rate(self):
+        """Two rate clusters of equal size: the median sits between them
+        and the tolerance keeps nothing, so the densest cluster wins and
+        the tie breaks deterministically toward the lower rate."""
+        n = 512
+        high = [np.full(n - 1, 2.0), np.full(n - 1, 2.0), np.full(n - 1, 2.0)]
+        low = [np.zeros(n - 1), np.zeros(n - 1), np.zeros(n - 1)]
+        spectra = {n: [(1000.0, high), (400.0, low)]}
+        freqs, ax, _ay, _az, used = NotchTuningAnalyzer._group_spectrum(spectra)
+        assert used == 1
+        assert freqs[-1] == pytest.approx(200.0, abs=1.0)  # the 400 Hz axis
+        assert float(np.max(ax)) == 0.0  # the low cluster's zeros won
+
+
 class TestPrePostSplit:
     """INS_LOG_BAT_OPT mixed logging measured against itself: the
     pre-filter group is the reference, the post-filter one the result."""
