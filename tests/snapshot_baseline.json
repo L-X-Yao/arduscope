@@ -1673,7 +1673,7 @@
       "param_count": 0
     },
     "attitude": {
-      "status": "critical",
+      "status": "warning",
       "action_level": "run_autotune",
       "param_count": 0
     },
@@ -2117,8 +2117,8 @@
       "param_count": 0
     },
     "mission": {
-      "status": "warning",
-      "action_level": "physical_check",
+      "status": "good",
+      "action_level": "ok",
       "param_count": 0
     },
     "wind": {
