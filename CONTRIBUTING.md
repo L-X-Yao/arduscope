@@ -7,6 +7,13 @@ continues development and fixes defects. A pull request goes through the gates
 under "Which gates a change has to pass". What follows describes how the code is
 put together, for a change and for anyone who extends a copy of their own.
 
+## How changes are made
+
+Development runs through writers, a blind reviewer and an integrator, with one
+release-gate pass per batch. The roles, the review format and the worktree
+rules are in [docs/workflow.md](docs/workflow.md); the gates each kind of
+change has to pass are below.
+
 ## Adding a new analyzer
 
 1. Create a new file in `analyzers/`, e.g. `analyzers/my_check.py`.
