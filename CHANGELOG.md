@@ -13,7 +13,8 @@ releases are not published.
 - Notch tuning no longer grades attitude through unsourced mean-error and
   peak-rate proxies. Those measurements remain informational details while
   attitude severity stays with the attitude card's sourced rules; notch
-  attenuation, bandwidth, frequency and hover-throttle checks are unchanged.
+  attenuation, bandwidth, frequency, second-notch (HNTC2) suggestions and
+  hover-throttle checks are unchanged.
 
 ## [0.12.8] - 2026-11-18
 
