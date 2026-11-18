@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Added
+- `tools/gate_preflight.py`: the gate's prerequisites — a clean tree,
+  `local_paths.json`, the SITL binaries and corpus folders the requested
+  steps need, 10 GB of free disk and 8 GB of available memory — checked in
+  seconds at the top of `run_gate()`, and standalone. A missing item now
+  fails before the gate writes anything, not twenty minutes in.
+
 ## [0.12.5] - 2026-11-18
 
 ### Added

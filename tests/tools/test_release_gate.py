@@ -17,6 +17,7 @@ import pytest
 
 sys.path.insert(0, str(TOOLS_DIR))
 
+import gate_preflight  # noqa: E402
 import release_gate as gate  # noqa: E402
 
 pytestmark = pytest.mark.fast
@@ -165,10 +166,14 @@ class TestAccept:
 
 class TestRunGate:
     def _args(self, steps=gate.STEPS):
-        return SimpleNamespace(steps=list(steps))
+        # The fields run_gate reads besides steps; the preflight itself is
+        # stubbed in _fake below.
+        return SimpleNamespace(steps=list(steps), sitl_dir="../ardupilot",
+                               corpora={})
 
     def _fake(self, monkeypatch, status="pass", dirty=(False, False)):
         states = iter(dirty)
+        monkeypatch.setattr(gate_preflight, "run_checks", lambda **kw: [])
         monkeypatch.setattr(gate, "head_commit", lambda: "abc")
         monkeypatch.setattr(gate, "tree_is_dirty", lambda: next(states))
         monkeypatch.setattr(gate, "RUNNERS", {

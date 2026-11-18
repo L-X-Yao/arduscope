@@ -58,6 +58,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import baseline_diff  # noqa: E402
 import check_suggestions  # noqa: E402
+import gate_preflight  # noqa: E402
 import local_paths  # noqa: E402
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -280,6 +281,9 @@ RUNNERS = {"ci_local": step_ci_local, "snapshots": step_snapshots,
 
 
 def run_gate(args) -> int:
+    if gate_preflight.run_checks(sitl_dir=args.sitl_dir, steps=args.steps,
+                                 corpora=args.corpora, repo_root=REPO_ROOT):
+        return 1
     if tree_is_dirty():
         print("Working tree is dirty. A result has to name a commit.")
         return 1
