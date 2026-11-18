@@ -170,8 +170,121 @@ class TestCompassInterference:
         mag["_timestamp"] = np.concatenate([TIMES, TIMES])
         order = np.argsort(mag["_timestamp"], kind="stable")
         mag = {k: v[order] for k, v in mag.items()}
-        _, pct = self._run(OCTAQUAD, rcou, mag)
-        assert pct is not None and pct > 30.0
+        result = self._run(OCTAQUAD, rcou, mag)
+        assert result.scalar_pct is not None and result.scalar_pct > 30.0
+
+
+def _test_dcm(roll, pitch, yaw):
+    """Body-to-earth 321 rotation, independent test fixture arithmetic."""
+    cr, sr = np.cos(roll), np.sin(roll)
+    cp, sp = np.cos(pitch), np.sin(pitch)
+    cy, sy = np.cos(yaw), np.sin(yaw)
+    rot = np.empty((len(roll), 3, 3))
+    rot[:, 0, 0] = cp * cy
+    rot[:, 0, 1] = sr * sp * cy - cr * sy
+    rot[:, 0, 2] = cr * sp * cy + sr * sy
+    rot[:, 1, 0] = cp * sy
+    rot[:, 1, 1] = sr * sp * sy + cr * cy
+    rot[:, 1, 2] = cr * sp * sy - sr * cy
+    rot[:, 2, 0] = -sp
+    rot[:, 2, 1] = sr * cp
+    rot[:, 2, 2] = cr * cp
+    return rot
+
+
+def _vector_log(impacts=(None,), current=False, short_baseline=False):
+    """A rotating compass with optional body-fixed motor impact vectors."""
+    n = 600
+    ts = np.linspace(0.0, 60.0, n)
+    throttle = 0.15 + 0.75 * (0.5 + 0.5 * np.sin(0.31 * ts))
+    if short_baseline:
+        throttle[:] = 0.8
+        throttle[:4] = 0.0
+    roll = np.radians(12.0 * np.sin(0.17 * ts))
+    pitch = np.radians(9.0 * np.cos(0.13 * ts))
+    yaw = np.radians(35.0 * np.sin(0.07 * ts))
+    rot = _test_dcm(roll, pitch, yaw)
+    earth = np.array([400.0, 0.0, 300.0])
+    clean = np.einsum("nji,j->ni", rot, earth)
+    excitation = 40.0 * throttle if current else throttle
+
+    parts = []
+    for instance, impact in enumerate(impacts):
+        field = clean.copy()
+        if impact is not None:
+            field += excitation[:, None] * np.asarray(impact)[None, :]
+        parts.append({
+            "_timestamp": ts, "I": np.full(n, instance),
+            "MagX": field[:, 0], "MagY": field[:, 1], "MagZ": field[:, 2],
+            "OfsX": np.zeros(n), "OfsY": np.zeros(n), "OfsZ": np.zeros(n),
+        })
+    mag = {k: np.concatenate([p[k] for p in parts]) for k in parts[0]}
+    order = np.argsort(mag["_timestamp"], kind="stable")
+    mag = {k: v[order] for k, v in mag.items()}
+    pwm = 1000.0 + 1000.0 * throttle
+    messages = {
+        "MAG": mag,
+        "RCOU": {"_timestamp": ts, **{f"C{i}": pwm for i in range(1, 5)}},
+        "ATT": {"_timestamp": ts, "Roll": np.degrees(roll),
+                "Pitch": np.degrees(pitch), "Yaw": np.degrees(yaw)},
+    }
+    if current:
+        messages["BAT"] = {"_timestamp": ts, "Inst": np.zeros(n),
+                           "Curr": excitation}
+    return SyntheticReader(messages, {"MOT_PWM_MIN": 1000,
+                                      "MOT_PWM_MAX": 2000},
+                           vehicle_type="ArduCopter")
+
+
+def _vector_result(reader):
+    analyzer = CompassAnalyzer(reader, Thresholds(),
+                               _info(4, False, "ArduCopter"))
+    mag = reader._messages["MAG"]
+    return analyzer._motor_interference(
+        mag["_timestamp"], mag["I"], mag["MagX"], mag["MagY"], mag["MagZ"],
+        mag["OfsX"], mag["OfsY"], mag["OfsZ"],
+        sorted({int(v) for v in mag["I"]}), False)
+
+
+class TestCompassVectorInterference:
+    def test_body_fixed_vector_is_detected_with_rcou_only(self):
+        impact = np.array([250.0, 180.0, 200.0])
+        result = _vector_result(_vector_log((impact,)))
+        expected = np.linalg.norm(impact) / 530.0 * 100.0
+        assert result.vector_pct == pytest.approx(expected, rel=1e-6)
+        assert result.vector_driver == "RCOU"
+        reader = _vector_log((impact,))
+        res = CompassAnalyzer(reader, Thresholds(),
+                              _info(4, False, "ArduCopter")).analyze()
+        assert res.status == "critical"
+        assert res.evidence[0]["value"] == pytest.approx(expected, rel=1e-6)
+
+    def test_pure_attitude_rotation_has_no_vector_impact(self):
+        reader = _vector_log()
+        result = _vector_result(reader)
+        assert result.vector_pct == pytest.approx(0.0, abs=1e-8)
+        res = CompassAnalyzer(reader, Thresholds(),
+                              _info(4, False, "ArduCopter")).analyze()
+        assert res.status == "good", res.details
+
+    def test_insufficient_low_throttle_baseline_returns_none(self):
+        result = _vector_result(_vector_log(short_baseline=True))
+        assert result.vector_pct is None
+
+    def test_worst_compass_instance_wins(self):
+        impact = np.array([250.0, 180.0, 200.0])
+        result = _vector_result(_vector_log((None, impact)))
+        assert result.vector_label == "MAG1"
+        assert result.vector_pct == pytest.approx(
+            np.linalg.norm(impact) / 530.0 * 100.0, rel=1e-6)
+
+    def test_primary_current_is_normalized_like_compassmot(self):
+        reader = _vector_log((np.array([7.0, 7.0, 7.0]),), current=True)
+        result = _vector_result(reader)
+        # current=40*throttle, so current_max/throttle_max is 40 A.
+        expected = 7.0 * np.sqrt(3.0) * 40.0 / 530.0 * 100.0
+        assert result.vector_driver == "BAT.Curr"
+        assert result.vector_pct == pytest.approx(expected, rel=1e-6)
 
 
 def test_pure_plane_aileron_dither_does_not_suggest_spin_min():

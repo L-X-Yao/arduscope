@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Fixed
+- Compass motor interference now includes CompassMot's three-axis vector
+  impact alongside the field-strength contrast, with ATT attitude terms,
+  throttle/current normalization and per-instance worst-case selection. The
+  existing SITL injection (`SIM_MAG_MOT_X/Y/Z=7.0`) rises from 14.6% scalar to
+  126.1% current-normalized vector interference; a normal control stays good.
+
 ## [0.12.4] - 2026-11-18
 
 ### Changed

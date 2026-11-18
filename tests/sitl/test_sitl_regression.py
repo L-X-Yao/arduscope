@@ -129,6 +129,19 @@ class TestSitlPipeline:
             assert r.status in ("warning", "critical"), \
                 f"Expected {key} to fire but got {r.status}: {r.summary}"
 
+    def test_expected_critical_analyzers(self, scenario):
+        """A strong injected fault must not hide behind a weaker warning."""
+        expected = scenario.get("expected", {})
+        critical_keys = expected.get("analyzers_critical", [])
+        if not critical_keys:
+            pytest.skip("No critical expectation")
+        result = _run_pipeline(scenario["_log_path"])
+        for key in critical_keys:
+            r = result.results_by_key.get(key)
+            assert r is not None, f"Expected analyzer '{key}' missing"
+            assert r.status == "critical", (
+                f"Expected {key} critical but got {r.status}: {r.summary}")
+
     def test_expected_not_critical(self, scenario):
         """Analyzers listed should not reach critical severity."""
         expected = scenario.get("expected", {})

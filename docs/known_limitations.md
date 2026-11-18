@@ -117,10 +117,22 @@ them readable.
 - **A hover throttle parameter over 0.12 from the measured hover reads
   critical.** In SITL a parameter of 0.20 on an aircraft that hovers at 0.36
   flew the same as the right one, within 6%. The limits are marked E.
-- **`compass` misses interference fixed to the airframe.** It compares the
-  field at high and low throttle, which averages a body-fixed offset away: an
-  offset injected in SITL read 14.3%, under the 30% limit. A fit per axis would
-  catch it and is not implemented.
+- **`compass` vector interference is an offline fit, not a controlled
+  CompassMot calibration.** The scalar field-strength contrast remains, and a
+  second metric fits each corrected MAG axis against throttle plus the nine ATT
+  rotation-matrix terms; the throttle coefficient is the full-throttle impact
+  vector, following `ArduCopter/compassmot.cpp`. With usable primary BAT current
+  (at least 3 A), current replaces throttle and the result is scaled by
+  `current_max/throttle_max`, as CompassMot does. The worst compass instance is
+  reported and the higher of scalar/vector drives severity, so this change can
+  only raise a verdict. The existing SITL scenario with
+  `SIM_MAG_MOT_X/Y/Z=7.0` read 14.6% by the scalar method and 126.1% by the
+  current-normalized vector method (109.0% with throttle only); a normal SITL
+  control read 0.25% and stayed good. Missing ATT, insufficient low/high
+  throttle support, or driver variation that attitude explains leave the vector
+  metric unavailable rather than inferring it. The linear model still cannot
+  distinguish motor current from an external magnetic disturbance that happens
+  to correlate with it.
 
 ## Notch advice
 

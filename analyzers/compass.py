@@ -13,12 +13,34 @@ Title: 罗盘分析
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import plotly.graph_objects as go
 
 from lib.i18n import t
 from lib.outputs import read_outputs
 from . import AnalysisResult, BaseAnalyzer
+
+
+# AP_Arming.cpp: AP_ARMING_COMPASS_MAGFIELD_EXPECTED, the denominator used
+# by CompassMot's interference_pct (ArduCopter/compassmot.cpp:206-216).
+_COMPASS_EXPECTED_FIELD_MGAUSS = 530.0
+
+
+@dataclass
+class _InterferenceResult:
+    figure: go.Figure
+    scalar_pct: float | None
+    vector_pct: float | None
+    vector_label: str | None
+    vector_driver: str | None
+
+    @property
+    def worst_pct(self) -> float | None:
+        values = [v for v in (self.scalar_pct, self.vector_pct)
+                  if v is not None]
+        return max(values) if values else None
 
 
 class CompassAnalyzer(BaseAnalyzer):
@@ -269,13 +291,21 @@ class CompassAnalyzer(BaseAnalyzer):
                 unique_instances, all_nan_inst,
             )
             if interf_result is not None:
-                interf_fig, interf_pct = interf_result
-                figures.append(interf_fig)
-                if interf_pct is not None:
+                figures.append(interf_result.figure)
+                if interf_result.scalar_pct is not None:
                     details.append(
                         t("compass.motor_interference",
-                          pct=f"{interf_pct:.1f}")
+                          pct=f"{interf_result.scalar_pct:.1f}")
                     )
+                if interf_result.vector_pct is not None:
+                    details.append(
+                        t("compass.motor_vector_interference",
+                          pct=f"{interf_result.vector_pct:.1f}",
+                          label=interf_result.vector_label,
+                          driver=interf_result.vector_driver)
+                    )
+                interf_pct = interf_result.worst_pct
+                if interf_pct is not None:
                     if interf_pct > self.thresholds.compass_interference_crit:
                         overall_status = self.worst_status(
                             overall_status, "critical")
@@ -303,8 +333,8 @@ class CompassAnalyzer(BaseAnalyzer):
             # forever and shipped a no-op line in the user's .param file.
             current_mot_comp = self.reader.get_param("COMPASS_MOTCT", 0)
             if (interf_result is not None
-                    and interf_result[1] is not None
-                    and interf_result[1] > self.thresholds.compass_interference_warn
+                    and interf_result.worst_pct is not None
+                    and interf_result.worst_pct > self.thresholds.compass_interference_warn
                     and current_mot_comp == 0):
                 # The type only selects how the vector is applied, and with
                 # a zero vector it changes nothing (AP_Compass_Backend.cpp).
@@ -369,10 +399,10 @@ class CompassAnalyzer(BaseAnalyzer):
             action_text=action_text,
             evidence_source=evidence_source,
             evidence=([{"field": "motor_interference_pct",
-                        "value": interf_result[1],
+                        "value": interf_result.worst_pct,
                         "threshold": self.thresholds.compass_interference_warn}]
                       if interf_result is not None
-                      and interf_result[1] is not None else []),
+                      and interf_result.worst_pct is not None else []),
         )
 
     # ------------------------------------------------------------------
@@ -391,61 +421,96 @@ class CompassAnalyzer(BaseAnalyzer):
         ofs_z: np.ndarray,
         unique_instances: list[int],
         all_nan_inst: bool = False,
-    ) -> tuple[go.Figure, float | None] | None:
-        """
-        Plot compass field strength vs throttle output to check interference.
+    ) -> _InterferenceResult | None:
+        """Measure scalar contrast and CompassMot's full-throttle vector.
 
-        Returns (figure, interference_pct) where interference_pct is the
-        relative change in mean field strength between high-throttle (top
-        20% PWM) and low-throttle (bottom 20% PWM) samples. None if there
-        isn't enough data to compute the contrast.
-
-        Uses mean RCOU PWM as proxy for throttle.
+        CompassMot subtracts a zero-throttle vector, divides the three-axis
+        impact by throttle or current, and reports its norm at full throttle
+        (ArduCopter/compassmot.cpp:172-216). Here a regression on the nine
+        body-to-earth DCM entries removes attitude rotation without assuming
+        the compass's installation orientation. The driver coefficient is
+        therefore the vector impact after orthogonalising attitude. Low- and
+        high-throttle support are still required; an unidentifiable driver
+        returns no vector metric rather than guessing.
         """
-        # Read RCOU for throttle proxy
         channels = self.motor_channels()
         rcou = read_outputs(self.reader, channels)
         t_rcou = rcou["_timestamp"]
-
         if len(t_rcou) < 10:
             return None
 
-        # Compute mean motor output as throttle proxy
-        motor_arrs = []
-        for ch in channels:
-            arr = rcou[ch]
-            if not np.all(np.isnan(arr)):
-                motor_arrs.append(arr)
+        motor_arrs = [rcou[ch] for ch in channels
+                      if not np.all(np.isnan(rcou[ch]))]
         if not motor_arrs:
             return None
-
         mean_pwm = np.nanmean(np.column_stack(motor_arrs), axis=1)
 
-        # Each compass has its own position relative to the motors, so
-        # report the most exposed one rather than whichever comes first.
-        worst = None
+        pwm_min = self.reader.get_param(self.motor_param("PWM_MIN"), 1000)
+        pwm_max = self.reader.get_param(self.motor_param("PWM_MAX"), 2000)
+        if pwm_min <= 0:
+            pwm_min = 1000
+        if pwm_max <= pwm_min:
+            pwm_max = 2000
+        throttle_rcou = np.clip(
+            (mean_pwm - pwm_min) / (pwm_max - pwm_min), 0.0, 1.0)
+        throttle = np.interp(t_mag, t_rcou, throttle_rcou)
+        # Keep the legacy scalar metric on raw PWM. Affine normalization
+        # would not matter until clipping, which can change its percentile bins.
+        mean_pwm_mag = np.interp(t_mag, t_rcou, mean_pwm)
+
+        attitude = self._attitude_design(t_mag)
+        driver = throttle
+        driver_name = "RCOU"
+        current_based = False
+        if attitude is not None:
+            primary_current = self._primary_current()
+            if primary_current is not None:
+                t_cur, cur = primary_current
+                current = self.safe_interp(t_mag, t_cur, cur)
+                if np.count_nonzero(np.isfinite(current)) >= 50:
+                    # CompassMot prefers current when the primary monitor
+                    # provides it (compassmot.cpp:80-85,194-216).
+                    driver = current
+                    driver_name = "BAT.Curr"
+                    current_based = True
+
+        scalar_worst = None
+        vector_worst = None
         for inst_id in ([None] if all_nan_inst else unique_instances):
             mask = (np.ones(len(t_mag), dtype=bool) if inst_id is None else
                     np.nan_to_num(inst, nan=-1).astype(int) == inst_id)
             if not np.any(mask):
                 continue
-            field = np.sqrt(
-                (mag_x[mask] - ofs_x[mask])**2
-                + (mag_y[mask] - ofs_y[mask])**2
-                + (mag_z[mask] - ofs_z[mask])**2
-            )
-            # Interpolate throttle to compass timestamps
-            throttle = np.interp(t_mag[mask], t_rcou, mean_pwm)
-            pct = self._throttle_field_contrast(throttle, field)
-            if worst is None or (pct or 0.0) > (worst[2] or 0.0):
-                worst = (throttle, field, pct)
-        if worst is None:
+            field_xyz = np.column_stack([
+                mag_x[mask] - ofs_x[mask],
+                mag_y[mask] - ofs_y[mask],
+                mag_z[mask] - ofs_z[mask],
+            ])
+            field = np.linalg.norm(field_xyz, axis=1)
+            throttle_inst = throttle[mask]
+            scalar_pct = self._throttle_field_contrast(
+                mean_pwm_mag[mask], field)
+            if (scalar_worst is None
+                    or (scalar_pct or 0.0) > (scalar_worst[2] or 0.0)):
+                scalar_worst = (mean_pwm_mag[mask], field, scalar_pct)
+
+            vector_pct = None
+            if attitude is not None:
+                vector_pct = self._vector_motor_impact(
+                    driver[mask], throttle_inst, field_xyz, attitude[mask],
+                    current_based)
+            label = "MAG" if inst_id is None else f"MAG{inst_id}"
+            if vector_pct is not None and (
+                    vector_worst is None or vector_pct > vector_worst[0]):
+                vector_worst = (vector_pct, label, driver_name)
+
+        if scalar_worst is None:
             return None
-        throttle_interp, field, interf_pct = worst
+        throttle_interp, field, scalar_pct = scalar_worst
 
-        # Subsample for scatter plot
+        # The existing figure remains the scalar field/PWM view. The vector
+        # regression is a separate detail and severity input, not a new plot.
         step = max(1, len(field) // 3000)
-
         fig = self.make_figure(
             title=t("compass.fig_interference"),
             xaxis_title=t("compass.avg_motor_pwm"),
@@ -453,14 +518,123 @@ class CompassAnalyzer(BaseAnalyzer):
             height=400,
         )
         fig.add_trace(go.Scattergl(
-            x=throttle_interp[::step],
-            y=field[::step],
-            mode='markers',
-            marker=dict(size=3, color='#1f77b4', opacity=0.4),
+            x=throttle_interp[::step], y=field[::step],
+            mode='markers', marker=dict(size=3, color='#1f77b4', opacity=0.4),
             name=t("compass.fig_interference_trace"),
         ))
+        return _InterferenceResult(
+            figure=fig, scalar_pct=scalar_pct,
+            vector_pct=vector_worst[0] if vector_worst else None,
+            vector_label=vector_worst[1] if vector_worst else None,
+            vector_driver=vector_worst[2] if vector_worst else None,
+        )
 
-        return fig, interf_pct
+    def _primary_current(self) -> tuple[np.ndarray, np.ndarray] | None:
+        """Primary BAT current when CompassMot would choose current mode.
+
+        AP_BattMonitor::current_amps defaults to instance zero and requires
+        has_current (AP_BattMonitor.cpp:839-845). Do not substitute another
+        pack or a sum monitor. CompassMot skips current updates below 3 A,
+        so a lower maximum falls back to throttle as well.
+        """
+        if not self.reader.has_message("BAT"):
+            return None
+        bat = self.reader.get_messages_as_arrays("BAT", ["Inst", "Curr"])
+        inst = bat["Inst"]
+        known = np.isfinite(inst)
+        mask = inst == 0 if np.any(known) else np.ones(len(inst), dtype=bool)
+        ts = bat["_timestamp"][mask]
+        curr = bat["Curr"][mask]
+        valid = np.isfinite(ts) & np.isfinite(curr)
+        if np.count_nonzero(valid) < 50 or np.max(curr[valid]) < 3.0:
+            return None
+        return ts[valid], curr[valid]
+
+    def _attitude_design(self, t_mag: np.ndarray) -> np.ndarray | None:
+        """Intercept plus nine ATT DCM entries, interpolated to MAG rows."""
+        if not self.reader.has_message("ATT"):
+            return None
+        att = self.reader.get_messages_as_arrays(
+            "ATT", ["Roll", "Pitch", "Yaw"])
+        t_att = att["_timestamp"]
+        angles = []
+        for name in ("Roll", "Pitch", "Yaw"):
+            values = np.radians(att[name])
+            good = np.isfinite(t_att) & np.isfinite(values)
+            if np.count_nonzero(good) < 2:
+                return None
+            # Unwrap before interpolation so a yaw crossing +/-180 degrees
+            # does not manufacture a full rotation between adjacent rows.
+            unwrapped = np.unwrap(values[good])
+            angles.append(np.interp(t_mag, t_att[good], unwrapped))
+        roll, pitch, yaw = angles
+        cr, sr = np.cos(roll), np.sin(roll)
+        cp, sp = np.cos(pitch), np.sin(pitch)
+        cy, sy = np.cos(yaw), np.sin(yaw)
+        # Matrix3::from_euler, AP_Math/matrix3.cpp:26-44 (321 ordering).
+        rot = np.empty((len(t_mag), 3, 3))
+        rot[:, 0, 0] = cp * cy
+        rot[:, 0, 1] = sr * sp * cy - cr * sy
+        rot[:, 0, 2] = cr * sp * cy + sr * sy
+        rot[:, 1, 0] = cp * sy
+        rot[:, 1, 1] = sr * sp * sy + cr * cy
+        rot[:, 1, 2] = cr * sp * sy - sr * cy
+        rot[:, 2, 0] = -sp
+        rot[:, 2, 1] = sr * cp
+        rot[:, 2, 2] = cr * cp
+        return np.column_stack([
+            np.ones(len(t_mag)), rot.reshape(len(t_mag), 9)])
+
+    @staticmethod
+    def _vector_motor_impact(
+        driver: np.ndarray,
+        throttle: np.ndarray,
+        field_xyz: np.ndarray,
+        attitude: np.ndarray,
+        current_based: bool,
+    ) -> float | None:
+        """Full-throttle vector impact in percent of the expected 530 mG."""
+        valid = (np.isfinite(driver) & np.isfinite(throttle)
+                 & np.all(np.isfinite(field_xyz), axis=1)
+                 & np.all(np.isfinite(attitude), axis=1))
+        if np.count_nonzero(valid) < 50:
+            return None
+        thr = throttle[valid]
+        # CompassMot's baseline is zero throttle. Offline, accept only rows
+        # near the lowest observed output (and within the bottom quintile),
+        # so a handful of idle rows cannot be diluted by a high 20th percentile.
+        low_cut = min(float(np.percentile(thr, 20)),
+                      float(np.min(thr)) + 0.05)
+        high_cut = float(np.percentile(thr, 80))
+        if np.count_nonzero(thr <= low_cut) < 5 \
+                or np.count_nonzero(thr >= high_cut) < 5:
+            return None
+
+        drv = driver[valid]
+        design = attitude[valid]
+        # Without driver variation orthogonal to attitude, a motor effect
+        # and an attitude effect are not separately identifiable.
+        driver_span = float(np.std(drv))
+        residual = drv - design @ np.linalg.lstsq(design, drv, rcond=None)[0]
+        if driver_span <= 1e-9 or np.std(residual) < 0.05 * driver_span:
+            return None
+
+        regressors = np.column_stack([design, drv])
+        coefficients = np.linalg.lstsq(
+            regressors, field_xyz[valid], rcond=None)[0]
+        impact = coefficients[-1]
+        if not np.all(np.isfinite(impact)):
+            return None
+        full_scale = 1.0
+        if current_based:
+            # compassmot.cpp:214-215: impact/amp at the observed current,
+            # expressed at full throttle via current_max/throttle_max.
+            throttle_max = float(np.max(thr))
+            if throttle_max <= 0:
+                return None
+            full_scale = float(np.max(drv)) / throttle_max
+        return float(np.linalg.norm(impact) * full_scale
+                     / _COMPASS_EXPECTED_FIELD_MGAUSS * 100.0)
 
     @staticmethod
     def _throttle_field_contrast(throttle: np.ndarray,
