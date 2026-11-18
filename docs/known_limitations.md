@@ -154,13 +154,18 @@ them readable.
   spectra.** That takes the spectrum from before the filter beside the one
   after it. Batches that hold both (`INS_LOG_BAT_OPT` 3 to 7) are told apart
   by an offset on the instance (`Write_ISBH` logs post-filter batches as
-  instance + gyro count), and the offset is now read: when every gyro
-  instance appears twice through the sampler's rotation, the two spectra are
-  measured against each other and the report names the method "pre/post
-  batch". When the split is not visible — few batches, a gap in the
-  instances — they stay averaged into one spectrum and attenuation is not
-  assessed. Where the notch follows its peak, attenuation says nothing either
-  way: compare a log from before the notch with one after.
+  instance + gyro count), and the offset is now read — but an identical
+  instance span also comes from more IMUs logged post-only, so the split is
+  accepted only when the span equals the real IMU count from the log's IMU
+  rows and every gyro instance appears twice through the sampler's
+  rotation. Then the pre spectrum is the reference and the post spectrum the
+  measurement, reported as method "pre/post batch", and only where the notch
+  band sits inside both groups' frequency ranges (the smaller Nyquist
+  binds; nothing is extrapolated). When the split is not visible — few
+  batches, a gap in the instances, no IMU rows — they stay averaged into one
+  spectrum and attenuation is not assessed. Where the notch follows its
+  peak, attenuation says nothing either way: compare a log from before the
+  notch with one after.
 - **A throttle-tracking set is a hover set.** `INS_HNTCH_FREQ` is the peak and
   `INS_HNTCH_REF` the hover throttle, and the notch does not go below FREQ.
   Through climbs and descents in SITL it did no better than a notch that stays

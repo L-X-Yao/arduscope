@@ -183,11 +183,15 @@ def _batch(log: BinLog, seq: int, time_us: int, tone_hz: float,
 
 def flight_log(vehicle: str = "copter", duration_s: float = 40.0,
                params: dict | None = None, batches: int = 6,
-               tone_hz: float = 120.0, seed: int = 7) -> BinLog:
+               tone_hz: float = 120.0, seed: int = 7,
+               imu_instances: tuple = (0, 1)) -> BinLog:
     """A healthy flight: boot, arm at 2 s, hover, disarm 2 s before the end.
 
     vehicle is "copter" or "quadplane". Pass params to change or add
     parameters; everything else stays at a plausible healthy value.
+    imu_instances is which IMU instances the log carries; real logs name
+    one per physical IMU, and the batch-sampler's instance offset is
+    derived from that count.
     """
     rnd = random.Random(seed)
     plane = vehicle == "quadplane"
@@ -241,7 +245,7 @@ def flight_log(vehicle: str = "copter", duration_s: float = 40.0,
         log.write("RCO2", t, 0, 0, 0, 0)
         log.write("RCIN", t, 1500, 1500, 1400, 1500, *([1000] * 10))
 
-        for imu in (0, 1):
+        for imu in imu_instances:
             log.write("IMU", t, imu, noise, noise, noise, 0.0, 0.0, -9.81,
                       0, 0, 45.0 + imu, 1, 1, 1000, 1000)
             log.write("VIBE", t, imu, 5.0, 5.0, 6.0, 0)

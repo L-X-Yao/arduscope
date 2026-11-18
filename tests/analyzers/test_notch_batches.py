@@ -408,33 +408,45 @@ def test_critical_attitude_error_does_not_raise_thr_mix():
 
 
 class TestInstanceSplit:
-    """gyro_count read back from the ISBH instance set: Write_ISBH logs
-    post-filter batches as instance + _gyro_count, pre ones unchanged."""
+    """The split needs the instance span AND the real gyro_count from the
+    log's IMU rows: an identical 0..1 span is one IMU pre/post or two IMUs
+    all post, and only the IMU count tells them apart."""
+
+    @staticmethod
+    def _batches(instances):
+        return {i: {"instance": inst} for i, inst in enumerate(instances)}
 
     def test_two_rounds_of_two_instances_split_at_one(self):
-        batches = {i: {"instance": inst}
-                   for i, inst in enumerate((0, 1, 0, 1))}
-        assert NotchTuningAnalyzer._gyro_instance_split(batches) == 1
+        batches = self._batches((0, 1, 0, 1))
+        assert NotchTuningAnalyzer._gyro_instance_split(batches, 1) == 1
+
+    def test_two_imus_all_post_is_not_a_split(self):
+        """options=3 with the sensor-rate flag off: two IMUs, no offset,
+        all post — the same 0,1 span a one-IMU pre/post pair would show."""
+        batches = self._batches((0, 1, 0, 1))
+        assert NotchTuningAnalyzer._gyro_instance_split(batches, 2) is None
+
+    def test_two_imus_pre_and_post_split_at_two(self):
+        batches = self._batches((0, 1, 2, 3, 0, 1, 2, 3))
+        assert NotchTuningAnalyzer._gyro_instance_split(batches, 2) == 2
 
     def test_a_single_instance_never_splits(self):
-        batches = {i: {"instance": 0} for i in range(4)}
-        assert NotchTuningAnalyzer._gyro_instance_split(batches) is None
+        batches = self._batches((0, 0, 0, 0))
+        assert NotchTuningAnalyzer._gyro_instance_split(batches, 1) is None
 
     def test_one_round_is_not_enough(self):
         """Each instance needs two batches: the sampler rotates per batch,
         and one round proves nothing about the split."""
-        batches = {i: {"instance": inst} for i, inst in enumerate((0, 1))}
-        assert NotchTuningAnalyzer._gyro_instance_split(batches) is None
+        batches = self._batches((0, 1))
+        assert NotchTuningAnalyzer._gyro_instance_split(batches, 1) is None
 
     def test_a_gap_in_the_instances_stays_unseparated(self):
-        batches = {i: {"instance": inst}
-                   for i, inst in enumerate((0, 1, 3, 0, 1, 3))}
-        assert NotchTuningAnalyzer._gyro_instance_split(batches) is None
+        batches = self._batches((0, 1, 3, 0, 1, 3))
+        assert NotchTuningAnalyzer._gyro_instance_split(batches, 2) is None
 
     def test_an_odd_span_stays_unseparated(self):
-        batches = {i: {"instance": inst}
-                   for i, inst in enumerate((0, 1, 2, 0, 1, 2))}
-        assert NotchTuningAnalyzer._gyro_instance_split(batches) is None
+        batches = self._batches((0, 1, 2, 0, 1, 2))
+        assert NotchTuningAnalyzer._gyro_instance_split(batches, 2) is None
 
 
 class TestPrePostSplit:
@@ -447,16 +459,21 @@ class TestPrePostSplit:
     @classmethod
     def _mixed_log(cls, tmp_path, options, pre_samples=1024,
                    post_samples=1024, pre_amp=2000.0, post_amp=200.0,
-                   rounds=2):
+                   rounds=2, imu_instances=(0,), pre_rate=1000.0,
+                   post_rate=1000.0):
         log = binlog.flight_log("copter", batches=0,
+                                imu_instances=imu_instances,
                                 params={**cls.NOTCH,
                                         "INS_LOG_BAT_OPT": options})
         seq = 0
         for _ in range(rounds):
-            for instance, amp, samples in ((0, pre_amp, pre_samples),
-                                           (1, post_amp, post_samples)):
+            for instance, amp, samples, rate in ((0, pre_amp, pre_samples,
+                                                 pre_rate),
+                                                (1, post_amp, post_samples,
+                                                 post_rate)):
                 _write_batch(log, seq, 5_000_000 + seq * 1_000_000, 120.0,
-                             samples, amplitude=amp, instance=instance)
+                             samples, amplitude=amp, instance=instance,
+                             rate_hz=rate)
                 seq += 1
         return log.save(tmp_path / "mixed.bin")
 
@@ -521,18 +538,79 @@ class TestPrePostSplit:
         _status, text = self._details(analyzer, 120.0)
         assert t("notch_tuning.atten_mixed", opt=4) in text
 
-    def test_different_group_lengths_interpolate(self, tmp_path):
-        """The groups may group by length differently; the post spectrum is
-        interpolated onto the pre axis and the ratio survives."""
+    def test_different_group_lengths_still_measure(self, tmp_path):
+        """The groups may group by length differently; each keeps its own
+        frequency axis and the band is read on both."""
         path = self._mixed_log(tmp_path, 4, pre_samples=1024,
                                post_samples=512)
         analyzer = _analyzer(path)
         analyzer._fft_from_batch()
         assert (analyzer._gyro_spectrum_post[0].shape
-                == analyzer._gyro_spectrum_pre[0].shape)
+                != analyzer._gyro_spectrum_pre[0].shape)
         atten = analyzer._measure_notch_attenuation(120, 40)
         assert atten["method"] == "pre/post batch"
         assert atten["atten_db"] == pytest.approx(20.0, abs=4.0)
+
+    def test_a_band_across_the_post_nyquist_is_refused(self, tmp_path):
+        """The post group logged at a lower rate: its Nyquist binds, and a
+        band that crosses it is refused, not extrapolated."""
+        path = self._mixed_log(tmp_path, 4, post_rate=400.0)
+        analyzer = _analyzer(path)
+        analyzer._fft_from_batch()
+        atten = analyzer._measure_notch_attenuation(190, 40)
+        assert atten["method"] == "nyquist_exceeded"
+        assert atten["nyquist"] == pytest.approx(200.0, abs=2.0)
+
+    def test_a_band_inside_both_rates_still_measures(self, tmp_path):
+        path = self._mixed_log(tmp_path, 4, post_rate=400.0)
+        analyzer = _analyzer(path)
+        analyzer._fft_from_batch()
+        atten = analyzer._measure_notch_attenuation(120, 40)
+        assert atten["method"] == "pre/post batch"
+        assert atten["atten_db"] == pytest.approx(20.0, abs=4.0)
+
+    def test_dual_imu_all_post_options3_stays_mixed(self, tmp_path):
+        """options=3 with the runtime sensor-rate flag off logs only
+        post-filter batches with no instance offset: two IMUs give the
+        same 0,1 span a one-IMU pre/post pair would, and only the IMU
+        count proves it is not a split."""
+        path = self._mixed_log(tmp_path, 3, imu_instances=(0, 1))
+        analyzer = _analyzer(path)
+        analyzer._fft_from_batch()
+        assert analyzer._gyro_spectrum_pre is None
+        assert analyzer._measure_notch_attenuation(120, 40) == {
+            "method": "mixed", "options": 3}
+
+    def test_two_rate_clusters_do_not_break_the_merged_spectrum(
+            self, tmp_path):
+        """Rates this far apart are two logging setups; the median sat
+        between them and the tolerance kept nothing, which used to leave
+        an empty slice."""
+        path = self._mixed_log(tmp_path, 4, post_rate=400.0)
+        analyzer = _analyzer(path)
+        peak, _figs, _details = analyzer._fft_from_batch()
+        assert analyzer._gyro_spectrum is not None
+        assert len(analyzer._gyro_spectrum[0]) > 0
+
+    def test_imu_instance_count_reads_the_log(self, tmp_path):
+        path = self._mixed_log(tmp_path, 4)
+        analyzer = _analyzer(path)
+        assert analyzer._imu_instance_count() == 1
+
+    def test_no_imu_rows_leave_the_split_unmade(self, tmp_path):
+        """Without IMU rows there is no real gyro_count to check the span
+        against, so the caller never reaches a split."""
+        log = binlog.flight_log("copter", batches=0, imu_instances=(),
+                                params={"INS_LOG_BAT_OPT": 4})
+        path = log.save(tmp_path / "no-imu.bin")
+        analyzer = _analyzer(path)
+        assert analyzer._imu_instance_count() is None
+        batches = {i: {"instance": inst} for i, inst in
+                   enumerate((0, 1, 0, 1))}
+        assert analyzer._gyro_instance_split(batches, 1) == 1  # span alone
+        # ... but _fft_from_batch never asks: the split stays None.
+        analyzer._fft_from_batch()
+        assert analyzer._gyro_spectrum_pre is None
 
     def test_the_method_reaches_the_report(self, tmp_path):
         """40 dB reads as good, and says it was measured pre against post."""

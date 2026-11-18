@@ -1181,7 +1181,7 @@
   "notch_tuning.att_tracking_err": "姿态跟踪误差偏大 (Roll={roll_err}°, Pitch={pitch_err}°)，建议优化 PID",
   "notch_tuning.atten_acceptable": "陷波衰减可接受: {db} dB (>{warn} dB, 目标 {converge} dB, 方法: {method})",
   "notch_tuning.atten_good": "陷波衰减良好: {db} dB (>={converge} dB, 方法: {method})",
-  "notch_tuning.atten_mixed": "批采样交替记录滤波前和滤波后数据（INS_LOG_BAT_OPT={opt}），实例号未显现滤波后偏移，无法拆分两者，本次不评估衰减。",
+  "notch_tuning.atten_mixed": "批采样交替记录滤波前和滤波后数据（INS_LOG_BAT_OPT={opt}），但本日志无法可靠区分两者，本次不评估衰减。",
   "notch_tuning.atten_no_peak": "{freq} Hz 附近无振动峰，衰减 {db} dB 不说明陷波有问题，本次不评估。",
   "notch_tuning.atten_pre_filter": "批采样是滤波前数据（INS_LOG_BAT_OPT 未开启滤波后采样），看不到陷波效果，本次不评估衰减。设 INS_LOG_BAT_OPT=2 再飞一次，可以看到滤波后的频谱。",
   "notch_tuning.atten_residual": "陷波带 {lo}-{hi} Hz 内仍有 {peak} Hz 的峰。陷波削峰后留下的是较小的峰而不是凹陷，单张滤波后频谱看不出削掉多少，要量化请与开陷波前的日志对比。",
