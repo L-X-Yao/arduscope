@@ -35,8 +35,9 @@ def _copter() -> VehicleInfo:
 
 
 def _write_batch(log, seq, time_us, tone_hz, samples, mul=1, amplitude=2000.0,
-                 rate_hz=1000.0, sweep_hz=0.0):
-    log.write("ISBH", time_us, seq, 1, 0, mul, samples, time_us, rate_hz)
+                 rate_hz=1000.0, sweep_hz=0.0, instance=0):
+    log.write("ISBH", time_us, seq, 1, instance, mul, samples, time_us,
+              rate_hz)
     # sweep_hz widens the tone into a band, as motors at differing speeds do.
     wave = [int(mul * amplitude * math.sin(
         2 * math.pi * (tone_hz + sweep_hz * i / (2 * samples)) * i / rate_hz))
@@ -404,3 +405,156 @@ def test_critical_attitude_error_does_not_raise_thr_mix():
     assert result_status == "critical"
     # The method now hands back no recommendations at all.
     assert len(analyzer._check_attitude_stability()) == 2
+
+
+class TestInstanceSplit:
+    """gyro_count read back from the ISBH instance set: Write_ISBH logs
+    post-filter batches as instance + _gyro_count, pre ones unchanged."""
+
+    def test_two_rounds_of_two_instances_split_at_one(self):
+        batches = {i: {"instance": inst}
+                   for i, inst in enumerate((0, 1, 0, 1))}
+        assert NotchTuningAnalyzer._gyro_instance_split(batches) == 1
+
+    def test_a_single_instance_never_splits(self):
+        batches = {i: {"instance": 0} for i in range(4)}
+        assert NotchTuningAnalyzer._gyro_instance_split(batches) is None
+
+    def test_one_round_is_not_enough(self):
+        """Each instance needs two batches: the sampler rotates per batch,
+        and one round proves nothing about the split."""
+        batches = {i: {"instance": inst} for i, inst in enumerate((0, 1))}
+        assert NotchTuningAnalyzer._gyro_instance_split(batches) is None
+
+    def test_a_gap_in_the_instances_stays_unseparated(self):
+        batches = {i: {"instance": inst}
+                   for i, inst in enumerate((0, 1, 3, 0, 1, 3))}
+        assert NotchTuningAnalyzer._gyro_instance_split(batches) is None
+
+    def test_an_odd_span_stays_unseparated(self):
+        batches = {i: {"instance": inst}
+                   for i, inst in enumerate((0, 1, 2, 0, 1, 2))}
+        assert NotchTuningAnalyzer._gyro_instance_split(batches) is None
+
+
+class TestPrePostSplit:
+    """INS_LOG_BAT_OPT mixed logging measured against itself: the
+    pre-filter group is the reference, the post-filter one the result."""
+
+    NOTCH = {"INS_HNTCH_ENABLE": 1, "INS_HNTCH_FREQ": 120, "INS_HNTCH_BW": 40,
+             "INS_HNTCH_MODE": 0, "INS_HNTCH_REF": 0}
+
+    @classmethod
+    def _mixed_log(cls, tmp_path, options, pre_samples=1024,
+                   post_samples=1024, pre_amp=2000.0, post_amp=200.0,
+                   rounds=2):
+        log = binlog.flight_log("copter", batches=0,
+                                params={**cls.NOTCH,
+                                        "INS_LOG_BAT_OPT": options})
+        seq = 0
+        for _ in range(rounds):
+            for instance, amp, samples in ((0, pre_amp, pre_samples),
+                                           (1, post_amp, post_samples)):
+                _write_batch(log, seq, 5_000_000 + seq * 1_000_000, 120.0,
+                             samples, amplitude=amp, instance=instance)
+                seq += 1
+        return log.save(tmp_path / "mixed.bin")
+
+    @pytest.mark.parametrize("options", [3, 4])
+    def test_separated_batches_measure_attenuation(self, tmp_path, options):
+        path = self._mixed_log(tmp_path, options)
+        analyzer = _analyzer(path)
+        analyzer._fft_from_batch()
+        assert analyzer._gyro_spectrum_pre is not None
+        assert analyzer._gyro_spectrum_post is not None
+        atten = analyzer._measure_notch_attenuation(120, 40)
+        assert atten["method"] == "pre/post batch"
+        # The batches carry a 2000-unit tone before the filter and a
+        # 200-unit one after: 20*log10(2000/200) = 20 dB.
+        assert atten["atten_db"] == pytest.approx(20.0, abs=3.0)
+
+    def test_a_mixed_log_still_reports_one_merged_spectrum(self, tmp_path):
+        """The main spectrum, peak and figure stay what they were; only the
+        attenuation uses the split."""
+        path = self._mixed_log(tmp_path, 4)
+        analyzer = _analyzer(path)
+        peak, figs, details = analyzer._fft_from_batch()
+        assert peak == pytest.approx(120.0, abs=5.0)
+        assert figs and details
+
+    def test_post_only_ignores_the_offset(self, tmp_path):
+        """Bit 1 alone never offsets the instance (Write_ISBH), so a log
+        with two instances is one post-filter spectrum, not a split."""
+        path = self._mixed_log(tmp_path, 2)
+        analyzer = _analyzer(path)
+        analyzer._fft_from_batch()
+        assert analyzer._gyro_spectrum_pre is None
+        assert analyzer._gyro_spectrum_post is None
+        atten = analyzer._measure_notch_attenuation(120, 40)
+        assert atten["method"] == "gyro FFT (ISBD batch)"
+
+    def test_pre_only_with_two_instances_stays_pre_filter(self, tmp_path):
+        path = self._mixed_log(tmp_path, 0)
+        analyzer = _analyzer(path)
+        self._flat(analyzer)
+        assert analyzer._measure_notch_attenuation(120, 40) == {
+            "method": "pre_filter"}
+
+    def test_sensor_rate_alone_is_pre_filter(self, tmp_path):
+        path = self._mixed_log(tmp_path, 1)
+        analyzer = _analyzer(path)
+        self._flat(analyzer)
+        assert analyzer._measure_notch_attenuation(120, 40) == {
+            "method": "pre_filter"}
+
+    def test_one_round_stays_mixed(self, tmp_path):
+        path = self._mixed_log(tmp_path, 4, rounds=1)
+        analyzer = _analyzer(path)
+        analyzer._fft_from_batch()
+        assert analyzer._measure_notch_attenuation(120, 40) == {
+            "method": "mixed", "options": 4}
+
+    def test_unseparated_batches_keep_the_mixed_line(self, tmp_path):
+        path = self._mixed_log(tmp_path, 4, rounds=1)
+        analyzer = _analyzer(path)
+        self._flat(analyzer)
+        _status, text = self._details(analyzer, 120.0)
+        assert t("notch_tuning.atten_mixed", opt=4) in text
+
+    def test_different_group_lengths_interpolate(self, tmp_path):
+        """The groups may group by length differently; the post spectrum is
+        interpolated onto the pre axis and the ratio survives."""
+        path = self._mixed_log(tmp_path, 4, pre_samples=1024,
+                               post_samples=512)
+        analyzer = _analyzer(path)
+        analyzer._fft_from_batch()
+        assert (analyzer._gyro_spectrum_post[0].shape
+                == analyzer._gyro_spectrum_pre[0].shape)
+        atten = analyzer._measure_notch_attenuation(120, 40)
+        assert atten["method"] == "pre/post batch"
+        assert atten["atten_db"] == pytest.approx(20.0, abs=4.0)
+
+    def test_the_method_reaches_the_report(self, tmp_path):
+        """40 dB reads as good, and says it was measured pre against post."""
+        path = self._mixed_log(tmp_path, 4, post_amp=20.0)
+        analyzer = _analyzer(path)
+        analyzer._fft_from_batch()
+        atten = analyzer._measure_notch_attenuation(120, 40)
+        assert atten["atten_db"] >= Thresholds().notch_atten_converge
+        status, text = self._details(analyzer, 120.0)
+        assert status == "good"
+        assert t("notch_tuning.atten_good", db=f"{atten['atten_db']:.1f}",
+                 converge=Thresholds().notch_atten_converge,
+                 method="pre/post batch") in text
+
+    @staticmethod
+    def _flat(analyzer):
+        """A spectrum cache, as analyze() would have left one."""
+        freqs = np.linspace(1.0, 500.0, 500)
+        flat = np.ones(500)
+        analyzer._gyro_spectrum = (freqs, flat, flat, flat)
+
+    @staticmethod
+    def _details(analyzer, peak):
+        status, details, _ = analyzer._check_notch_filter("", peak)
+        return status, " ".join(details)

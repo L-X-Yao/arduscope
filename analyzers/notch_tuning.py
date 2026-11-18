@@ -78,6 +78,12 @@ class NotchTuningAnalyzer(BaseAnalyzer):
     optional_messages = ["ISBH", "ISBD", "IMU", "VIBE", "ATT", "RATE",
                          "CTUN", "QTUN", "ESC"]
 
+    # Pre- and post-filter spectra, set by _fft_from_batch when
+    # INS_LOG_BAT_OPT mixes the two and the instances separate. Class
+    # defaults so a fresh instance answers None before analyze() runs.
+    _gyro_spectrum_pre: tuple | None = None
+    _gyro_spectrum_post: tuple | None = None
+
     def analyze(self) -> AnalysisResult:
         details: list[str] = []
         figures: list[go.Figure] = []
@@ -103,6 +109,10 @@ class NotchTuningAnalyzer(BaseAnalyzer):
         self._actual_hover_throttle = self._compute_hover_throttle(q_prefix)
         self._armed_intervals = self.reader.get_armed_intervals()
         self._gyro_spectrum: tuple | None = None
+        # Pre- and post-filter spectra, split by the ISBH instance offset
+        # when INS_LOG_BAT_OPT mixes the two. None when not separable.
+        self._gyro_spectrum_pre: tuple | None = None
+        self._gyro_spectrum_post: tuple | None = None
         # Set when a peak calls for a notch and the log cannot set one up.
         self._no_notch_source = False
 
@@ -329,11 +339,23 @@ class NotchTuningAnalyzer(BaseAnalyzer):
             details.append(t("notch_tuning.no_gyro_batch"))
             return None, [], details
 
+        # With INS_LOG_BAT_OPT mixing pre- and post-filter batches, the
+        # post ones carry instance + gyro_count (Write_ISBH), so the two
+        # can be separated — when the instance set actually shows the split.
+        self._gyro_spectrum_pre = None
+        self._gyro_spectrum_post = None
+        split_at = None
+        if (self.reader.has_message("ISBD")
+                and self._mixed_batch_logging()):
+            split_at = self._gyro_instance_split(gyro)
+
         # FFT each batch, grouped by length. Batches can differ in length or
         # rate, and one short batch must not decide the frequency axis:
         # averaging by bin index would mix frequencies, and trimming to the
         # shortest batch would cut the spectrum off below the real peak.
         spectra: dict[int, list] = {}
+        spectra_pre: dict[int, list] = {}
+        spectra_post: dict[int, list] = {}
         for bid, b in sorted(gyro_batches.items()):
             smp_rate = b["smp_rate"]
             # BatchSampler stores multiplier * value, as int16, so widen
@@ -355,20 +377,21 @@ class NotchTuningAnalyzer(BaseAnalyzer):
                 fft_vals = np.fft.rfft(data_c * window)
                 amps.append(2.0 * np.abs(fft_vals[1:]) / np.sum(window))
             spectra.setdefault(N, []).append((smp_rate, amps))
-
-        if not spectra:
-            return None, [], [t("notch_tuning.fft_failed")]
+            if split_at is not None:
+                target = (spectra_pre if b["instance"] < split_at
+                          else spectra_post)
+                target.setdefault(N, []).append((smp_rate, amps))
 
         # Keep the length most batches share, the longer one on a tie. Each
         # batch logs its measured rate, so no two agree exactly: a log of 273
         # batches holds 271 rates, up to 1.3% apart. Same rate means close.
-        n_samples, group = max(
-            spectra.items(), key=lambda kv: (len(kv[1]), kv[0]))
-        smp_rate = float(np.median([rate for rate, _ in group]))
-        same_rate = [amps for rate, amps in group
-                     if abs(rate - smp_rate) <= _BATCH_RATE_TOLERANCE * smp_rate]
-        freqs = np.fft.rfftfreq(n_samples, 1.0 / smp_rate)[1:]  # skip DC
-        avg_x, avg_y, avg_z = np.mean(same_rate, axis=0)
+        grouped = self._group_spectrum(spectra)
+        if grouped is None:
+            return None, [], [t("notch_tuning.fft_failed")]
+        freqs, avg_x, avg_y, avg_z, n_used = grouped
+
+        if split_at is not None:
+            self._cache_pre_post_spectra(spectra_pre, spectra_post)
 
         # Cache spectrum for _measure_notch_attenuation
         self._gyro_spectrum = (freqs, avg_x, avg_y, avg_z)
@@ -394,7 +417,7 @@ class NotchTuningAnalyzer(BaseAnalyzer):
             details.append(
                 t("notch_tuning.fft_peak_batch",
                   freq=f"{peak_freq:.0f}",
-                  n=len(group), bw=bw_desc)
+                  n=n_used, bw=bw_desc)
             )
         else:
             details.append(t("notch_tuning.no_peak"))
@@ -404,8 +427,83 @@ class NotchTuningAnalyzer(BaseAnalyzer):
                                      peak_freq,
                                      t("notch_tuning.sensor_gyro"),
                                      t("notch_tuning.source_batch",
-                                       n=len(group)))
+                                       n=n_used))
         return peak_freq, [fig], details
+
+    def _mixed_batch_logging(self) -> bool:
+        """Whether batch samples alternate pre- and post-filter data.
+
+        AP_InertialSensor.h batch_opt_t: bit0 sensor rate, bit1 post-filter,
+        bit2 pre+post. With bit 2, or with bits 0 and 1 together, the
+        sampler alternates the two and Write_ISBH marks the post batches by
+        an instance offset.
+        """
+        options = int(self.reader.get_param("INS_LOG_BAT_OPT", 0))
+        return bool(options & 4 or (options & 3) == 3)
+
+    @staticmethod
+    def _gyro_instance_split(gyro_batches: dict) -> int | None:
+        """The instance count Write_ISBH adds to post-filter gyro batches,
+        or None when the log does not show the split.
+
+        Write_ISBH logs post-filter batches as instance + _gyro_count and
+        pre-filter ones unchanged, so a mixed log's gyro instances run
+        0..2*gyro_count-1 and gyro_count is read back from that set. The
+        split is accepted only when every instance 0..max appears, max+1
+        is even, and each instance owns at least two batches — the sampler
+        rotates instances per batch, so two full rounds must have passed.
+        Anything else stays unseparated; no guessing.
+        """
+        counts: dict[int, int] = {}
+        for b in gyro_batches.values():
+            counts[b["instance"]] = counts.get(b["instance"], 0) + 1
+        instances = sorted(counts)
+        n = len(instances)
+        if n == 0 or instances != list(range(n)) or n % 2:
+            return None
+        if min(counts[i] for i in instances) < 2:
+            return None
+        return n // 2
+
+    @staticmethod
+    def _group_spectrum(spectra: dict[int, list]) -> tuple | None:
+        """Average a length/rate group of batch spectra into one spectrum.
+
+        Keeps the length most batches share, the longer one on a tie, and
+        averages the batches whose logged rate is within tolerance of the
+        group's median rate. Returns the frequency axis, the three axes'
+        amplitudes, and how many batches made it in.
+        """
+        if not spectra:
+            return None
+        n_samples, group = max(
+            spectra.items(), key=lambda kv: (len(kv[1]), kv[0]))
+        smp_rate = float(np.median([rate for rate, _ in group]))
+        same_rate = [amps for rate, amps in group
+                     if abs(rate - smp_rate) <= _BATCH_RATE_TOLERANCE * smp_rate]
+        freqs = np.fft.rfftfreq(n_samples, 1.0 / smp_rate)[1:]  # skip DC
+        avg_x, avg_y, avg_z = np.mean(same_rate, axis=0)
+        return freqs, avg_x, avg_y, avg_z, len(same_rate)
+
+    def _cache_pre_post_spectra(self, spectra_pre, spectra_post) -> None:
+        """Cache the separated spectra for attenuation.
+
+        The post spectrum is interpolated onto the pre spectrum's frequency
+        axis: the two groups may group by length or rate differently, and
+        the comparison needs one axis.
+        """
+        pre = self._group_spectrum(spectra_pre)
+        post = self._group_spectrum(spectra_post)
+        if pre is None or post is None:
+            return
+        f_pre, ax, ay, az, _ = pre
+        f_post, bx, by, bz, _ = post
+        if len(f_post) != len(f_pre) or not np.allclose(f_post, f_pre):
+            bx = np.interp(f_pre, f_post, bx)
+            by = np.interp(f_pre, f_post, by)
+            bz = np.interp(f_pre, f_post, bz)
+        self._gyro_spectrum_pre = (f_pre, ax, ay, az)
+        self._gyro_spectrum_post = (f_pre, bx, by, bz)
 
     def _fft_from_imu(self):
         """Fallback FFT from regular IMU log data.
@@ -1456,12 +1554,19 @@ class NotchTuningAnalyzer(BaseAnalyzer):
         # Batch samples are pre-filter unless INS_LOG_BAT_OPT says otherwise,
         # and a notch leaves no mark on pre-filter data. Bit 1 logs them
         # post-filter. With bit 2, or with bits 0 and 1 together, the sampler
-        # alternates the two, told apart only by an offset on the instance
-        # (Write_ISBH), which is not read here. IMU rows are always filtered.
+        # alternates the two, and Write_ISBH marks the post ones with
+        # instance + gyro_count. When that split is visible in the log the
+        # two spectra are measured against each other; when it is not, the
+        # log stays unassessed. IMU rows are always filtered.
         if self.reader.has_message("ISBD"):
             options = int(self.reader.get_param("INS_LOG_BAT_OPT", 0))
             if options & 4 or (options & 3) == 3:
-                return {"method": "mixed", "options": options}
+                if (self._gyro_spectrum_pre is None
+                        or self._gyro_spectrum_post is None):
+                    return {"method": "mixed", "options": options}
+                return self._atten_pre_post(
+                    self._gyro_spectrum_pre, self._gyro_spectrum_post,
+                    configured_freq, configured_bw)
             if not options & 2:
                 return {"method": "pre_filter"}
 
@@ -1520,6 +1625,46 @@ class NotchTuningAnalyzer(BaseAnalyzer):
             "method": "gyro FFT (ISBD batch)"
                       if self.reader.has_message("ISBD")
                       else "gyro FFT (IMU fallback)",
+        }
+
+    @staticmethod
+    def _atten_pre_post(pre: tuple, post: tuple, configured_freq: float,
+                        configured_bw: float) -> dict | None:
+        """Attenuation from separated pre- and post-filter spectra.
+
+        The unfiltered group is the reference and the filtered group the
+        measurement, both read in the notch's band: the noise floor the two
+        share cancels in the ratio, where the single-spectrum method has to
+        estimate it from side bands.
+        """
+        freqs = pre[0]
+        nyquist = float(freqs[-1]) if len(freqs) > 0 else 0.0
+        if configured_freq > nyquist:
+            return {
+                "method": "nyquist_exceeded",
+                "nyquist": nyquist,
+                "configured_freq": configured_freq,
+            }
+
+        f_lo = configured_freq - configured_bw / 2.0
+        f_hi = configured_freq + configured_bw / 2.0
+        in_mask = (freqs >= f_lo) & (freqs <= f_hi)
+        pre_band = np.sqrt(pre[1] ** 2 + pre[2] ** 2 + pre[3] ** 2)[in_mask]
+        post_band = np.sqrt(post[1] ** 2 + post[2] ** 2 + post[3] ** 2)[in_mask]
+
+        if len(pre_band) < 3 or len(post_band) < 3:
+            return None
+        pre_level = float(np.max(pre_band))
+        post_level = float(np.max(post_band))
+        if pre_level <= 0 or post_level <= 0:
+            return None
+
+        return {
+            "atten_db": 20.0 * float(np.log10(pre_level / post_level)),
+            "pre_level": pre_level,
+            "post_level": post_level,
+            "in_band_hz": (f_lo, f_hi),
+            "method": "pre/post batch",
         }
 
     @staticmethod

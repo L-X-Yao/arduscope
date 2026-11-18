@@ -7,6 +7,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Added
+- Notch attenuation is now measured on logs whose batches hold both pre- and
+  post-filter samples (`INS_LOG_BAT_OPT` 3 to 7). `Write_ISBH` marks
+  post-filter batches with instance + gyro count; when the log's gyro
+  instances show that split (complete 0..max coverage, even span, two
+  batches per instance through the sampler's rotation), the pre spectrum is
+  the reference and the post spectrum the measurement, reported as method
+  "pre/post batch" under the existing attenuation thresholds. Logs whose
+  instances do not show the split stay unassessed ("mixed"), as before;
+  pre-only, post-only and IMU-fallback paths are unchanged.
+
 ## [0.12.7] - 2026-11-18
 
 ### Fixed

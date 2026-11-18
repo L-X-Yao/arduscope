@@ -150,12 +150,17 @@ them readable.
 
 ## Notch advice
 
-- **How much a notch removes is not measured.** That takes the spectrum from
-  before the filter beside the one after it. Batches that hold both
-  (`INS_LOG_BAT_OPT` 3 to 7) are told apart by an offset on the instance, which
-  is not read: they are averaged into one spectrum. The report says so only
-  beside an enabled notch that stays put, not where it looks for a peak.
-  Compare a log from before the notch with one after.
+- **How much a notch removes is measured only when the log separates the
+  spectra.** That takes the spectrum from before the filter beside the one
+  after it. Batches that hold both (`INS_LOG_BAT_OPT` 3 to 7) are told apart
+  by an offset on the instance (`Write_ISBH` logs post-filter batches as
+  instance + gyro count), and the offset is now read: when every gyro
+  instance appears twice through the sampler's rotation, the two spectra are
+  measured against each other and the report names the method "pre/post
+  batch". When the split is not visible — few batches, a gap in the
+  instances — they stay averaged into one spectrum and attenuation is not
+  assessed. Where the notch follows its peak, attenuation says nothing either
+  way: compare a log from before the notch with one after.
 - **A throttle-tracking set is a hover set.** `INS_HNTCH_FREQ` is the peak and
   `INS_HNTCH_REF` the hover throttle, and the notch does not go below FREQ.
   Through climbs and descents in SITL it did no better than a notch that stays

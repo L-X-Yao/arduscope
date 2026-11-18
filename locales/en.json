@@ -1181,7 +1181,7 @@
   "notch_tuning.att_tracking_err": "Attitude tracking error elevated (Roll={roll_err}°, Pitch={pitch_err}°), suggest PID optimization",
   "notch_tuning.atten_acceptable": "Notch attenuation acceptable: {db} dB (>{warn} dB, target {converge} dB, method: {method})",
   "notch_tuning.atten_good": "Notch attenuation good: {db} dB (>={converge} dB, method: {method})",
-  "notch_tuning.atten_mixed": "Batch samples alternate between pre-filter and post-filter data (INS_LOG_BAT_OPT={opt}). This tool does not separate them, so attenuation is not assessed.",
+  "notch_tuning.atten_mixed": "Batch samples alternate between pre-filter and post-filter data (INS_LOG_BAT_OPT={opt}), and their instances do not show the post-filter offset, so the two could not be separated and attenuation is not assessed.",
   "notch_tuning.atten_no_peak": "No vibration peak near {freq} Hz, so {db} dB of attenuation says nothing about the notch. Not assessed this time.",
   "notch_tuning.atten_pre_filter": "Batch samples are pre-filter (INS_LOG_BAT_OPT has post-filter sampling off), so the notch leaves no mark and attenuation is not assessed. Set INS_LOG_BAT_OPT=2 and fly again to see the spectrum after the filter.",
   "notch_tuning.atten_residual": "A peak at {peak} Hz remains inside the notch band, {lo} to {hi} Hz. A notch leaves a smaller peak there, not a dip, so one filtered spectrum cannot show how much it removed. Compare with a log from before the notch to measure it.",
