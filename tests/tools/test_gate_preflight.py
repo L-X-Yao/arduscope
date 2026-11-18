@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from types import SimpleNamespace
 
 from tests._repo import TOOLS_DIR
 
@@ -32,9 +33,10 @@ def repo(tmp_path, monkeypatch):
     corpus = tmp_path / "logs"
     corpus.mkdir()
     (corpus / "flight.BIN").write_bytes(b"")
-    monkeypatch.setattr(gp, "tree_dirty", lambda root: False)
+    monkeypatch.setattr(gp, "_tree_state", lambda root: (False, "clean"))
     monkeypatch.setattr(gp, "disk_free_bytes", lambda root: 100 * GB)
     monkeypatch.setattr(gp, "available_memory_bytes", lambda: 16 * GB)
+    monkeypatch.delenv("ARDUSCOPE_LOG_CACHE", raising=False)
     return tmp_path
 
 
@@ -48,20 +50,22 @@ def _sitl_binaries(tmp_path) -> str:
     return str(bin_dir)
 
 
-def _run(repo, steps=("ci_local",), corpora=None, sitl_dir=None):
+def _run(repo, steps=("ci_local",), corpora=None, sitl_dir=None,
+         from_config=False):
     return gp.run_checks(
         sitl_dir=sitl_dir if sitl_dir is not None else str(repo / "ardupilot"),
         steps=list(steps),
         corpora={"field": str(repo / "logs")}
         if corpora is None else corpora,
-        repo_root=str(repo))
+        repo_root=str(repo),
+        corpora_from_config=from_config)
 
 
 class TestChecks:
 
     def test_all_present_passes(self, repo, capsys):
         _sitl_binaries(repo)
-        assert _run(repo, steps=gp.STEPS) == []
+        assert _run(repo, steps=gp.STEPS, from_config=True) == []
         out = capsys.readouterr().out
         assert out.count("PASS ") == 6  # tree, local_paths, sitl, corpus,
         # disk, memory
@@ -90,9 +94,38 @@ class TestChecks:
         out = capsys.readouterr().out
         assert "FAIL" not in out and "sitl:" not in out
 
+
+class TestLocalPaths:
+    """local_paths.json is only needed when a step reads it: snapshots, or
+    a corpus taken from the file rather than a --corpus override."""
+
+    def test_a_snapshots_run_needs_it(self, repo):
+        os.remove(repo / "local_paths.json")
+        assert "local_paths" in _run(repo, steps=("snapshots",))
+
+    def test_a_corpus_run_from_the_config_needs_it(self, repo):
+        os.remove(repo / "local_paths.json")
+        failures = _run(repo, steps=("corpus",), from_config=True)
+        assert failures == ["local_paths"]
+
+    def test_a_corpus_run_with_an_override_skips_it(self, repo):
+        os.remove(repo / "local_paths.json")
+        assert _run(repo, steps=("corpus",)) == []
+
+    def test_a_sitl_run_skips_it(self, repo):
+        _sitl_binaries(repo)
+        os.remove(repo / "local_paths.json")
+        assert _run(repo, steps=("sitl",)) == []
+
+    def test_a_config_corpus_with_the_file_present_passes(self, repo):
+        assert _run(repo, steps=("corpus",), from_config=True) == []
+
     def test_a_missing_local_paths_file_fails(self, repo):
         os.remove(repo / "local_paths.json")
-        assert "local_paths" in _run(repo)
+        assert "local_paths" in _run(repo, steps=("snapshots",))
+
+
+class TestCorpora:
 
     def test_a_missing_corpus_directory_fails(self, repo):
         failures = _run(repo, steps=("corpus",),
@@ -121,9 +154,35 @@ class TestChecks:
         failures = _run(repo, steps=("corpus",), corpora={})
         assert "corpus" in failures
 
-    def test_a_dirty_tree_fails(self, repo, monkeypatch):
-        monkeypatch.setattr(gp, "tree_dirty", lambda root: True)
-        assert "tree" in _run(repo)
+
+class TestFailClosed:
+    """A check that cannot run is a FAIL, never a pass or a traceback."""
+
+    def test_a_directory_that_is_not_a_repository_fails(self, tmp_path,
+                                                        monkeypatch, capsys):
+        monkeypatch.setattr(gp, "disk_free_bytes", lambda root: 100 * GB)
+        monkeypatch.setattr(gp, "available_memory_bytes", lambda: 16 * GB)
+        failures = gp.run_checks(sitl_dir=str(tmp_path / "a"),
+                                 steps=["ci_local"], corpora={},
+                                 repo_root=str(tmp_path))
+        assert "tree" in failures
+        assert "git" in capsys.readouterr().out
+
+    def test_a_missing_git_fails(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(gp, "disk_free_bytes", lambda root: 100 * GB)
+        monkeypatch.setattr(gp, "available_memory_bytes", lambda: 16 * GB)
+
+        def no_git(command, **kwargs):
+            raise OSError("git: not found")
+
+        monkeypatch.setattr(gp.subprocess, "run", no_git)
+        failures = gp.run_checks(sitl_dir=str(tmp_path / "a"),
+                                 steps=["ci_local"], corpora={},
+                                 repo_root=str(tmp_path))
+        assert "tree" in failures
+
+    def test_tree_dirty_returns_none_outside_a_repository(self, tmp_path):
+        assert gp.tree_dirty(str(tmp_path)) is None
 
     def test_low_disk_fails(self, repo, monkeypatch):
         monkeypatch.setattr(gp, "disk_free_bytes", lambda root: 5 * GB)
@@ -139,6 +198,30 @@ class TestChecks:
         monkeypatch.setattr(gp, "available_memory_bytes", lambda: None)
         assert "memory" in _run(repo)
         assert "MemAvailable" in capsys.readouterr().out
+
+
+class TestDisk:
+    def _fake_disk(self, monkeypatch, repo, sizes):
+        monkeypatch.setattr(gp.shutil, "disk_usage",
+                            lambda path: SimpleNamespace(
+                                free=sizes.get(os.path.abspath(str(path)),
+                                               100 * GB)))
+        monkeypatch.setattr(gp, "_tree_state", lambda root: (False, "clean"))
+        monkeypatch.setattr(gp, "available_memory_bytes", lambda: 16 * GB)
+        return repo
+
+    def test_the_cache_disk_counts_when_it_is_elsewhere(self, tmp_path,
+                                                        monkeypatch):
+        repo = self._fake_disk(monkeypatch, tmp_path,
+                               {str(tmp_path): 100 * GB,
+                                str(tmp_path / "data"): 5 * GB})
+        (repo / "data").mkdir()  # the cache's nearest existing ancestor
+        monkeypatch.setenv("ARDUSCOPE_LOG_CACHE",
+                           str(repo / "data" / "cache" / "not" / "there"))
+        assert "disk" in _run(repo)
+
+    def test_without_the_variable_only_the_root_counts(self, repo):
+        assert _run(repo) == []
 
 
 class TestTheTreeCheck:
@@ -175,6 +258,14 @@ class TestCommandLine:
         monkeypatch.setattr(gp.local_paths, "corpora",
                             lambda: {"field": str(empty)})
         assert gp.main(["--steps", "corpus"]) == 1
+
+    def test_a_corpus_override_passes_without_local_paths(self, repo,
+                                                          monkeypatch):
+        os.remove(repo / "local_paths.json")
+        monkeypatch.setattr(gp, "REPO_ROOT", str(repo))
+        monkeypatch.setattr(gp.local_paths, "corpora", lambda: {})
+        assert gp.main(["--steps", "corpus",
+                        "--corpus", f"field={repo / 'logs'}"]) == 0
 
     def test_an_unknown_step_is_refused(self):
         with pytest.raises(SystemExit):

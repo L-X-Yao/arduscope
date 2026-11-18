@@ -282,7 +282,8 @@ RUNNERS = {"ci_local": step_ci_local, "snapshots": step_snapshots,
 
 def run_gate(args) -> int:
     if gate_preflight.run_checks(sitl_dir=args.sitl_dir, steps=args.steps,
-                                 corpora=args.corpora, repo_root=REPO_ROOT):
+                                 corpora=args.corpora, repo_root=REPO_ROOT,
+                                 corpora_from_config=not args.corpus):
         return 1
     if tree_is_dirty():
         print("Working tree is dirty. A result has to name a commit.")

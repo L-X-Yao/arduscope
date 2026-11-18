@@ -109,10 +109,14 @@ class TestReleasePy:
     def test_an_empty_section_is_refused_before_anything_is_written(
             self, tmp_path, monkeypatch):
         """The version file used to be written first: the refusal then left
-        lib/__init__.py dirty, with no release to show for it."""
+        lib/__init__.py dirty, with no release to show for it. dist/ counts
+        as written too -- a release wipes it."""
         (tmp_path / "CHANGELOG.md").write_text(
             "# Changelog\n\n## [Unreleased]\n\n## [0.4.0] - 2026-07-15\n",
             encoding="utf-8")
+        dist = tmp_path / "dist"
+        dist.mkdir()
+        (dist / "sentinel").write_text("keep", encoding="utf-8")
         mod = _load_release()
         calls = []
         monkeypatch.setattr(sys, "argv", ["release.py", "patch"])
@@ -121,11 +125,28 @@ class TestReleasePy:
         monkeypatch.setattr(mod.release_gate, "head_commit", lambda: "abc")
         monkeypatch.setattr(mod.release_gate, "passed", lambda commit: True)
         monkeypatch.setattr(mod, "_current_version", lambda: "0.9.3")
+        monkeypatch.setattr(mod, "_clean_dist", lambda: calls.append("dist"))
         monkeypatch.setattr(mod, "_update_version_file", calls.append)
         monkeypatch.setattr(mod, "_update_changelog", calls.append)
         with pytest.raises(SystemExit, match="empty"):
             mod.main()
         assert not calls
+        assert (dist / "sentinel").exists()
+
+    def test_dry_run_with_empty_notes_still_only_previews(
+            self, tmp_path, monkeypatch, capsys):
+        changelog = tmp_path / "CHANGELOG.md"
+        content = "# Changelog\n\n## [Unreleased]\n\n## [0.4.0] - 2026-07-15\n"
+        changelog.write_text(content, encoding="utf-8")
+        mod = _load_release()
+        monkeypatch.setattr(sys, "argv",
+                            ["release.py", "patch", "--dry-run"])
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(mod, "_current_version", lambda: "0.9.3")
+        assert mod.main() is None
+        assert "[dry-run]" in capsys.readouterr().out
+        assert changelog.read_text(encoding="utf-8") == content
+        assert not (tmp_path / "dist").exists()
 
     def test_no_passing_gate_stops_the_release(self, monkeypatch):
         """Before the version moves or anything is committed."""

@@ -7,13 +7,16 @@ binary or an emptied corpus surfaces twenty minutes in, after the machine is
 committed. tools/release_gate.py runs this at the top of run_gate(); it also
 runs standalone:
 
-    python3 tools/gate_preflight.py [--sitl-dir DIR] [--steps a,b]
+    python3 tools/gate_preflight.py [--sitl-dir DIR] [--steps a,b] \\
+        [--corpus NAME=PATH]
 
 Every check prints one PASS or FAIL line and the exit code is 0 only when
 all of them pass. There is no --skip flag, on purpose: the gate has none
 either, and an escape hatch here would be used exactly once it should not
-be. A partial run checks only what its steps need -- a missing SITL binary
-never blocks a corpus scan.
+be. A partial run checks only what its steps need: a missing SITL binary
+never blocks a corpus scan, and local_paths.json is required only when a
+step reads it -- snapshots, or a corpus named in the file rather than given
+with --corpus.
 """
 
 from __future__ import annotations
@@ -35,14 +38,15 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STEPS = ("ci_local", "snapshots", "sitl", "corpus")
 DEFAULT_SITL_DIR = "../ardupilot"
 
-# The parse cache alone is ~56 GB and a corpus scan writes more of it plus
-# its reports; a disk that fills mid-corpus leaves a baseline nobody can
-# trust. Checked at the repository root, where that cache lives.
+# A corpus scan writes its parse cache (ARDUSCOPE_LOG_CACHE, by default
+# .log_cache/ at the repository root) plus its reports; the cache alone is
+# ~56 GB. When the variable points at another disk, that is the disk that
+# fills mid-scan, so the smaller free space of the two governs.
 MIN_FREE_DISK_GB = 10.0
 # The 2026-11 gate runs peaked at 7.43 GB under the operator's 12 GB cap
-# (measured then, not recorded in the repository). Less than 8 GB available
-# and the OOM killer lands mid-corpus, which reads as a gate failure rather
-# than a full machine.
+# (measured then, not recorded in the repository). With much less than
+# 8 GB available the OOM killer can land mid-corpus, which would read as a
+# gate failure rather than a full machine.
 MIN_AVAILABLE_MEM_GB = 8.0
 
 # The binaries _launch() in tests/sitl/generate_logs.py flies, under
@@ -52,14 +56,41 @@ SITL_BINARIES = ("arducopter", "arduplane")
 CORPUS_PATTERNS = ("*.bin", "*.BIN")
 
 
-def tree_dirty(repo_root: str) -> bool:
-    out = subprocess.run(["git", "status", "--porcelain"],
-                         cwd=repo_root, capture_output=True, text=True)
-    return bool(out.stdout.strip())
+def tree_dirty(repo_root: str) -> bool | None:
+    """Whether git reports changes; None when git cannot answer."""
+    return _tree_state(repo_root)[0]
+
+
+def _tree_state(repo_root: str) -> tuple[bool | None, str]:
+    """(dirty, detail); dirty is None when git could not be asked."""
+    try:
+        out = subprocess.run(["git", "status", "--porcelain"],
+                             cwd=repo_root, capture_output=True, text=True)
+    except OSError as e:
+        return None, str(e)
+    if out.returncode != 0:
+        return None, (out.stderr.strip() or f"git exited {out.returncode}")
+    dirty = bool(out.stdout.strip())
+    return dirty, ("clean" if not dirty
+                   else "uncommitted changes; a result names a commit")
 
 
 def disk_free_bytes(repo_root: str) -> int:
-    return shutil.disk_usage(repo_root).free
+    """Free bytes where the scan writes: the repo root, and the cache disk
+    when ARDUSCOPE_LOG_CACHE moves the cache off it."""
+    free = shutil.disk_usage(repo_root).free
+    cache = os.environ.get("ARDUSCOPE_LOG_CACHE")
+    if cache:
+        probe = os.path.abspath(cache)
+        while not os.path.exists(probe):
+            parent = os.path.dirname(probe)
+            if parent == probe:
+                probe = ""
+                break
+            probe = parent
+        if probe:
+            free = min(free, shutil.disk_usage(probe).free)
+    return free
 
 
 def available_memory_bytes() -> int | None:
@@ -89,8 +120,14 @@ def _corpus_has_log(root: str) -> bool:
 
 
 def run_checks(sitl_dir: str, steps: list[str], corpora: dict[str, str],
-               repo_root: str | None = None) -> list[str]:
-    """Print one PASS/FAIL line per check; return the FAIL lines."""
+               repo_root: str | None = None,
+               corpora_from_config: bool = True) -> list[str]:
+    """Print one PASS/FAIL line per check; return the failed check names.
+
+    corpora_from_config says whether `corpora` came from local_paths.json
+    (the gate without --corpus) or from a --corpus override: only in the
+    first case does the corpus step need the file to exist.
+    """
     repo_root = repo_root or REPO_ROOT
     failures: list[str] = []
 
@@ -99,17 +136,22 @@ def run_checks(sitl_dir: str, steps: list[str], corpora: dict[str, str],
         if not ok:
             failures.append(name)
 
-    if tree_dirty(repo_root):
-        report(False, "tree", "uncommitted changes; a result names a commit")
+    dirty, detail = _tree_state(repo_root)
+    if dirty is None:
+        report(False, "tree", f"git could not check: {detail}")
     else:
-        report(True, "tree", "clean")
+        report(not dirty, "tree", detail)
 
-    paths_file = os.path.join(repo_root, "local_paths.json")
-    if os.path.isfile(paths_file):
-        report(True, "local_paths", paths_file)
-    else:
-        report(False, "local_paths",
-               f"{paths_file} is missing; the gate takes its corpora from it")
+    needs_paths = "snapshots" in steps or ("corpus" in steps
+                                           and corpora_from_config)
+    if needs_paths:
+        paths_file = os.path.join(repo_root, "local_paths.json")
+        if os.path.isfile(paths_file):
+            report(True, "local_paths", paths_file)
+        else:
+            report(False, "local_paths",
+                   f"{paths_file} is missing; snapshots and file-named "
+                   f"corpora take their logs from it")
 
     if "sitl" in steps:
         bin_dir = sitl_bin_dir(sitl_dir, repo_root)
@@ -156,20 +198,33 @@ def run_checks(sitl_dir: str, steps: list[str], corpora: dict[str, str],
     return failures
 
 
+def _corpus_arg(value: str) -> tuple[str, str]:
+    # Same shape as tools/release_gate.py's --corpus.
+    name, _, path = value.partition("=")
+    if not name or not path:
+        raise argparse.ArgumentTypeError("expected NAME=PATH")
+    return name, path
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Check what the release gate needs, before it runs")
     parser.add_argument("--sitl-dir", default=DEFAULT_SITL_DIR)
     parser.add_argument("--steps", default=",".join(STEPS),
                         help=f"comma list, default {','.join(STEPS)}")
+    parser.add_argument("--corpus", action="append", type=_corpus_arg,
+                        metavar="NAME=PATH",
+                        help="replaces the corpora in local_paths.json")
     args = parser.parse_args(argv)
 
     steps = [s for s in args.steps.split(",") if s]
     unknown = sorted(set(steps) - set(STEPS))
     if unknown:
         parser.error(f"unknown steps: {', '.join(unknown)}")
+    corpora = dict(args.corpus) if args.corpus else local_paths.corpora()
     failures = run_checks(sitl_dir=args.sitl_dir, steps=steps,
-                          corpora=local_paths.corpora())
+                          corpora=corpora,
+                          corpora_from_config=not args.corpus)
     return 1 if failures else 0
 
 

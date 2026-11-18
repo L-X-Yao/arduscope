@@ -58,13 +58,14 @@ own code changes follow the same rule and always carry tests.
 
 ## Before the gate
 
-`tools/gate_preflight.py` checks, in seconds: a clean working tree;
-`local_paths.json`; the SITL binaries (`arducopter` and `arduplane`) and the
-corpus folders the requested steps need; 10 GB of free disk and 8 GB of
-available memory. `tools/release_gate.py` runs it at the top of `run_gate()`,
-so a full run and a `--steps corpus` partial each check only what they use;
-it also runs standalone. The pinned virtual environment stays a manual check.
-A missing item fails here, not twenty minutes into the gate.
+`tools/gate_preflight.py` checks, in seconds: a clean working tree; the SITL
+binaries (`arducopter` and `arduplane`) and the corpus folders the requested
+steps need; `local_paths.json` when a step reads it (snapshots, or corpora
+taken from the file rather than a `--corpus` override); 10 GB of free disk
+and 8 GB of available memory. `tools/release_gate.py` runs it at the top of
+`run_gate()`, so a full run and a `--steps corpus` partial each check only
+what they use; it also runs standalone. The pinned virtual environment stays
+a manual check. A missing item fails here, not twenty minutes into the gate.
 
 ## Hard rules
 

@@ -169,7 +169,26 @@ class TestRunGate:
         # The fields run_gate reads besides steps; the preflight itself is
         # stubbed in _fake below.
         return SimpleNamespace(steps=list(steps), sitl_dir="../ardupilot",
-                               corpora={})
+                               corpora={}, corpus=None)
+
+    def test_a_failing_preflight_blocks_the_gate(self, dirs, monkeypatch):
+        """Nothing runs, nothing is written, and the args go through whole."""
+        seen = {}
+        called = []
+        monkeypatch.setattr(gate_preflight, "run_checks",
+                            lambda **kw: (seen.update(kw), ["tree"])[1])
+        monkeypatch.setattr(gate, "head_commit",
+                            lambda: called.append("head"))
+        monkeypatch.setattr(gate, "RUNNERS",
+                            {name: (lambda args, log_dir: called.append(name))
+                             for name in gate.STEPS})
+        args = self._args()
+        assert gate.run_gate(args) == 1
+        assert seen["steps"] == list(args.steps)
+        assert seen["sitl_dir"] == "../ardupilot" and seen["corpora"] == {}
+        assert seen["corpora_from_config"] is True
+        assert not called
+        assert not list(Path(gate.GATE_DIR).iterdir())  # nothing was written
 
     def _fake(self, monkeypatch, status="pass", dirty=(False, False)):
         states = iter(dirty)
@@ -220,6 +239,22 @@ class TestCommandLine:
         monkeypatch.setattr(gate, "head_commit", lambda: "abc")
         assert gate.main(["--check"]) == 1
         assert "no result" in capsys.readouterr().out
+
+    def test_check_does_not_preflight(self, dirs, monkeypatch):
+        calls = []
+        monkeypatch.setattr(gate_preflight, "run_checks",
+                            lambda **kw: calls.append(kw))
+        monkeypatch.setattr(gate, "head_commit", lambda: "abc")
+        assert gate.main(["--check"]) == 1
+        assert not calls
+
+    def test_accept_does_not_preflight(self, dirs, monkeypatch):
+        calls = []
+        monkeypatch.setattr(gate_preflight, "run_checks",
+                            lambda **kw: calls.append(kw))
+        monkeypatch.setattr(gate, "head_commit", lambda: "abc")
+        assert gate.main(["--accept", "reason"]) == 1
+        assert not calls
 
     def test_check_passes_on_a_pass(self, dirs, monkeypatch):
         monkeypatch.setattr(gate, "head_commit", lambda: "abc")
