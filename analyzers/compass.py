@@ -534,15 +534,19 @@ class CompassAnalyzer(BaseAnalyzer):
 
         AP_BattMonitor::current_amps defaults to instance zero and requires
         has_current (AP_BattMonitor.cpp:839-845). Do not substitute another
-        pack or a sum monitor. CompassMot skips current updates below 3 A,
-        so a lower maximum falls back to throttle as well.
+        pack or a sum monitor. If the instance column is absent, pack identity
+        is unknown, so return None rather than merging potentially mixed rows.
+        CompassMot skips current updates below 3 A, so a lower maximum falls
+        back to throttle as well.
         """
         if not self.reader.has_message("BAT"):
             return None
         bat = self.reader.get_messages_as_arrays("BAT", ["Inst", "Curr"])
         inst = bat["Inst"]
         known = np.isfinite(inst)
-        mask = inst == 0 if np.any(known) else np.ones(len(inst), dtype=bool)
+        if not np.any(known):
+            return None
+        mask = inst == 0
         ts = bat["_timestamp"][mask]
         curr = bat["Curr"][mask]
         valid = np.isfinite(ts) & np.isfinite(curr)

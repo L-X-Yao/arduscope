@@ -123,7 +123,14 @@ them readable.
   rotation-matrix terms; the throttle coefficient is the full-throttle impact
   vector, following `ArduCopter/compassmot.cpp`. With usable primary BAT current
   (at least 3 A), current replaces throttle and the result is scaled by
-  `current_max/throttle_max`, as CompassMot does. The worst compass instance is
+  `current_max/throttle_max`, as CompassMot does. Firmware takes throttle from
+  the RC stick (`compassmot.cpp:160-165`), while this offline driver is
+  normalized motor PWM. On a throttle-limited aircraft whose PWM ceiling is
+  below stick-full, the current/PWM extrapolation is higher than the value at
+  stick-full, biasing the result strict. Firmware also updates compensation only
+  from samples at or above 3 A (`compassmot.cpp:197-203`), while the offline fit
+  uses all valid current rows; the estimator differs but has more samples with
+  which to stabilize its slope. The worst compass instance is
   reported and the higher of scalar/vector drives severity, so this change can
   only raise a verdict. The existing SITL scenario with
   `SIM_MAG_MOT_X/Y/Z=7.0` read 14.6% by the scalar method and 126.1% by the

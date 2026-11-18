@@ -259,6 +259,10 @@ class TestCompassVectorInterference:
         assert res.status == "critical"
         assert res.evidence[0]["value"] == pytest.approx(expected, rel=1e-6)
 
+    def test_vector_crosses_threshold_when_scalar_does_not(self):
+        result = _vector_result(_vector_log((np.array([100.0, 100.0, 100.0]),)))
+        assert result.scalar_pct < 30.0 < result.vector_pct
+
     def test_pure_attitude_rotation_has_no_vector_impact(self):
         reader = _vector_log()
         result = _vector_result(reader)
@@ -285,6 +289,14 @@ class TestCompassVectorInterference:
         expected = 7.0 * np.sqrt(3.0) * 40.0 / 530.0 * 100.0
         assert result.vector_driver == "BAT.Curr"
         assert result.vector_pct == pytest.approx(expected, rel=1e-6)
+
+    def test_missing_bat_instance_falls_back_to_rcou(self):
+        reader = _vector_log((np.array([7.0, 7.0, 7.0]),), current=True)
+        del reader._messages["BAT"]["Inst"]
+        analyzer = CompassAnalyzer(reader, Thresholds(),
+                                   _info(4, False, "ArduCopter"))
+        assert analyzer._primary_current() is None
+        assert _vector_result(reader).vector_driver == "RCOU"
 
 
 def test_pure_plane_aileron_dither_does_not_suggest_spin_min():
