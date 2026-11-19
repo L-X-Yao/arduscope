@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Changed
+- The critical counts quoted in the READMEs and the known limitations come
+  from the v0.12.9 gate baseline: 389 of 560 readable logs carry one,
+  `attitude` on 189, `battery` on 109, `vibration` on 93, `power` on 77 and
+  `failsafe` on 65. The old figures predated v0.12.7 and v0.12.9, which
+  changed the attitude and notch grading.
+
 ## [0.12.9] - 2026-11-19
 
 ### Fixed
