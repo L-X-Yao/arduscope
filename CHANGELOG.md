@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.12.9] - 2026-11-19
 
 ### Fixed
 - A mission whose arrival radius is zero or negative keeps its route map on
