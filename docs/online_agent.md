@@ -131,8 +131,9 @@ fault is not named. Results go to `reports/agent-eval/`.
   through their Anthropic-compatible endpoints. DeepSeek named every injected
   fault and left no number unverified; Kimi missed one fault and left five
   observations unverified; GLM left no number unverified, but one run of 24
-  passed ten minutes. Anthropic's and OpenAI's own services need a run with
-  their own key.
+  passed ten minutes. A 2026-11-18 re-run gave GLM 22/24 with two unverified
+  numbers and Kimi 23/24 with one fault-term miss. Anthropic's and OpenAI's own
+  services need a run with their own key.
 - Log text can contain instructions. The system prompt treats it as data, and
   STATUSTEXT is not sent unless opted in, but prompt injection is not fully
   preventable.

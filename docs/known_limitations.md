@@ -256,8 +256,10 @@ them readable, on the v0.12.9 gate baseline.
   result that does not carry their number, and one run named the injected
   gyro noise as IMU divergence rather than motor noise. GLM-5.3 passed 23 of
   24 runs at a 600-second budget with no unverified number; one run passed ten
-  minutes and was stopped. At the 300-second default GLM times out on the
-  heavier scenarios. Anthropic's and OpenAI's own services are uncalled, and
+  minutes and was stopped. A 2026-11-18 re-run with the same scenarios gave
+  GLM-5.3 22 of 24 with two unverified numbers and Kimi 23 of 24 with one run
+  that did not name the injected fault. At the 300-second default GLM times out
+  on the heavier scenarios. Anthropic's and OpenAI's own services are uncalled, and
   other compatible services need a run with their own key. The tool loop's
   fallbacks also run in the test suite against a fake provider.
 - **A citation check cannot judge meaning.** The agent marks an observation

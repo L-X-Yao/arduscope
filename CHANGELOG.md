@@ -10,6 +10,9 @@ releases are not published.
 ## [Unreleased]
 
 ### Changed
+- `docs/online_agent.md` and the known limitations record the 2026-11-18
+  vendor re-run: GLM-5.3 22 of 24 with two unverified numbers, Kimi 23 of 24
+  with one fault-term miss.
 - The critical counts quoted in the READMEs and the known limitations come
   from the v0.12.9 gate baseline: 389 of 560 readable logs carry one,
   `attitude` on 189, `battery` on 109, `vibration` on 93, `power` on 77 and
