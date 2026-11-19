@@ -11,8 +11,10 @@ releases are not published.
 
 ### Changed
 - `docs/online_agent.md` and the known limitations record the 2026-11-18
-  vendor re-run: GLM-5.3 22 of 24 with two unverified numbers, Kimi 23 of 24
-  with one fault-term miss.
+  vendor re-run: GLM-5.3 22 of 24 with two unverified observations (both
+  citation errors); Kimi 23 of 24, whose one miss diagnosed the injected motor
+  noise as an inter-IMU consistency fault. The offline analyzer inputs changed
+  between the two runs, so the scores are not a same-condition comparison.
 - The critical counts quoted in the READMEs and the known limitations come
   from the v0.12.9 gate baseline: 389 of 560 readable logs carry one,
   `attitude` on 189, `battery` on 109, `vibration` on 93, `power` on 77 and

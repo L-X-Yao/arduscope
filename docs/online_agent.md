@@ -132,8 +132,13 @@ fault is not named. Results go to `reports/agent-eval/`.
   fault and left no number unverified; Kimi missed one fault and left five
   observations unverified; GLM left no number unverified, but one run of 24
   passed ten minutes. A 2026-11-18 re-run gave GLM 22/24 with two unverified
-  numbers and Kimi 23/24 with one fault-term miss. Anthropic's and OpenAI's own
-  services need a run with their own key.
+  observations (both citation errors) and Kimi 23/24, whose one miss diagnosed
+  the injected motor noise as an inter-IMU consistency fault rather than motor
+  noise. The offline analyzer results changed between the two runs (four
+  scenarios differ; `copter_motor_noise_climbs` went from one critical to
+  eight warning/critical entries), so the scores are not a same-condition
+  comparison. Anthropic's and OpenAI's own services need a run with their own
+  key.
 - Log text can contain instructions. The system prompt treats it as data, and
   STATUSTEXT is not sent unless opted in, but prompt injection is not fully
   preventable.
