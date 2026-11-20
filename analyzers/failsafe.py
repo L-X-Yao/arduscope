@@ -3,7 +3,7 @@ Failsafe Analyzer: safety margin assessment.
 
 Evaluates how close each monitored metric came to its failsafe threshold,
 using shaded margin areas (green -> yellow -> red gradient). Detects
-triggered failsafes from ERR messages.
+triggered failsafes from ERR and STATUSTEXT messages.
 
 Required: (uses pre-scan errors/events from reader)
 Optional: BAT, GPS, XKF4, NKF4
@@ -12,6 +12,8 @@ Title: 安全裕度
 """
 
 from __future__ import annotations
+
+import re
 
 import numpy as np
 import plotly.graph_objects as go
@@ -47,6 +49,234 @@ _FS_SUBSYS_KEYS = {
     31: "failsafe.subsys_deadreckon",
 }
 
+# STATUSTEXT names ArduPilot uses for its failsafes, mapped to the same
+# i18n keys as the ERR subsystems. Sources: ArduCopter/events.cpp and
+# ekf_check.cpp, ArduPlane/events.cpp and radio.cpp,
+# ArduSub/failsafe.cpp, Rover/failsafe.cpp.
+_TEXT_FAILSAFE_KEYS = {
+    "radio": "failsafe.subsys_radio",
+    "rc": "failsafe.subsys_radio",
+    "rc short": "failsafe.subsys_radio",
+    "rc long": "failsafe.subsys_radio",
+    "short": "failsafe.subsys_radio",
+    "throttle": "failsafe.subsys_radio",
+    "gcs": "failsafe.subsys_gcs",
+    "battery": "failsafe.subsys_battery",
+    "ekf": "failsafe.subsys_ekf",
+    "fence": "failsafe.subsys_fence",
+    "terrain": "failsafe.subsys_terrain",
+    "ads-b": "failsafe.subsys_adsb",
+    "adsb": "failsafe.subsys_adsb",
+    "leak": "failsafe.subsys_leak",
+    "vibe": "failsafe.subsys_vibe",
+    "vibration": "failsafe.subsys_vibe",
+    "deadreckon": "failsafe.subsys_deadreckon",
+    "dead reckoning": "failsafe.subsys_deadreckon",
+    "sensors": "failsafe.subsys_sensors",
+    "gps": "failsafe.subsys_gps",
+    "radio + battery": "failsafe.subsys_radio_battery",
+    "gcs + battery": "failsafe.subsys_gcs_battery",
+}
+# Text events may stand for more than one ERR subsystem (ArduCopter's
+# combined "Radio + Battery" and "GCS + Battery" announcements).
+_TEXT_DEDUPE_SUBSYS = {key: (subsys,)
+                       for subsys, key in _FS_SUBSYS_KEYS.items()}
+_TEXT_DEDUPE_SUBSYS["failsafe.subsys_radio_battery"] = (5, 6)
+_TEXT_DEDUPE_SUBSYS["failsafe.subsys_gcs_battery"] = (8, 6)
+
+# Text-only criticals in these subsystems point at the link, not at the
+# battery/GPS/EKF margin text the generic action names.
+_LINK_TEXT_KEYS = {
+    "failsafe.subsys_radio",
+    "failsafe.subsys_gcs",
+    "failsafe.subsys_radio_battery",
+    "failsafe.subsys_gcs_battery",
+}
+# ArduCopter announces a combined "Radio + Battery" or "GCS + Battery"
+# failsafe, but clears it with the plain "Radio Failsafe Cleared" or
+# "GCS Failsafe Cleared" message (ArduCopter/events.cpp). Pair the
+# combined event under the link subsystem's clear.
+_TEXT_STACK_KEYS = {
+    "failsafe.subsys_radio_battery": "failsafe.subsys_radio",
+    "failsafe.subsys_gcs_battery": "failsafe.subsys_gcs",
+}
+
+# The patterns cover the firmware's forms:
+#   "Radio Failsafe", "Radio Failsafe - Continuing Landing",
+#   "Radio + Battery Failsafe - Continuing Landing",
+#   "RC Short Failsafe On", "RC Long Failsafe On: switched to RTL",
+#   "GCS Failsafe On: switched to QRTL", "Throttle failsafe on",
+#   "Failsafe: Terrain data missing", "Failsafe terrain triggered".
+# Clear forms are matched first so "Radio Failsafe Cleared" is not an On.
+_TEXT_CLEAR_RE = re.compile(
+    r"^(?P<name>[A-Za-z0-9][A-Za-z0-9 _+-]*?)\s+Failsafe\s+"
+    r"(?:Cleared|Off)\b",
+    re.IGNORECASE,
+)
+_TEXT_ON_RE = re.compile(
+    r"^(?P<name>[A-Za-z0-9][A-Za-z0-9 _+-]*?)\s+Failsafe"
+    r"(?:\s+On)?(?:\s*[:\-].*)?$",
+    re.IGNORECASE,
+)
+_TEXT_COLON_RE = re.compile(
+    r"^Failsafe\s*:\s*(?P<name>[A-Za-z0-9][A-Za-z0-9 _+-]*)",
+    re.IGNORECASE,
+)
+_TEXT_TRIGGERED_RE = re.compile(
+    r"^Failsafe\s+(?P<name>[A-Za-z0-9][A-Za-z0-9 _+-]*?)\s+triggered\b",
+    re.IGNORECASE,
+)
+
+
+def _text_failsafe_key(text: str) -> tuple[str, str] | None:
+    """(i18n key, "on" | "clear") for a firmware failsafe line."""
+    if not isinstance(text, str):
+        return None
+    text = " ".join(text.strip().split())
+    match = _TEXT_CLEAR_RE.match(text)
+    if match:
+        key = _key_from_name(match.group("name"))
+        return (key, "clear") if key else None
+    for pattern in (_TEXT_ON_RE, _TEXT_COLON_RE, _TEXT_TRIGGERED_RE):
+        match = pattern.match(text)
+        if match:
+            key = _key_from_name(match.group("name"))
+            if key:
+                return key, "on"
+    return None
+
+
+def _key_from_name(name: str) -> str | None:
+    """The i18n key for a firmware name, including a trailing action."""
+    name = name.strip().lower()
+    if name in _TEXT_FAILSAFE_KEYS:
+        return _TEXT_FAILSAFE_KEYS[name]
+    for candidate in sorted(_TEXT_FAILSAFE_KEYS, key=len, reverse=True):
+        if name.startswith(candidate + " "):
+            return _TEXT_FAILSAFE_KEYS[candidate]
+    return None
+
+
+def _is_rover(reader) -> bool:
+    vehicle_type = str(getattr(
+        reader, "canonical_vehicle_type",
+        getattr(reader, "vehicle_type", ""))).lower()
+    if "rover" in vehicle_type:
+        return True
+    # A vendor banner renames the first token (`FC-Ground ... [ArduRover
+    # V4.6.0]`); the official family in the banner is the evidence.
+    for message in getattr(reader, "text_messages", []) or []:
+        text = getattr(message, "text", "")
+        if isinstance(text, str) and "ardurover" in text.lower():
+            return True
+    return False
+
+
+def _pop_latest_open(open_by_key: dict[str, list[dict]]) -> dict | None:
+    """The most recently started open event across subsystems."""
+    latest = None
+    latest_key = None
+    for key, stack in open_by_key.items():
+        if stack and (latest is None or stack[-1]["start"] > latest["start"]):
+            latest = stack[-1]
+            latest_key = key
+    if latest is not None:
+        open_by_key[latest_key].pop()
+    return latest
+
+
+def _text_failsafe_events(reader) -> list[dict]:
+    """Pair firmware STATUSTEXT failsafe On/Cleared lines into events.
+
+    Each On opens an event; clears close the most recent open event of the
+    same subsystem, newest first. Two On lines for the same subsystem
+    within one second are one event (`Throttle failsafe on` and
+    `RC Short Failsafe On` are emitted together on Plane). An On with no
+    clear is unresolved at the end of the log.
+
+    Rover aggregates its failsafe bits and sends the clear with the last
+    type that fired, so a Rover clear with no matching open event closes
+    the most recent open event across subsystems.
+    """
+    events: list[dict] = []
+    open_by_key: dict[str, list[dict]] = {}
+    for message in getattr(reader, "text_messages", []) or []:
+        text = getattr(message, "text", "")
+        if not isinstance(text, str):
+            continue
+        parsed = _text_failsafe_key(text)
+        if parsed is None:
+            continue
+        key, state = parsed
+        when = float(getattr(message, "timestamp", 0.0))
+        stack_key = _TEXT_STACK_KEYS.get(key, key)
+        if state == "on":
+            stack = open_by_key.setdefault(stack_key, [])
+            if stack and 0.0 <= when - stack[-1]["start"] <= 1.0:
+                # Keep the more specific name (`RC Short` over `Throttle`,
+                # `Radio + Battery` over `Radio`).
+                if len(text) > len(stack[-1]["text"]):
+                    stack[-1]["text"] = text
+                    stack[-1]["key"] = key
+                continue
+            event = {
+                "key": key,
+                "time": when,
+                "start": when,
+                "end": None,
+                "unresolved": True,
+                "text": text,
+            }
+            events.append(event)
+            stack.append(event)
+        else:
+            stack = open_by_key.get(stack_key, [])
+            event = stack.pop() if stack else None
+            if event is None and _is_rover(reader):
+                event = _pop_latest_open(open_by_key)
+            if event is not None:
+                event["end"] = when
+                event["unresolved"] = False
+
+    duration = float(getattr(reader, "get_flight_duration", lambda: 0.0)())
+    for event in events:
+        if event["end"] is None:
+            event["end"] = duration
+            event["unresolved"] = True
+    return events
+
+
+def _overlaps_armed(reader, start: float, end: float) -> bool:
+    """True when the event's interval overlaps armed flight.
+
+    The bounds are strict: an event that starts exactly at the disarm
+    timestamp, or ends exactly at the arm timestamp, is not counted as
+    armed. MSG and EV have no shared ordering, so the tie goes to the
+    side that does not raise a false critical.
+    """
+    return any(start < armed_end and end > armed_start
+               for armed_start, armed_end in reader.get_armed_intervals())
+
+
+def _text_event_state(reader, event: dict) -> str:
+    """Return "armed", "unarmed" or "unknown" for a STATUSTEXT event."""
+    intervals = reader.get_armed_intervals()
+    if not intervals:
+        never_armed = getattr(reader, "never_armed", lambda: False)
+        return "unarmed" if never_armed() else "unknown"
+    if event["unresolved"]:
+        # The log can end while the vehicle is still armed. The event is
+        # then a point at the last row; an inclusive check against an
+        # armed interval that reaches the end keeps it critical.
+        duration = float(getattr(reader, "get_flight_duration",
+                                 lambda: 0.0)())
+        for armed_start, armed_end in intervals:
+            if (armed_start <= event["start"] <= armed_end
+                    and armed_end >= duration - 1e-6):
+                return "armed"
+    return ("armed" if _overlaps_armed(reader, event["start"], event["end"])
+            else "unarmed")
+
 
 class FailsafeAnalyzer(BaseAnalyzer):
     """
@@ -76,28 +306,98 @@ class FailsafeAnalyzer(BaseAnalyzer):
         self._ekf_single_over = False
 
         # -----------------------------------------------------------
-        # 1. Check triggered failsafes from ERR messages
+        # 1. Check triggered failsafes from ERR and STATUSTEXT messages
         # -----------------------------------------------------------
-        triggered = []
+        err_triggers = []
         for err in self.reader.errors:
             # ECode 0 == ERROR_RESOLVED (the failsafe cleared). Counting
             # it as a trigger double-counts every transient failsafe and
             # turns a log that only holds recovery records into a false
             # critical. Only the occurrence (ECode != 0) is a trigger.
             if err.ecode != 0 and err.subsys in _FS_SUBSYS_KEYS:
-                name = t(_FS_SUBSYS_KEYS[err.subsys])
-                triggered.append(
-                    t("failsafe.triggered_event",
-                      name=name, time=f"{err.timestamp:.1f}",
-                      code=err.ecode)
-                )
+                err_triggers.append(
+                    (err.subsys, float(err.timestamp), int(err.ecode)))
 
-        if triggered:
-            details.append(t("failsafe.triggered_count", count=len(triggered)))
-            for t_str in triggered:
-                details.append(f"  - {t_str}")
+        # The same failsafe can be written as both ERR and STATUSTEXT;
+        # the two lines are emitted together. The window covers logging
+        # jitter only and does not grade anything. Each ERR line can
+        # suppress at most one text episode, and the nearest one wins.
+        text_events = _text_failsafe_events(self.reader)
+        consumed_err: set[int] = set()
+        kept_text = []
+        for event in text_events:
+            candidates = [
+                (index, err_time)
+                for index, (subsys, err_time, _code) in enumerate(err_triggers)
+                if index not in consumed_err
+                and subsys in _TEXT_DEDUPE_SUBSYS.get(event["key"], ())
+                and abs(err_time - event["start"]) <= 10.0
+            ]
+            if candidates:
+                index, _ = min(
+                    candidates,
+                    key=lambda item: abs(item[1] - event["start"]))
+                consumed_err.add(index)
+                continue
+            kept_text.append(event)
+        text_events = kept_text
+
+        critical_events = [
+            {"key": _FS_SUBSYS_KEYS[subsys], "time": when, "code": code,
+             "source": "err", "end": when, "unresolved": False}
+            for subsys, when, code in err_triggers
+        ]
+        unarmed_events = []
+        for event in text_events:
+            event["state"] = _text_event_state(self.reader, event)
+            if event["state"] == "armed":
+                event["source"] = "text"
+                critical_events.append(event)
+            else:
+                unarmed_events.append(event)
+
+        confirmed_unarmed = [event for event in unarmed_events
+                             if event["state"] == "unarmed"]
+        unknown_events = [event for event in unarmed_events
+                          if event["state"] == "unknown"]
+
+        if critical_events:
+            details.append(t("failsafe.triggered_count",
+                             count=len(critical_events)))
+            for event in critical_events:
+                name = t(event["key"])
+                if event["source"] == "err":
+                    line = t("failsafe.triggered_event",
+                             name=name, time=f"{event['time']:.1f}",
+                             code=event["code"])
+                elif event["unresolved"]:
+                    line = t("failsafe.triggered_text_unresolved",
+                             name=name, time=f"{event['time']:.1f}")
+                else:
+                    line = t("failsafe.triggered_text_event",
+                             name=name, time=f"{event['time']:.1f}",
+                             end=f"{event['end']:.1f}")
+                details.append(f"  - {line}")
             margin_statuses.append("critical")
-        else:
+
+        if confirmed_unarmed:
+            details.append(t("failsafe.text_unarmed_count",
+                             count=len(confirmed_unarmed)))
+        if unknown_events:
+            details.append(t("failsafe.text_unknown_count",
+                             count=len(unknown_events)))
+        for event in unarmed_events:
+            if event["unresolved"]:
+                line = t("failsafe.text_unarmed_unresolved",
+                         name=t(event["key"]),
+                         time=f"{event['start']:.1f}")
+            else:
+                line = t("failsafe.text_unarmed_event",
+                         name=t(event["key"]),
+                         time=f"{event['start']:.1f}")
+            details.append(line)
+
+        if not critical_events and not unarmed_events:
             details.append(t("failsafe.none_triggered"))
 
         # -----------------------------------------------------------
@@ -175,10 +475,21 @@ class FailsafeAnalyzer(BaseAnalyzer):
             # unrelated to the actual trigger. A fired failsafe means "find
             # out why", not "raise the threshold"; battery-threshold advice
             # belongs to the battery analyzer, which has cell-count context.
-            action_text = t(
-                "failsafe.action_critical",
-                fs_ekf=f"{fs_ekf:.2g}",
-            )
+            other_critical_margin = (
+                margin_statuses.count("critical")
+                > (1 if critical_events else 0))
+            text_only = (bool(critical_events)
+                         and not other_critical_margin
+                         and all(event["source"] == "text"
+                                 and event["key"] in _LINK_TEXT_KEYS
+                                 for event in critical_events))
+            if text_only:
+                action_text = t("failsafe.action_text_critical")
+            else:
+                action_text = t(
+                    "failsafe.action_critical",
+                    fs_ekf=f"{fs_ekf:.2g}",
+                )
             action_level = "physical_check"
         elif overall == "warning":
             summary = t("failsafe.summary_warning")
@@ -188,6 +499,20 @@ class FailsafeAnalyzer(BaseAnalyzer):
         elif self._ekf_single_over:
             summary = t("failsafe.summary_good_ekf")
             plain_summary = t("failsafe.plain_good_ekf")
+            action_text = ""
+            action_level = "ok"
+        elif unknown_events:
+            summary = t("failsafe.summary_good_unknown",
+                        count=len(unknown_events))
+            plain_summary = t("failsafe.plain_good_unknown",
+                              count=len(unknown_events))
+            action_text = ""
+            action_level = "ok"
+        elif confirmed_unarmed:
+            summary = t("failsafe.summary_good_unarmed",
+                        count=len(confirmed_unarmed))
+            plain_summary = t("failsafe.plain_good_unarmed",
+                              count=len(confirmed_unarmed))
             action_text = ""
             action_level = "ok"
         else:

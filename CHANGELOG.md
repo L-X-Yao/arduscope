@@ -21,6 +21,12 @@ releases are not published.
   `failsafe` on 65. The old figures predated v0.12.7 and v0.12.9, which
   changed the attitude and notch grading.
 
+### Fixed
+- The failsafe card now reads the firmware's STATUSTEXT failsafe lines
+  (`RC Short Failsafe On`, `GCS Failsafe On`, ...), pairs On/Cleared and
+  grades them by armed flight, instead of reading only ERR records. A log
+  with six in-flight RC short failsafes no longer reports `good`.
+
 ## [0.12.9] - 2026-11-19
 
 ### Fixed

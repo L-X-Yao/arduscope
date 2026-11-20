@@ -35,10 +35,13 @@ them readable, on the v0.12.9 gate baseline.
 - **The failsafe and EKF cards intentionally answer different questions.** For
   the EKF check, the failsafe card asks whether ArduPilot would trigger its EKF
   failsafe, so it applies the vehicle's mode gate. The card also aggregates
-  triggered ERR events, battery voltage, GPS satellite count and the EKF margin
-  (`_FS_SUBSYS_KEYS`, `_battery_margin`, `_gps_margin` and `_ekf_margin` in
-  `analyzers/failsafe.py`). A non-EKF failsafe or a battery breach can therefore
-  make it critical; low GPS satellite count is a warning. The EKF card asks
+  triggered ERR and STATUSTEXT failsafe events, battery voltage, GPS satellite
+  count and the EKF margin (`_FS_SUBSYS_KEYS`, `_battery_margin`,
+  `_gps_margin` and `_ekf_margin` in `analyzers/failsafe.py`). A non-EKF
+  failsafe or a battery breach can therefore make it critical; low GPS
+  satellite count is a warning. A STATUSTEXT event in armed flight is
+  critical; one outside armed flight, or with no armed window to prove it,
+  is a detail. The EKF card asks
   whether the variance combination itself reaches the failsafe condition, and
   is not downgraded by mode. Its warning only means a variance reached
   `ekf_variance_warn`, not that the sustained failsafe combination was met
