@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.12.10] - 2026-11-20
 
 ### Changed
 - `docs/online_agent.md` and the known limitations record the 2026-11-18
