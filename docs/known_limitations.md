@@ -1,15 +1,15 @@
 # Known limitations
 
-What ArduScope does not do, or does not get right, as of 2026-11-19, and what
+What ArduScope does not do, or does not get right, as of 2026-11-20, and what
 to do about each. What was found and fixed is in [CHANGELOG.md](../CHANGELOG.md).
 Figures are from the two log corpora the release gate scans: 561 logs, 560 of
-them readable, on the v0.12.9 gate baseline.
+them readable, on the current gate baseline.
 
 ## Verdicts
 
-- **A critical is common, and its share of false alarms is not known.** 389 of
+- **A critical is common, and its share of false alarms is not known.** 390 of
   560 logs carry at least one: `attitude` on 189, `battery` on 109,
-  `vibration` on 93, `power` on 77, `failsafe` on 65. No one has gone
+  `vibration` on 93, `power` on 77, `failsafe` on 70. No one has gone
   through them flight by flight. Read the figures on a card, not its badge
   alone.
 - **Plane's EKF failsafe gate is conservative in AUTO and GUIDED.** QLOITER,

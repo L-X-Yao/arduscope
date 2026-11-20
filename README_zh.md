@@ -183,7 +183,7 @@ ANTHROPIC_API_KEY=... python3 flight_report.py --ai-agent --ai-provider anthropi
 
 [docs/known_limitations.md](docs/known_limitations.md) 列出 ArduScope 做不到或做不准的地方。按报告行动前先了解三点：
 
-- critical 很常见：语料 560 份日志里 389 份至少有一条，其中误报占多少没有统计过。
+- critical 很常见：语料 560 份日志里 390 份至少有一条，其中误报占多少没有统计过。
 - 参数建议只在 SITL 里飞过，20 条规则中的 12 条，没有上过真机。加载 `.param` 文件前请逐项核对。
 - 损坏的日志会按能读到的部分分析，报告不会提示日志已损坏。
 

@@ -16,10 +16,10 @@ releases are not published.
   noise as an inter-IMU consistency fault. The offline analyzer inputs changed
   between the two runs, so the scores are not a same-condition comparison.
 - The critical counts quoted in the READMEs and the known limitations come
-  from the v0.12.9 gate baseline: 389 of 560 readable logs carry one,
+  from the current gate baseline: 390 of 560 readable logs carry one,
   `attitude` on 189, `battery` on 109, `vibration` on 93, `power` on 77 and
-  `failsafe` on 65. The old figures predated v0.12.7 and v0.12.9, which
-  changed the attitude and notch grading.
+  `failsafe` on 70. The old figures predated v0.12.7, v0.12.9 and the
+  STATUSTEXT fix.
 
 ### Fixed
 - The failsafe card now reads the firmware's STATUSTEXT failsafe lines
