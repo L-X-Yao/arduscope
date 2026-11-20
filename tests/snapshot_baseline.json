@@ -2062,8 +2062,8 @@
       "param_count": 0
     },
     "failsafe": {
-      "status": "good",
-      "action_level": "ok",
+      "status": "critical",
+      "action_level": "physical_check",
       "param_count": 0
     },
     "clock_health": {
