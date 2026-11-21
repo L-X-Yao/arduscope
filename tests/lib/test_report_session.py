@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from arduscope.lib.fleet_history import _is_full_run
 from arduscope.lib.issues import AnalysisIssue
 from arduscope.lib.report_session import AnalysisRequest, ReportSession
 from arduscope.lib.results import AnalysisResult
@@ -82,3 +83,27 @@ def test_session_keeps_an_archive_error_out_of_the_report(monkeypatch):
     assert outcome.archive_error == "archive broke"
     assert [r.registry_key for r in outcome.results] == ["a"]
     assert outcome.issues == []
+
+@pytest.mark.fast
+def test_archive_sees_a_diagnosis_failure(monkeypatch):
+    """A failed diagnosis must reach the archive's completeness check."""
+    pipeline = _pipeline()
+    seen = {}
+
+    def diagnose(_pipeline):
+        raise RuntimeError("diagnosis broke")
+
+    def archive(pipeline_result):
+        seen["issues"] = list(pipeline_result.issues)
+        seen["failed"] = any(r.failed for r in pipeline_result.results)
+        seen["full"] = _is_full_run(pipeline_result)
+        return None
+
+    monkeypatch.setattr("arduscope.lib.report_session.run_analysis",
+                        lambda *_args, **_kwargs: pipeline)
+    ReportSession(
+        AnalysisRequest("x.BIN"), diagnose=diagnose, archive=archive).run()
+
+    assert seen["issues"][0].stage == "diagnosis"
+    assert seen["failed"] is True
+    assert seen["full"] is False

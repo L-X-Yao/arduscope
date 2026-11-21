@@ -81,6 +81,11 @@ class ReportSession:
             if diagnosis is not None:
                 results.insert(0, diagnosis)
 
+        # The archive decides whether this run is complete from the same
+        # result list the report uses, including a failed diagnosis card.
+        pipeline.results = results
+        pipeline.issues = issues
+
         history = None
         archive_error = ""
         if self._archive is not None:
