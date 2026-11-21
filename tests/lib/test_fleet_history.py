@@ -15,6 +15,7 @@ import pytest
 import fleet_report
 from arduscope.analyzers import discover_analyzers
 from arduscope.lib import fleet_history
+from arduscope.lib import log_metadata
 from arduscope.lib.i18n import t
 from arduscope.lib.log_reader import TextMessage
 from arduscope.lib.thresholds import Thresholds
@@ -125,7 +126,7 @@ def _archive(db, tmp_path, name, date, score=80):
     if date:
         when = datetime.datetime.strptime(date, "%Y-%m-%d").replace(
             tzinfo=datetime.timezone.utc)
-        weeks = (when - fleet_history._GPS_EPOCH).total_seconds() / 604800
+        weeks = (when - log_metadata._GPS_EPOCH).total_seconds() / 604800
         reader._messages["GPS"]["GWk"] = np.full(100, float(int(weeks)))
         reader._messages["GPS"]["GMS"] = np.full(
             100, (weeks - int(weeks)) * 604800e3)

@@ -19,6 +19,7 @@ import plotly.graph_objects as go
 
 from arduscope.lib.log_reader import LogReader
 from arduscope.lib.outputs import motor_channels
+from arduscope.lib.series import armed_mask
 from arduscope.lib.results import (  # noqa: F401 — re-export
     ACTION_APPLY_PARAM,
     ACTION_OK,
@@ -199,13 +200,8 @@ class BaseAnalyzer:
         when the log cannot say: one with no arming events and no
         POWR.Safety may hold a whole flight.
         """
-        armed = self.reader.get_armed_intervals()
-        if not armed and not self.reader.never_armed():
-            return np.ones(len(ts), dtype=bool)
-        mask = np.zeros(len(ts), dtype=bool)
-        for s, e in armed:
-            mask |= (ts >= s) & (ts <= e)
-        return mask
+        return armed_mask(self.reader, ts,
+                          empty_is_all=not self.reader.never_armed())
 
     @staticmethod
     def safe_interp(x, xp, fp):

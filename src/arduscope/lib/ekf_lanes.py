@@ -15,6 +15,8 @@ def primary_lane_rows(core: np.ndarray, primary: np.ndarray) -> np.ndarray:
 
     Falls back to the lowest core when the log has no usable PI column.
     """
+    if np.all(np.isnan(core)):
+        return np.ones(len(core), dtype=bool)
     core_id = np.nan_to_num(core, nan=-1).astype(int)
     rows = core_id == np.nan_to_num(primary, nan=-2).astype(int)
     if np.any(rows):

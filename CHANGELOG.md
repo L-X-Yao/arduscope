@@ -12,6 +12,8 @@ releases are not published.
 ### Changed
 - The Python packages now live under `src/arduscope/`; the five CLI commands
   and the Windows package entry points are unchanged.
+- The armed-window, primary-lane and LTTB helpers now have one implementation
+  shared by the analyzers, the comparison report and the fleet metrics.
 
 ### Fixed
 - A failed analyzer import, metrics extraction or diagnosis no longer leaves a

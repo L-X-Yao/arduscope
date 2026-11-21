@@ -27,6 +27,7 @@ from .executive_summary import (
 )
 from .i18n import localized_value, t
 from .param_conflict import distinct_values, merge_suggestions
+from .series import lttb_downsample
 from .vehicle_detect import VehicleInfo
 
 
@@ -88,58 +89,6 @@ def _format_action_text(text: str) -> str:
     # Insert <br> before circled-number steps: ① ② ③ etc.
     escaped = re.sub(r'(?<=.)([①②③④⑤⑥⑦⑧⑨⑩])', r'<br>\1', escaped)
     return escaped
-
-
-def lttb_downsample(x: np.ndarray, y: np.ndarray,
-                    threshold: int) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Largest Triangle Three Buckets (LTTB) downsampling.
-
-    Reduces the number of data points while preserving visual shape.
-    Peaks and valleys are retained, making the downsampled plot
-    visually indistinguishable from the original.
-
-    Uses numpy vectorized operations for the inner loop.
-
-    Args:
-        x: x-axis values (e.g. timestamps)
-        y: y-axis values
-        threshold: target number of output points
-
-    Returns:
-        (x_out, y_out) downsampled arrays
-    """
-    n = len(x)
-    if n <= threshold or threshold < 3:
-        return x, y
-
-    out_idx = np.empty(threshold, dtype=np.int64)
-    out_idx[0] = 0
-    out_idx[-1] = n - 1
-
-    bucket_size = (n - 2) / (threshold - 2)
-    a_idx = 0
-
-    for i in range(1, threshold - 1):
-        bucket_start = int((i - 1) * bucket_size) + 1
-        bucket_end = min(int(i * bucket_size) + 1, n)
-        next_start = int(i * bucket_size) + 1
-        next_end = min(int((i + 1) * bucket_size) + 1, n - 1)
-
-        avg_x = np.mean(x[next_start:next_end + 1])
-        avg_y = np.mean(y[next_start:next_end + 1])
-
-        # Vectorized area calculation for all points in current bucket
-        bx = x[bucket_start:bucket_end]
-        by = y[bucket_start:bucket_end]
-        ax, ay = x[a_idx], y[a_idx]
-        areas = np.abs((ax - avg_x) * (by - ay) - (ax - bx) * (avg_y - ay))
-
-        max_idx = bucket_start + np.argmax(areas)
-        out_idx[i] = max_idx
-        a_idx = max_idx
-
-    return x[out_idx], y[out_idx]
 
 
 def downsample_figure(fig, max_points: int = MAX_POINTS_PER_TRACE):

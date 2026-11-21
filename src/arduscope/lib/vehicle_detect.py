@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .fleet_history import extract_identity
+from .log_metadata import extract_identity
 from .log_reader import LogReader
 
 

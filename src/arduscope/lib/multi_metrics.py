@@ -10,29 +10,18 @@ from dataclasses import fields
 
 import numpy as np
 
-from arduscope.lib.fleet_history import extract_flight_time, extract_identity
+from arduscope.lib.log_metadata import extract_flight_time, extract_identity
 from arduscope.lib.hover import hover_thrust
-from arduscope.lib.html_report import lttb_downsample
+from arduscope.lib.ekf_lanes import primary_lane_rows
+from arduscope.lib.series import (
+    EKF_ARMED_FLOOR,
+    VIBE_ARMED_FLOOR,
+    armed_rows,
+    lttb_downsample,
+)
 from arduscope.lib.log_reader import LogReader
 from arduscope.lib.np_helpers import safe_nanmax
 from arduscope.lib.thresholds import Thresholds
-
-
-# Fewest armed samples worth narrowing to, as vibration.py and ekf.py use:
-# below this the analyzers read the whole log, and the same log has to
-# give the same number in both reports.
-_VIBE_ARMED_FLOOR = 100
-_EKF_ARMED_FLOOR = 10
-
-
-def _armed_rows(reader: LogReader, ts: np.ndarray, rows: np.ndarray,
-                floor: int) -> np.ndarray:
-    """rows narrowed to armed time, if more than floor samples remain."""
-    armed = np.zeros(len(ts), dtype=bool)
-    for start, end in reader.get_armed_intervals():
-        armed |= (ts >= start) & (ts <= end)
-    narrowed = rows & armed
-    return narrowed if np.sum(narrowed) > floor else rows
 
 
 def _lowest_instance_rows(inst: np.ndarray) -> np.ndarray:
@@ -40,17 +29,6 @@ def _lowest_instance_rows(inst: np.ndarray) -> np.ndarray:
     if np.all(np.isnan(inst)):
         return np.ones(len(inst), dtype=bool)
     return inst == np.nanmin(inst)
-
-
-def _primary_core_rows(core: np.ndarray, primary: np.ndarray) -> np.ndarray:
-    """Rows of the EKF core flying the vehicle at each sample.
-
-    PI names it and can change in flight. The failsafe only ever sees that
-    core, so a backup lane's variance says nothing about convergence.
-    """
-    if not np.all(np.isnan(primary)):
-        return core == primary
-    return _lowest_instance_rows(core)
 
 
 def _clip_counters(vibe: dict) -> list[tuple[np.ndarray, np.ndarray]]:
@@ -125,9 +103,9 @@ def extract_metrics(reader: LogReader,
             "Clip", "Clip0", "Clip1", "Clip2",
         ])
         if len(vibe["_timestamp"]) > 0:
-            rows = _armed_rows(reader, vibe["_timestamp"],
+            rows = armed_rows(reader, vibe["_timestamp"],
                                _lowest_instance_rows(vibe["IMU"]),
-                               _VIBE_ARMED_FLOOR)
+                               VIBE_ARMED_FLOOR)
             metrics["max_vibe"] = safe_nanmax(
                 vibe["VibeX"][rows], vibe["VibeY"][rows], vibe["VibeZ"][rows],
             )
@@ -151,9 +129,9 @@ def extract_metrics(reader: LogReader,
             "C", "PI", "SV", "SP", "SH", "SM",
         ])
         if len(kf4["_timestamp"]) > 0:
-            rows = _armed_rows(reader, kf4["_timestamp"],
-                               _primary_core_rows(kf4["C"], kf4["PI"]),
-                               _EKF_ARMED_FLOOR)
+            rows = armed_rows(reader, kf4["_timestamp"],
+                               primary_lane_rows(kf4["C"], kf4["PI"]),
+                               EKF_ARMED_FLOOR)
             metrics["max_ekf_var"] = safe_nanmax(
                 kf4["SV"][rows], kf4["SP"][rows],
                 kf4["SH"][rows], kf4["SM"][rows],

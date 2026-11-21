@@ -14,7 +14,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import plotly.offline
 
-from arduscope.lib.fleet_history import format_flight_time
+from arduscope.lib.log_metadata import format_flight_time
 from arduscope.lib.i18n import t
 from arduscope.lib.thresholds import Thresholds
 from arduscope.lib.trend_analyzer import (

@@ -20,6 +20,7 @@ from arduscope.lib.ekf_failsafe import (
     ekf_failsafe_replay, over_threshold, sustained, vehicle_kind,
     window_touches_armed)
 from arduscope.lib.ekf_lanes import primary_lane_rows
+from arduscope.lib.series import EKF_ARMED_FLOOR, armed_rows
 from arduscope.lib.i18n import t as _t
 from arduscope.lib.np_helpers import safe_nanmax
 from . import AnalysisResult, BaseAnalyzer
@@ -122,13 +123,7 @@ class EKFAnalyzer(BaseAnalyzer):
             stat_mask = primary_lane_rows(core_ids, kf4["PI"])
         primary_mask = stat_mask
 
-        armed = self.reader.get_armed_intervals()
-        if armed:
-            armed_mask = np.zeros(len(t), dtype=bool)
-            for start, end in armed:
-                armed_mask |= (t >= start) & (t <= end)
-            if np.sum(armed_mask & stat_mask) > 10:
-                stat_mask = stat_mask & armed_mask
+        stat_mask = armed_rows(self.reader, t, stat_mask, EKF_ARMED_FLOOR)
 
         sv_stat = sv[stat_mask]
         sp_stat = sp[stat_mask]
@@ -163,6 +158,7 @@ class EKFAnalyzer(BaseAnalyzer):
             t_p = t[primary_mask]
             windows, pos_loss, _over = ekf_failsafe_replay(
                 self.reader, kf4_p, t_p, kind, ekf_thresh)
+            armed = self.reader.get_armed_intervals()
             touched = [w for w in windows
                        if window_touches_armed(w, t_p, armed)]
             ap_triggered = bool(touched)
