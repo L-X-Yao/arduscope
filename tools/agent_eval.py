@@ -25,8 +25,10 @@ import sys
 import time
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _ROOT not in sys.path:
-    sys.path.insert(0, _ROOT)
+_SRC = os.path.join(_ROOT, "src")
+for _path in (_ROOT, _SRC):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 from arduscope.lib.agent.config import AgentConfig  # noqa: E402
 from arduscope.lib.agent.loop import run_agent  # noqa: E402

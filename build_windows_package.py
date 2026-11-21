@@ -362,6 +362,20 @@ def copy_module_files(script_dir: str, la_dir: str) -> int:
     return file_count
 
 
+def copy_data_files(script_dir: str, la_dir: str) -> int:
+    """Copy INCLUDE_DATA_DIRS to the package root, preserving structure."""
+    data_count = 0
+    for src_subdir, dest_subdir in INCLUDE_DATA_DIRS:
+        src_dir = os.path.join(script_dir, src_subdir)
+        dst_dir = os.path.join(la_dir, dest_subdir)
+        if os.path.isdir(src_dir):
+            shutil.copytree(src_dir, dst_dir, dirs_exist_ok=True,
+                            ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "__init__.py"))
+            for root, _dirs, files in os.walk(dst_dir):
+                data_count += len(files)
+    return data_count
+
+
 def _precompile(la_dir: str, py_exe: str) -> int:
     """
     Compile all .py files in la_dir to same-dir .pyc using py_exe.
@@ -487,13 +501,12 @@ def _nuitka_compile_entry(entry_py: str, output_dir: str, extra_paths: list) -> 
 
 def _build_nuitka(script_dir: str, pkg_dir: str, py_ver: str):
     """
-    Nuitka build, untested: compile lib/ and analyzers/ to .pyd, entry
+    Nuitka build, untested: compile the arduscope package to .pyd, entry
     points remain as thin .pyc wrappers that import the .pyd modules.
 
     Strategy:
-      - lib/ → one compiled extension module
-      - analyzers/ → one compiled extension module
-      - Entry points (web_app.py etc.) → .pyc (tiny, just "import lib; main()")
+      - arduscope/ -> one compiled extension module
+      - Entry points (web_app.py etc.) → .pyc (tiny, just "from arduscope.lib import ...; main()")
         The actual logic is in the .pyd which is native machine code.
     """
     la_dir = os.path.join(pkg_dir, "log_analysis")
@@ -691,21 +704,16 @@ def main():
     file_count = copy_module_files(script_dir, la_dir)
 
     # Copy data directories (locales, etc.) preserving structure
-    data_count = 0
-    for src_subdir, dest_subdir in INCLUDE_DATA_DIRS:
-        src_dir = os.path.join(script_dir, src_subdir)
-        dst_dir = os.path.join(la_dir, dest_subdir)
-        if os.path.isdir(src_dir):
-            shutil.copytree(src_dir, dst_dir, dirs_exist_ok=True,
-                            ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "__init__.py"))
-            for root, _dirs, files in os.walk(dst_dir):
-                data_count += len(files)
+    data_count = copy_data_files(script_dir, la_dir)
     print(f"  Copied {len(INCLUDE_FILES)} entry files + {file_count} module files + {data_count} data files")
 
     # ---- Step 6: Compile ----
     if args.nuitka:
         print(f"\n[6/6] Nuitka compiling core modules to native .pyd...")
         _build_nuitka(script_dir, pkg_dir, py_ver)
+        # _build_nuitka removes the copied package directory; restore locales
+        # and vendored assets that the compiled package still needs.
+        copy_data_files(script_dir, la_dir)
     else:
         print(f"\n[6/6] Compiling source (.py -> .pyc)...")
 
