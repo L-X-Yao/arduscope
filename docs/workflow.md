@@ -12,7 +12,7 @@ and the process that applies when work reopens. The code-facing rules stay in
 
 - Two sessions: the integrator and one peer. The peer is the blind reviewer by
   default and writes when assigned; the integrator writes otherwise. A session
-  never reviews its own change. The third session is optional.
+  never reviews its own code change. The third session is optional.
 - No scheduled capability probes while idle. Re-probe after a model switch or
   when feature work resumes.
 - The change tiers below set the review and gate level.
@@ -26,7 +26,9 @@ and the process that applies when work reopens. The code-facing rules stay in
 
 Safety code means EKF, thresholds, failsafe, the log reader, the pipeline and
 the release path. Policy documents (`POSITIONING*.md`, this file,
-`CONTRIBUTING.md`) still need the maintainer's word, not a review tier.
+`CONTRIBUTING.md`) still need the maintainer's word, not a review tier. Docs
+and CI changes may be made directly by the integrator, without a brief or a
+worktree; they still run `ci_local`.
 
 ### Feature development (when reopened)
 
@@ -119,8 +121,10 @@ a manual check. A missing item fails here, not twenty minutes into the gate.
 
 ## Hard rules
 
-- A writer never pushes; the repository ruleset refuses new branches anyway.
-- A writer never reviews their own change.
+- A peer writer never pushes; the integrator lands the change. The repository
+  ruleset refuses new branches anyway.
+- A writer never reviews their own code change; the docs/CI self-check is the
+  only exception.
 - No session edits `POSITIONING.md` or `POSITIONING_zh.md` without the
   maintainer's explicit word, and both languages move together.
 - A published release is immutable; a defect found later ships as a new
