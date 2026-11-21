@@ -287,20 +287,16 @@ class BaseAnalyzer:
         return f"ATC_RAT_{name}"
 
 
-def discover_analyzers() -> list[tuple[str, type[BaseAnalyzer]]]:
-    """
-    Auto-discover all analyzer classes in the analyzers/ package.
+def load_analyzers() -> tuple[
+        list[tuple[str, type[BaseAnalyzer]]], list[tuple[str, Exception]]]:
+    """Load every analyzer module and return both the loaded and the errors.
 
-    Scans all modules in this directory, imports them, and collects
-    any BaseAnalyzer subclass that has a non-empty `registry_key`.
-    pkgutil sees .py files and the same-directory .pyc files of the
-    Windows package alike.
-
-    Returns:
-        Sorted list of (registry_key, analyzer_class) tuples,
-        ordered by sort_order then registry_key.
+    A module that fails to import is returned in the error list instead of
+    being silently dropped; `discover_analyzers` wraps this for callers that
+    only need the loaded classes.
     """
     found: list[tuple[str, type[BaseAnalyzer]]] = []
+    errors: list[tuple[str, Exception]] = []
     package_dir = os.path.dirname(__file__)
     module_names: set[str] = set()
 
@@ -312,8 +308,7 @@ def discover_analyzers() -> list[tuple[str, type[BaseAnalyzer]]]:
         try:
             module = importlib.import_module(f'.{modname}', package=__name__)
         except Exception as e:
-            import warnings
-            warnings.warn(f"Failed to load analyzer '{modname}': {e}")
+            errors.append((modname, e))
             continue
 
         for _name, obj in inspect.getmembers(module, inspect.isclass):
@@ -324,4 +319,14 @@ def discover_analyzers() -> list[tuple[str, type[BaseAnalyzer]]]:
 
     # Sort by sort_order, then alphabetically by key
     found.sort(key=lambda x: (x[1].sort_order, x[0]))
+    return found, errors
+
+
+def discover_analyzers() -> list[tuple[str, type[BaseAnalyzer]]]:
+    """Return the loaded analyzers, warning about modules that failed."""
+    found, errors = load_analyzers()
+    if errors:
+        import warnings
+        for modname, error in errors:
+            warnings.warn(f"Failed to load analyzer '{modname}': {error}")
     return found

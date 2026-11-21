@@ -61,6 +61,7 @@ from arduscope.lib.i18n import available_locales, get_locale, set_locale, t
 from arduscope.lib import fleet_history
 from arduscope.lib.html_report import HtmlReportGenerator
 from arduscope.lib.ai_diagnosis import generate_diagnosis
+from arduscope.lib.issues import AnalysisIssue, issue_card
 from arduscope.lib.agent import analyze_with_agent
 from arduscope.lib.agent.config import ConfigError, load_config, update_config
 from arduscope.lib.agent.providers import NoProviderPackage, test_connection
@@ -459,6 +460,7 @@ def _start_job(job_id: str, save_path: str, filename: str, written: int,
             'agent': use_agent,
             'agent_calls': 0,
             'agent_fallback': '',
+            'issues': [],
         }
     worker = threading.Thread(
         target=_analyze_then_free_slot,
@@ -1011,6 +1013,8 @@ def _run_analysis(job_id: str, filepath: str, original_name: str,
         results_by_key = pipeline.results_by_key
         health_score = pipeline.health_score
         gps_track = pipeline.gps_track
+        issues = list(pipeline.issues)
+        _update_job(job_id, issues=[issue.as_dict() for issue in issues])
 
         _update_job(job_id, vehicle_info={
             'type': vehicle_info.vehicle_type,
@@ -1024,8 +1028,16 @@ def _run_analysis(job_id: str, filepath: str, original_name: str,
         try:
             metrics = extract_metrics(reader, pipeline.thresholds)
             _update_job(job_id, metrics=metrics, params=dict(reader.params))
-        except Exception:
-            _update_job(job_id, metrics={})
+        except Exception as e:
+            issue = AnalysisIssue(
+                stage="metrics",
+                message=t("pipeline.stage_failed_detail", error=e),
+                exception=type(e).__name__,
+            )
+            issues.append(issue)
+            print(f"  [warn] {issue.message}", file=sys.stderr)
+            _update_job(job_id, metrics={},
+                        issues=[item.as_dict() for item in issues])
 
         # ----- AI diagnosis -----
         _update_job(job_id, message=t("web.ai_diagnosis"), progress=85)
@@ -1069,8 +1081,21 @@ def _run_analysis(job_id: str, filepath: str, original_name: str,
                         reader.get_flight_duration(),
                     )
                 results.insert(0, diagnosis)
-            except Exception:
-                pass
+            except Exception as e:
+                issue = AnalysisIssue(
+                    stage="diagnosis",
+                    message=t("pipeline.stage_failed_detail", error=e),
+                    exception=type(e).__name__,
+                )
+                issues.append(issue)
+                results.append(issue_card(
+                    issue,
+                    "pipeline.stage_failed_title",
+                    "pipeline.stage_failed_summary",
+                    "diagnosis",
+                ))
+                print(f"  [warn] {issue.message}", file=sys.stderr)
+                _update_job(job_id, issues=[item.as_dict() for item in issues])
 
         # ----- Fleet history (archive + trend card) -----
         # Default on; failures never block the report.

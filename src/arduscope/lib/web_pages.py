@@ -607,6 +607,7 @@ const I18N = """
         "js.agent_confirm": t("web.agent_egress_confirm"),
         "js.agent_tag": t("web.agent_tag"),
         "js.unknown": t("report.unknown"),
+        "js.issues": t("web.js_issues"),
     }, ensure_ascii=False)
     + f";\nconst MAX_UPLOAD_BYTES = {max_upload_bytes};"
     + r"""
@@ -826,6 +827,13 @@ function renderJobCard(job) {
         agentTag = `<span class="vehicle-tag">${I18N['js.agent_tag']}${calls}</span>`;
     }
 
+    /* incomplete stages: load, metrics or diagnosis */
+    let issueTag = '';
+    if (job.issues && job.issues.length) {
+        const detail = job.issues.map(i => i.message).join(' | ');
+        issueTag = `<span class="vehicle-tag" style="color:#e6a23c" title="${esc(detail)}">${I18N['js.issues']} ${job.issues.length}</span>`;
+    }
+
     /* analyzer dots */
     let dots = '';
     if (job.analyzer_results) {
@@ -861,7 +869,7 @@ function renderJobCard(job) {
 
     return `<div class="job-card ${cls}">
         <div class="job-header">
-            <span class="job-filename">${esc(job.filename)}</span>${sizeTag}${veh}${score}${agentTag}${elapsedTag}
+            <span class="job-filename">${esc(job.filename)}</span>${sizeTag}${veh}${score}${agentTag}${issueTag}${elapsedTag}
         </div>
         ${prog}${dots}${err}${act}
     </div>`;

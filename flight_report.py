@@ -392,6 +392,9 @@ def main():
     health_score = pipeline.health_score
     param_conflicts = pipeline.conflicts
     gps_track = pipeline.gps_track
+    for issue in pipeline.issues:
+        print(t("pipeline.issue_line", stage=issue.stage,
+                message=issue.message), file=sys.stderr)
 
     vehicle = (f"{localized_value(vehicle_info.vehicle_type)} "
                f"{localized_value(vehicle_info.firmware_version)}")

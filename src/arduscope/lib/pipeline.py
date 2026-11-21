@@ -12,12 +12,13 @@ from __future__ import annotations
 
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
 
 from .i18n import t
+from .issues import AnalysisIssue
 from .log_reader import LogReader, UnreadableLog
 from .param_conflict import detect_param_conflicts
 from .results import ACTION_OK, ACTION_PHYSICAL_CHECK, AnalysisResult
@@ -65,9 +66,9 @@ def _unreadable_reason(name: str, error: UnreadableLog) -> str:
 
 def _collect_preload_types() -> list[str]:
     """Auto-collect all message types needed by registered analyzers."""
-    from arduscope.analyzers import discover_analyzers
+    from arduscope.analyzers import load_analyzers
     types: set[str] = set()
-    for _key, cls in discover_analyzers():
+    for _key, cls in load_analyzers()[0]:
         types.update(cls.required_messages)
         types.update(getattr(cls, "optional_messages", []))
     types.update(["ATT", "RATE", "RCOU", "BAT", "GPS", "POS"])
@@ -172,6 +173,7 @@ class PipelineResult:
     health_score: int
     conflicts: list[dict]
     gps_track: Optional[dict]
+    issues: list[AnalysisIssue] = field(default_factory=list)
 
 
 def run_analysis(
@@ -195,7 +197,8 @@ def run_analysis(
         include_gps: extract GPS track for map
         on_progress: optional callback(pct: int, msg: str)
     """
-    from arduscope.analyzers import discover_analyzers
+    from arduscope.analyzers import load_analyzers
+    global PRELOAD_MESSAGE_TYPES
 
     def _progress(pct: int, msg: str = ""):
         if on_progress:
@@ -220,7 +223,21 @@ def run_analysis(
         thresholds.load_overrides(thresholds_path)
 
     # Build analyzer list
-    registry = discover_analyzers()
+    registry, load_errors = load_analyzers()
+    if load_errors:
+        # The preload list built before this call is incomplete; do not keep
+        # it for the next log in this process.
+        PRELOAD_MESSAGE_TYPES = None
+    issues = [
+        AnalysisIssue(
+            stage="analyzer_load",
+            severity="critical",
+            analyzer_key=name,
+            message=t("pipeline.analyzer_load_detail", name=name, error=error),
+            exception=type(error).__name__,
+        )
+        for name, error in load_errors
+    ]
     template_only = set(template.analyzers) if template and template.analyzers else set()
     analyzers_to_run = []
     for key, cls in registry:
@@ -269,6 +286,17 @@ def run_analysis(
             results.append(result)
             results_by_key[key] = result
 
+    if issues:
+        results.insert(0, AnalysisResult(
+            title=t("pipeline.analyzer_load_title"),
+            status="info",
+            summary=t("pipeline.analyzer_load_summary", count=len(issues)),
+            details=[issue.message for issue in issues],
+            action_level=ACTION_PHYSICAL_CHECK,
+            failed=True,
+            registry_key="analyzer_load",
+        ))
+
     health_score = compute_health_score(results)
     conflicts = detect_param_conflicts(results)
     if template:
@@ -281,6 +309,11 @@ def run_analysis(
             gps_track = extract_gps_track(reader)
         except Exception as e:
             print(f"[warn] GPS track extraction failed: {e}", file=sys.stderr)
+            issues.append(AnalysisIssue(
+                stage="gps_track",
+                message=t("pipeline.gps_track_failed", error=e),
+                exception=type(e).__name__,
+            ))
 
     _progress(95, t("cli.stage_done"))
 
@@ -293,4 +326,5 @@ def run_analysis(
         health_score=health_score,
         conflicts=conflicts,
         gps_track=gps_track,
+        issues=issues,
     )

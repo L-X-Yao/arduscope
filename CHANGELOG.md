@@ -7,6 +7,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Changed
+- The Python packages now live under `src/arduscope/`; the five CLI commands
+  and the Windows package entry points are unchanged.
+
+### Fixed
+- A failed analyzer import, metrics extraction or diagnosis no longer leaves a
+  report that looks complete: it records an issue, shows a failed card or
+  warning, and marks the report incomplete.
+
 ## [0.12.11] - 2026-11-21
 
 ### Added

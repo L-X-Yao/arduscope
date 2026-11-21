@@ -40,6 +40,7 @@ from arduscope.lib.csv_safe import SafeWriter
 from arduscope.lib.i18n import t
 from arduscope.lib.html_report import HtmlReportGenerator
 from arduscope.lib.ai_diagnosis import generate_diagnosis
+from arduscope.lib.issues import AnalysisIssue, issue_card
 from arduscope.lib.pipeline import run_analysis
 from arduscope.lib.templates import get_template
 from multi_report import (
@@ -122,6 +123,7 @@ def analyze_one(
         "n_criticals": 0,
         "error": None,
         "archive_warning": None,
+        "issues": [],
         "elapsed": 0.0,
     }
 
@@ -138,6 +140,7 @@ def analyze_one(
         analysis_results = pipeline.results
         results_by_key = pipeline.results_by_key
         gps_track = pipeline.gps_track
+        result["issues"] = [issue.as_dict() for issue in pipeline.issues]
 
         result["vehicle_type"] = vehicle_info.vehicle_type
         result["firmware"] = vehicle_info.firmware_version
@@ -160,14 +163,32 @@ def analyze_one(
                     reader.get_flight_duration(),
                 )
                 analysis_results.insert(0, diagnosis)
-            except Exception:
-                pass
+            except Exception as e:
+                issue = AnalysisIssue(
+                    stage="diagnosis",
+                    message=t("pipeline.stage_failed_detail", error=e),
+                    exception=type(e).__name__,
+                )
+                result.setdefault("issues", []).append(issue.as_dict())
+                analysis_results.append(issue_card(
+                    issue,
+                    "pipeline.stage_failed_title",
+                    "pipeline.stage_failed_summary",
+                    "diagnosis",
+                ))
+                print(f"  [warn] {issue.message}", file=sys.stderr)
 
         # Extract metrics
         try:
             result["metrics"] = extract_metrics(reader, pipeline.thresholds)
-        except Exception:
-            pass
+        except Exception as e:
+            issue = AnalysisIssue(
+                stage="metrics",
+                message=t("pipeline.stage_failed_detail", error=e),
+                exception=type(e).__name__,
+            )
+            result.setdefault("issues", []).append(issue.as_dict())
+            print(f"  [warn] {issue.message}", file=sys.stderr)
 
         # Fleet history (archive + trend card); never blocks the batch
         if not no_fleet_record:
