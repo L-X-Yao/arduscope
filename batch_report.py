@@ -40,13 +40,14 @@ from arduscope.lib.csv_safe import SafeWriter
 from arduscope.lib.i18n import t
 from arduscope.lib.html_report import HtmlReportGenerator
 from arduscope.lib.ai_diagnosis import generate_diagnosis
-from arduscope.lib.issues import AnalysisIssue, issue_card
-from arduscope.lib.pipeline import run_analysis
+from arduscope.lib.issues import AnalysisIssue
+from arduscope.lib.report_session import AnalysisRequest, ReportSession
 from arduscope.lib.templates import get_template
-from multi_report import (
-    extract_metrics, METRIC_CONFIG,
+from arduscope.lib.comparison_report import (
+    METRIC_CONFIG,
     generate_html as generate_multi_html,
 )
+from arduscope.lib.multi_metrics import extract_metrics
 
 
 # =====================================================================
@@ -128,19 +129,42 @@ def analyze_one(
     }
 
     t0 = time.time()
-    try:
-        pipeline = run_analysis(
-            filepath,
-            template=template,
-            include_gps=not no_map,
+
+    def _diagnose(pipeline):
+        if no_ai or not pipeline.results_by_key:
+            return None
+        return generate_diagnosis(
+            pipeline.results_by_key, pipeline.vehicle_info,
+            pipeline.health_score, pipeline.reader.get_flight_duration(),
         )
 
+    def _archive(pipeline):
+        from arduscope.lib import fleet_history
+        fleet_db = os.path.join(output_dir, "fleet.db")
+        serial, _n = fleet_history.record(fleet_db, pipeline, filepath)
+        return fleet_history.build_history_result(
+            fleet_history.query_history(fleet_db, serial), serial)
+
+    try:
+        outcome = ReportSession(
+            AnalysisRequest(
+                filepath=filepath,
+                template=template,
+                include_gps=not no_map,
+            ),
+            diagnose=_diagnose,
+            archive=None if no_fleet_record else _archive,
+        ).run()
+
+        pipeline = outcome.pipeline
         reader = pipeline.reader
         vehicle_info = pipeline.vehicle_info
-        analysis_results = pipeline.results
-        results_by_key = pipeline.results_by_key
+        analysis_results = outcome.results
         gps_track = pipeline.gps_track
-        result["issues"] = [issue.as_dict() for issue in pipeline.issues]
+        result["issues"] = [issue.as_dict() for issue in outcome.issues]
+        if outcome.archive_error:
+            result["archive_warning"] = t(
+                "fleet.record_failed", error=outcome.archive_error)
 
         result["vehicle_type"] = vehicle_info.vehicle_type
         result["firmware"] = vehicle_info.firmware_version
@@ -149,34 +173,11 @@ def analyze_one(
         result["params"] = dict(reader.params)
         result["health_score"] = pipeline.health_score
         result["n_warnings"] = sum(
-            1 for r in analysis_results if r.status == "warning"
+            1 for r in pipeline.results if r.status == "warning"
         )
         result["n_criticals"] = sum(
-            1 for r in analysis_results if r.status == "critical"
+            1 for r in pipeline.results if r.status == "critical"
         )
-
-        # AI diagnosis
-        if not no_ai and results_by_key:
-            try:
-                diagnosis = generate_diagnosis(
-                    results_by_key, vehicle_info, pipeline.health_score,
-                    reader.get_flight_duration(),
-                )
-                analysis_results.insert(0, diagnosis)
-            except Exception as e:
-                issue = AnalysisIssue(
-                    stage="diagnosis",
-                    message=t("pipeline.stage_failed_detail", error=e),
-                    exception=type(e).__name__,
-                )
-                result.setdefault("issues", []).append(issue.as_dict())
-                analysis_results.append(issue_card(
-                    issue,
-                    "pipeline.stage_failed_title",
-                    "pipeline.stage_failed_summary",
-                    "diagnosis",
-                ))
-                print(f"  [warn] {issue.message}", file=sys.stderr)
 
         # Extract metrics
         try:
@@ -189,20 +190,6 @@ def analyze_one(
             )
             result.setdefault("issues", []).append(issue.as_dict())
             print(f"  [warn] {issue.message}", file=sys.stderr)
-
-        # Fleet history (archive + trend card); never blocks the batch
-        if not no_fleet_record:
-            try:
-                from arduscope.lib import fleet_history
-                fleet_db = os.path.join(output_dir, "fleet.db")
-                serial, _n = fleet_history.record(
-                    fleet_db, pipeline, filepath)
-                hist = fleet_history.build_history_result(
-                    fleet_history.query_history(fleet_db, serial), serial)
-                if hist is not None:
-                    analysis_results.append(hist)
-            except Exception as e:
-                result["archive_warning"] = t("fleet.record_failed", error=e)
 
         # Generate HTML report
         base = os.path.splitext(filename)[0]

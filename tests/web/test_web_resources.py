@@ -466,7 +466,7 @@ class TestMemoryBudget:
             for thread in threads:
                 thread.join(5)
 
-        monkeypatch.setattr(web_app, "run_analysis", fake_analysis)
+        monkeypatch.setattr("arduscope.lib.report_session.run_analysis", fake_analysis)
         monkeypatch.setattr(web_app, "ANALYSIS_BASE_BYTES", 0)
         monkeypatch.setattr(web_app, "ANALYSIS_PEAK_PER_LOG_BYTE", 1)
         monkeypatch.setattr(web_app, "_ANALYSIS_BUDGET",

@@ -61,11 +61,11 @@ from arduscope.lib.i18n import available_locales, get_locale, set_locale, t
 from arduscope.lib import fleet_history
 from arduscope.lib.html_report import HtmlReportGenerator
 from arduscope.lib.ai_diagnosis import generate_diagnosis
-from arduscope.lib.issues import AnalysisIssue, issue_card
+from arduscope.lib.issues import AnalysisIssue
 from arduscope.lib.agent import analyze_with_agent
 from arduscope.lib.agent.config import ConfigError, load_config, update_config
 from arduscope.lib.agent.providers import NoProviderPackage, test_connection
-from arduscope.lib.pipeline import run_analysis
+from arduscope.lib.report_session import AnalysisRequest, ReportSession
 from arduscope.lib.templates import get_template
 from arduscope.lib.web_limits import (  # noqa: F401 - two re-exported for tests
     ANALYSIS_BASE_BYTES, ANALYSIS_PEAK_PER_LOG_BYTE,
@@ -75,7 +75,8 @@ from arduscope.lib.web_pages import (_build_fleet_shell,
                            build_fleet_html, build_index_html,
                            build_settings_html as _build_settings_html)
 
-from multi_report import extract_metrics, generate_html as generate_multi_html
+from arduscope.lib.comparison_report import generate_html as generate_multi_html
+from arduscope.lib.multi_metrics import extract_metrics
 
 # No MEMFILE_MAX needed — uploads use raw binary body, not multipart.
 
@@ -1001,20 +1002,74 @@ def _run_analysis(job_id: str, filepath: str, original_name: str,
         def _on_progress(pct, msg):
             _update_job(job_id, progress=pct, message=msg)
 
-        pipeline = run_analysis(
-            filepath,
-            template=template,
-            on_progress=_on_progress,
-        )
+        def _diagnose(pipeline):
+            _update_job(job_id, message=t("web.ai_diagnosis"), progress=85)
+            if not pipeline.results_by_key:
+                return None
+            if use_agent:
+                try:
+                    agent_config = load_config()
+                except ConfigError as e:
+                    agent_config = None
+                    _update_job(job_id, agent_fallback=str(e))
+                if agent_config is not None and agent_config.is_configured():
+                    _update_job(job_id, message=t("web.agent_analyzing"),
+                                progress=85)
 
-        reader = pipeline.reader
-        vehicle_info = pipeline.vehicle_info
-        results = pipeline.results
-        results_by_key = pipeline.results_by_key
-        health_score = pipeline.health_score
-        gps_track = pipeline.gps_track
-        issues = list(pipeline.issues)
+                    def _on_agent(event):
+                        if event.get("stage") == "tool":
+                            _update_job(
+                                job_id,
+                                message=t("web.agent_tool",
+                                          tool=event.get("tool", ""),
+                                          calls=event.get("calls", 0)),
+                                agent_calls=event.get("calls", 0))
+                        elif event.get("stage") == "fallback":
+                            _update_job(job_id,
+                                        agent_fallback=event.get("reason", ""))
+
+                    return analyze_with_agent(
+                        pipeline, agent_config, on_event=_on_agent)
+                diagnosis = generate_diagnosis(
+                    pipeline.results_by_key, pipeline.vehicle_info,
+                    pipeline.health_score, pipeline.reader.get_flight_duration(),
+                )
+                diagnosis.details.insert(
+                    0, html.escape(t("web.agent_not_configured")))
+                return diagnosis
+            return generate_diagnosis(
+                pipeline.results_by_key, pipeline.vehicle_info,
+                pipeline.health_score, pipeline.reader.get_flight_duration(),
+            )
+
+        def _archive(pipeline):
+            fleet_db = _fleet_db_path()
+            serial, _n = fleet_history.record(
+                fleet_db, pipeline, filepath, log_name=original_name)
+            return fleet_history.build_history_result(
+                fleet_history.query_history(fleet_db, serial), serial)
+
+        outcome = ReportSession(
+            AnalysisRequest(
+                filepath=filepath,
+                template=template,
+                on_progress=_on_progress,
+            ),
+            diagnose=_diagnose,
+            archive=_archive,
+        ).run()
+
+        reader = outcome.pipeline.reader
+        vehicle_info = outcome.pipeline.vehicle_info
+        results = outcome.results
+        health_score = outcome.pipeline.health_score
+        gps_track = outcome.pipeline.gps_track
+        issues = list(outcome.issues)
         _update_job(job_id, issues=[issue.as_dict() for issue in issues])
+        if outcome.archive_error:
+            warning = t("fleet.record_failed", error=outcome.archive_error)
+            print(f"  [warn] {warning}", file=sys.stderr)
+            _update_job(job_id, archive_warning=warning)
 
         _update_job(job_id, vehicle_info={
             'type': vehicle_info.vehicle_type,
@@ -1026,7 +1081,7 @@ def _run_analysis(job_id: str, filepath: str, original_name: str,
         # ----- Extract metrics for multi-log comparison -----
         _update_job(job_id, message=t("web.extracting_metrics"), progress=80)
         try:
-            metrics = extract_metrics(reader, pipeline.thresholds)
+            metrics = extract_metrics(reader, outcome.pipeline.thresholds)
             _update_job(job_id, metrics=metrics, params=dict(reader.params))
         except Exception as e:
             issue = AnalysisIssue(
@@ -1038,79 +1093,6 @@ def _run_analysis(job_id: str, filepath: str, original_name: str,
             print(f"  [warn] {issue.message}", file=sys.stderr)
             _update_job(job_id, metrics={},
                         issues=[item.as_dict() for item in issues])
-
-        # ----- AI diagnosis -----
-        _update_job(job_id, message=t("web.ai_diagnosis"), progress=85)
-        if results_by_key:
-            try:
-                if use_agent:
-                    try:
-                        agent_config = load_config()
-                    except ConfigError as e:
-                        agent_config = None
-                        _update_job(job_id, agent_fallback=str(e))
-                    if agent_config is not None and agent_config.is_configured():
-                        _update_job(job_id,
-                                    message=t("web.agent_analyzing"),
-                                    progress=85)
-
-                        def _on_agent(event):
-                            if event.get("stage") == "tool":
-                                _update_job(
-                                    job_id,
-                                    message=t("web.agent_tool",
-                                              tool=event.get("tool", ""),
-                                              calls=event.get("calls", 0)),
-                                    agent_calls=event.get("calls", 0))
-                            elif event.get("stage") == "fallback":
-                                _update_job(job_id,
-                                            agent_fallback=event.get("reason", ""))
-
-                        diagnosis = analyze_with_agent(
-                            pipeline, agent_config, on_event=_on_agent)
-                    else:
-                        diagnosis = generate_diagnosis(
-                            results_by_key, vehicle_info, health_score,
-                            reader.get_flight_duration(),
-                        )
-                        diagnosis.details.insert(
-                            0, html.escape(t("web.agent_not_configured")))
-                else:
-                    diagnosis = generate_diagnosis(
-                        results_by_key, vehicle_info, health_score,
-                        reader.get_flight_duration(),
-                    )
-                results.insert(0, diagnosis)
-            except Exception as e:
-                issue = AnalysisIssue(
-                    stage="diagnosis",
-                    message=t("pipeline.stage_failed_detail", error=e),
-                    exception=type(e).__name__,
-                )
-                issues.append(issue)
-                results.append(issue_card(
-                    issue,
-                    "pipeline.stage_failed_title",
-                    "pipeline.stage_failed_summary",
-                    "diagnosis",
-                ))
-                print(f"  [warn] {issue.message}", file=sys.stderr)
-                _update_job(job_id, issues=[item.as_dict() for item in issues])
-
-        # ----- Fleet history (archive + trend card) -----
-        # Default on; failures never block the report.
-        try:
-            fleet_db = _fleet_db_path()
-            serial, _n = fleet_history.record(
-                fleet_db, pipeline, filepath, log_name=original_name)
-            hist = fleet_history.build_history_result(
-                fleet_history.query_history(fleet_db, serial), serial)
-            if hist is not None:
-                results.append(hist)
-        except Exception as e:
-            warning = t("fleet.record_failed", error=e)
-            print(f"  [warn] {warning}", file=sys.stderr)
-            _update_job(job_id, archive_warning=warning)
 
         # ----- Generate HTML report -----
         _update_job(job_id, message=t("web.generating_report"), progress=92)

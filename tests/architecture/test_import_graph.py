@@ -1,8 +1,7 @@
 """Entry modules must not import one another.
 
 The project linter checks `lib` and `analyzers`; this test covers the entry
-layer. The current violations are expected to disappear with the application
-boundary, so the test is marked xfail until Phase 4 removes the marker.
+layer. The application boundary removed the last entry-to-entry imports.
 """
 
 from __future__ import annotations
@@ -35,10 +34,6 @@ def _imported_modules(path: Path):
 
 
 @pytest.mark.fast
-@pytest.mark.xfail(
-    strict=True,
-    reason="Phase 4 removes the entry-to-entry imports",
-)
 def test_entry_modules_do_not_import_each_other():
     offenders = []
     for name in ENTRY_MODULES:

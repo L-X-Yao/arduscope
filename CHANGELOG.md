@@ -14,6 +14,9 @@ releases are not published.
   and the Windows package entry points are unchanged.
 - The armed-window, primary-lane and LTTB helpers now have one implementation
   shared by the analyzers, the comparison report and the fleet metrics.
+- The CLI, batch and web entry points now share a `ReportSession` for the
+  pipeline, diagnosis and fleet order; entry-to-entry imports are gone and
+  the linter rejects new ones.
 
 ### Fixed
 - A failed analyzer import, metrics extraction or diagnosis no longer leaves a

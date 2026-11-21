@@ -419,6 +419,16 @@ def check_dependency_direction() -> list[str]:
                     report(relpath, lineno,
                            "analyzers must not import an entry module")
 
+    for name in ENTRY_MODULES:
+        fpath = os.path.join(PROJECT_ROOT, f"{name}.py")
+        if not os.path.isfile(fpath):
+            continue
+        with open(fpath, encoding="utf-8") as f:
+            for lineno, line in enumerate(f, 1):
+                if _ENTRY_IMPORT.match(line):
+                    report(os.path.relpath(fpath, PROJECT_ROOT), lineno,
+                           "entry modules must not import each other")
+
     if not errors:
         ok("lib and analyzers only import downward")
 

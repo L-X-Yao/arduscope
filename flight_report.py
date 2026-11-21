@@ -39,7 +39,7 @@ from arduscope.lib.ai_diagnosis import generate_diagnosis
 from arduscope.lib.agent import analyze_with_agent
 from arduscope.lib.agent.config import config_from_args
 from arduscope.lib.param_conflict import distinct_values, merge_suggestions
-from arduscope.lib.pipeline import run_analysis
+from arduscope.lib.report_session import AnalysisRequest, ReportSession
 from arduscope.lib.templates import get_template, list_templates
 from arduscope.lib.thresholds import Thresholds
 from arduscope.analyzers import AnalysisResult, discover_analyzers
@@ -367,17 +367,49 @@ def main():
             print(t("cli.note_template_overrides"), file=sys.stderr)
         only_set = set(template.analyzers)
 
-    # Run unified pipeline
+    output_path = build_output_path(args.logfile, args.output, args.format)
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+
+    def _diagnose(pipeline):
+        if args.no_ai or not pipeline.results_by_key:
+            return None
+        if args.ai_agent:
+            return analyze_with_agent(
+                pipeline,
+                config_from_args(args.ai_provider, args.ai_model or "",
+                                 args.ai_base_url or ""),
+            )
+        return generate_diagnosis(
+            pipeline.results_by_key, pipeline.vehicle_info,
+            pipeline.health_score, pipeline.reader.get_flight_duration(),
+            provider=args.ai_provider,
+            model=args.ai_model or "",
+            base_url=args.ai_base_url or "",
+        )
+
+    def _archive(pipeline):
+        from arduscope.lib import fleet_history
+        db_path = os.path.join(
+            os.path.dirname(os.path.abspath(output_path)), "fleet.db")
+        serial, n = fleet_history.record(db_path, pipeline, args.logfile)
+        print("      " + t("fleet.recorded_note", serial=serial, n=n))
+        return fleet_history.build_history_result(
+            fleet_history.query_history(db_path, serial), serial)
+
     print(f"{t('cli.stage_read')} {os.path.basename(args.logfile)} ...")
     try:
-        pipeline = run_analysis(
-            args.logfile,
-            template=template,
-            only=only_set,
-            skip=skip_set,
-            thresholds_path=args.thresholds,
-            include_gps=not args.no_map,
-        )
+        outcome = ReportSession(
+            AnalysisRequest(
+                filepath=args.logfile,
+                template=template,
+                only=only_set,
+                skip=skip_set,
+                thresholds_path=args.thresholds,
+                include_gps=not args.no_map,
+            ),
+            diagnose=_diagnose,
+            archive=None if args.no_fleet_record else _archive,
+        ).run()
     except (ValueError, FileNotFoundError) as e:
         print(f"  {e}", file=sys.stderr)
         sys.exit(1)
@@ -385,16 +417,20 @@ def main():
         print(t("cli.err_parse", error=e), file=sys.stderr)
         sys.exit(1)
 
+    pipeline = outcome.pipeline
     reader = pipeline.reader
     vehicle_info = pipeline.vehicle_info
-    results = pipeline.results
+    results = outcome.results
     results_by_key = pipeline.results_by_key
     health_score = pipeline.health_score
     param_conflicts = pipeline.conflicts
     gps_track = pipeline.gps_track
-    for issue in pipeline.issues:
+    for issue in outcome.issues:
         print(t("pipeline.issue_line", stage=issue.stage,
                 message=issue.message), file=sys.stderr)
+    if outcome.archive_error:
+        print(f"  [warn] fleet record failed: {outcome.archive_error}",
+              file=sys.stderr)
 
     vehicle = (f"{localized_value(vehicle_info.vehicle_type)} "
                f"{localized_value(vehicle_info.firmware_version)}")
@@ -403,47 +439,12 @@ def main():
     if param_conflicts:
         print(t("cli.param_conflicts", count=len(param_conflicts)))
 
-    # AI diagnosis (post-pipeline, CLI-specific)
     print(t('cli.stage_report'))
-    if not args.no_ai and results_by_key:
-        if args.ai_agent:
-            diagnosis = analyze_with_agent(
-                pipeline,
-                config_from_args(args.ai_provider, args.ai_model or "",
-                                 args.ai_base_url or ""),
-            )
-        else:
-            diagnosis = generate_diagnosis(
-                results_by_key, vehicle_info, health_score,
-                reader.get_flight_duration(),
-                provider=args.ai_provider,
-                model=args.ai_model or "",
-                base_url=args.ai_base_url or "",
-            )
-        results.insert(0, diagnosis)
-        print(t("cli.ai_diagnosis", provider=diagnosis.provider, summary=diagnosis.summary))
+    if outcome.diagnosis is not None:
+        print(t("cli.ai_diagnosis", provider=outcome.diagnosis.provider,
+                summary=outcome.diagnosis.summary))
 
-    # Step 5: Generate report
-    output_path = build_output_path(args.logfile, args.output, args.format)
-    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     print(f"{t('cli.stage_done')} {output_path} ...")
-
-    # Fleet history: archive this flight (default on) and append the
-    # per-airframe trend card when there is history to show. Archive
-    # failures must never block the report.
-    if not args.no_fleet_record:
-        try:
-            from arduscope.lib import fleet_history
-            db_path = os.path.join(
-                os.path.dirname(os.path.abspath(output_path)), "fleet.db")
-            serial, n = fleet_history.record(db_path, pipeline, args.logfile)
-            print("      " + t("fleet.recorded_note", serial=serial, n=n))
-            hist = fleet_history.build_history_result(
-                fleet_history.query_history(db_path, serial), serial)
-            if hist is not None:
-                results.append(hist)
-        except Exception as e:
-            print(f"  [warn] fleet record failed: {e}", file=sys.stderr)
 
     if args.format == "json":
         export_json(results, vehicle_info, reader, health_score, output_path,
