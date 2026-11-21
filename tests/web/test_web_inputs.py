@@ -22,9 +22,9 @@ from arduscope.lib.templates import get_template
 @pytest.fixture
 def report_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(web_app, "REPORT_DIR", str(tmp_path))
-    monkeypatch.setattr(web_app, "HISTORY_FILE", str(tmp_path / "history.json"))
-    monkeypatch.setattr(web_app, "HISTORY", [])
-    monkeypatch.setattr(web_app, "JOBS", {})
+    monkeypatch.setattr(web_app.STATE.history, "path", str(tmp_path / "history.json"))
+    monkeypatch.setattr(web_app.STATE.history, "entries", [])
+    monkeypatch.setattr(web_app.STATE.jobs, "jobs", {})
     yield tmp_path
     set_locale("zh")
 
@@ -38,7 +38,7 @@ def client(report_dir):
 def slots(monkeypatch):
     """Two pending slots, checked to be free again when the test ends."""
     semaphore = threading.BoundedSemaphore(2)
-    monkeypatch.setattr(web_app, "_PENDING_SLOTS", semaphore)
+    monkeypatch.setattr(web_app.STATE.jobs, "pending", semaphore)
     yield semaphore
     _settle(semaphore)
 
@@ -92,7 +92,7 @@ class TestUploadName:
         resp = _upload(client, sent)
 
         assert resp.status_int == 200
-        job = web_app.JOBS[resp.json["job_id"]]
+        job = web_app.STATE.jobs.jobs[resp.json["job_id"]]
         assert job["filename"] == stored
         assert (report_dir / f"upload_{job['id']}_{stored}").is_file()
 
@@ -118,7 +118,7 @@ class TestUploadName:
         resp = _upload(client, sent)
 
         assert resp.status_int == 200
-        stored = web_app.JOBS[resp.json["job_id"]]["filename"]
+        stored = web_app.STATE.jobs.jobs[resp.json["job_id"]]["filename"]
         assert stored.startswith("测") and stored.endswith(".BIN")
         assert len(list(report_dir.glob("upload_*"))) == 1
         report = f"12345678_{os.path.splitext(stored)[0]}_report.html"
@@ -167,7 +167,7 @@ class TestPendingSlot:
 
         assert resp.status_int == 500
         assert slots._value == 2
-        assert web_app.JOBS == {}
+        assert web_app.STATE.jobs.jobs == {}
         assert list(report_dir.iterdir()) == []
 
     def test_batch_thread_that_cannot_start_leaves_nothing(
@@ -182,7 +182,7 @@ class TestPendingSlot:
         assert resp.json["jobs"] == []
         assert [e["filename"] for e in resp.json["errors"]] == ["a.BIN", "b.BIN"]
         assert slots._value == 2
-        assert web_app.JOBS == {}
+        assert web_app.STATE.jobs.jobs == {}
         assert list(report_dir.iterdir()) == []
 
     def test_discard_survives_a_name_the_system_refuses(self):
@@ -203,7 +203,7 @@ class TestTemplateName:
         assert bottle.response.status_code == 400
         assert "nope" in json.loads(reply)["error"]
         assert list(report_dir.iterdir()) == []
-        assert web_app.JOBS == {}
+        assert web_app.STATE.jobs.jobs == {}
 
     def test_known_template_reaches_the_analysis(self, client, slots,
                                                  monkeypatch):

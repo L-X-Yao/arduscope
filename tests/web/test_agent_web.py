@@ -18,9 +18,9 @@ def app(monkeypatch, tmp_path):
     import arduscope.lib.agent.config as agent_config
 
     original_report_dir = web_app.REPORT_DIR
-    original_history_file = web_app.HISTORY_FILE
-    original_history = web_app.HISTORY[:]
-    original_jobs = dict(web_app.JOBS)
+    original_history_file = web_app.STATE.history.path
+    original_history = web_app.STATE.history.entries[:]
+    original_jobs = dict(web_app.STATE.jobs.jobs)
     original_allowed = web_app._ALLOW_SETTINGS
 
     config_path = tmp_path / "agent.json"
@@ -29,14 +29,14 @@ def app(monkeypatch, tmp_path):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         web_app.REPORT_DIR = tmpdir
-        web_app.HISTORY_FILE = os.path.join(tmpdir, "history.json")
-        web_app.HISTORY = []
-        web_app.JOBS = {}
+        web_app.STATE.history.path = os.path.join(tmpdir, "history.json")
+        web_app.STATE.history.entries = []
+        web_app.STATE.jobs.jobs = {}
         yield TestApp(web_app.app)
         web_app.REPORT_DIR = original_report_dir
-        web_app.HISTORY_FILE = original_history_file
-        web_app.HISTORY = original_history
-        web_app.JOBS = original_jobs
+        web_app.STATE.history.path = original_history_file
+        web_app.STATE.history.entries = original_history
+        web_app.STATE.jobs.jobs = original_jobs
         web_app._ALLOW_SETTINGS = original_allowed
     set_locale("zh")
 
@@ -159,7 +159,7 @@ def test_upload_with_agent_refuses_when_not_configured(app):
     assert resp.status_int == 400
     assert resp.json["error"]
     import web_app
-    assert web_app.JOBS == {}
+    assert web_app.STATE.jobs.jobs == {}
 
 
 def test_settings_test_refuses_an_unconfigured_agent(app):

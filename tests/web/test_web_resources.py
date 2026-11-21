@@ -20,9 +20,9 @@ from tests.binlog import flight_log
 @pytest.fixture
 def report_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(web_app, "REPORT_DIR", str(tmp_path))
-    monkeypatch.setattr(web_app, "HISTORY_FILE", str(tmp_path / "history.json"))
-    monkeypatch.setattr(web_app, "HISTORY", [])
-    monkeypatch.setattr(web_app, "JOBS", {})
+    monkeypatch.setattr(web_app.STATE.history, "path", str(tmp_path / "history.json"))
+    monkeypatch.setattr(web_app.STATE.history, "entries", [])
+    monkeypatch.setattr(web_app.STATE.jobs, "jobs", {})
     yield tmp_path
     set_locale("zh")
 
@@ -64,7 +64,7 @@ class TestUploadSize:
 
         assert bottle.response.status_code == 413
         assert list(report_dir.iterdir()) == []
-        assert web_app.JOBS == {}
+        assert web_app.STATE.jobs.jobs == {}
 
     def test_limit_itself_is_accepted(self, report_dir, monkeypatch):
         monkeypatch.setattr(web_app, "MAX_UPLOAD_BYTES", 1000)
@@ -73,7 +73,7 @@ class TestUploadSize:
 
         reply = json.loads(web_app.upload())
 
-        assert reply["job_id"] in web_app.JOBS
+        assert reply["job_id"] in web_app.STATE.jobs.jobs
 
     def test_body_goes_straight_to_its_file(self, report_dir, monkeypatch):
         monkeypatch.setattr(web_app, "_run_analysis", lambda *args: None)
@@ -91,7 +91,7 @@ class TestUploadSize:
 
         assert bottle.response.status_code == 400
         assert list(report_dir.iterdir()) == []
-        assert web_app.JOBS == {}
+        assert web_app.STATE.jobs.jobs == {}
 
     def test_unknown_length_is_refused(self, report_dir):
         _bind_upload(_MustNotBeRead(), None)
@@ -116,7 +116,7 @@ class TestBatchUploadSize:
         assert resp.status_int == 413
         assert "error" in resp.json
         assert list(report_dir.iterdir()) == []
-        assert web_app.JOBS == {}
+        assert web_app.STATE.jobs.jobs == {}
 
     def test_batch_within_the_limit_still_runs(self, client, report_dir,
                                                monkeypatch):
@@ -175,10 +175,10 @@ class TestPendingCap:
         slots = threading.BoundedSemaphore(2)
         monkeypatch.setattr(web_app, "_run_analysis",
                             lambda *args: release.wait(10))
-        monkeypatch.setattr(web_app, "_PENDING_SLOTS", slots, raising=False)
+        monkeypatch.setattr(web_app.STATE.jobs, "pending", slots, raising=False)
         yield release
         release.set()
-        # Workers release into web_app._PENDING_SLOTS, so let them finish
+        # Workers release into web_app.STATE.jobs.pending, so let them finish
         # before monkeypatch puts the real semaphore back.
         for _ in range(500):
             if slots._value == 2:
@@ -292,7 +292,7 @@ class TestReportRetention:
         calls = []
         monkeypatch.setattr(web_app, "_prune_reports",
                             lambda: calls.append(1), raising=False)
-        monkeypatch.setattr(web_app, "HISTORY",
+        monkeypatch.setattr(web_app.STATE.history, "entries",
                             [{"id": f"id{i}", "filename": f"{i}.BIN",
                               "metrics": {"max_vibe": 1.0}}
                              for i in range(2)])
@@ -310,7 +310,7 @@ class TestReportRetention:
                           bytes(flight_log(duration_s=6.0).data),
                           content_type="application/octet-stream").json
         for _ in range(1000):
-            state = web_app.JOBS[job["job_id"]]["status"]
+            state = web_app.STATE.jobs.jobs[job["job_id"]]["status"]
             if state in ("done", "error"):
                 break
             time.sleep(0.02)
@@ -457,7 +457,7 @@ class TestMemoryBudget:
             for i, size in enumerate(sizes):
                 path = report_dir / f"upload_{i}.BIN"
                 path.write_bytes(b"x" * size)
-                web_app.JOBS[str(i)] = {"id": str(i), "status": "queued"}
+                web_app.STATE.jobs.jobs[str(i)] = {"id": str(i), "status": "queued"}
                 threads.append(threading.Thread(
                     target=web_app._run_analysis,
                     args=(str(i), str(path), f"{i}.BIN")))
@@ -469,7 +469,7 @@ class TestMemoryBudget:
         monkeypatch.setattr("arduscope.lib.report_session.run_analysis", fake_analysis)
         monkeypatch.setattr(web_app, "ANALYSIS_BASE_BYTES", 0)
         monkeypatch.setattr(web_app, "ANALYSIS_PEAK_PER_LOG_BYTE", 1)
-        monkeypatch.setattr(web_app, "_ANALYSIS_BUDGET",
+        monkeypatch.setattr(web_app.STATE.jobs, "budget",
                             web_app._MemoryBudget(1000))
 
         run_all([600, 600, 600])
@@ -491,10 +491,10 @@ class TestUploadCleanup:
 
         upload = report_dir / "upload_x_a.BIN"
         upload.write_bytes(b"not a log")
-        monkeypatch.setitem(web_app.JOBS, "x", {"id": "x", "start_time": 0.0})
+        monkeypatch.setitem(web_app.STATE.jobs.jobs, "x", {"id": "x", "start_time": 0.0})
         monkeypatch.setattr(web_app.os, "remove", in_use)
 
         web_app._run_analysis("x", str(upload), "a.BIN")
 
-        assert web_app.JOBS["x"]["status"] == "error"
+        assert web_app.STATE.jobs.jobs["x"]["status"] == "error"
         assert "upload_x_a.BIN" in capsys.readouterr().err

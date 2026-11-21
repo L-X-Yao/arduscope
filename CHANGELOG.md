@@ -17,6 +17,8 @@ releases are not published.
 - The CLI, batch and web entry points now share a `ReportSession` for the
   pipeline, diagnosis and fleet order; entry-to-entry imports are gone and
   the linter rejects new ones.
+- Web job and history state live in a `WebState` store instead of module
+  globals; the tests address the store directly.
 
 ### Fixed
 - A failed analyzer import, metrics extraction or diagnosis no longer leaves a

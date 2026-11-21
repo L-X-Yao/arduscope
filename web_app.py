@@ -70,6 +70,11 @@ from arduscope.lib.templates import get_template
 from arduscope.lib.web_limits import (  # noqa: F401 - two re-exported for tests
     ANALYSIS_BASE_BYTES, ANALYSIS_PEAK_PER_LOG_BYTE,
     _MemoryBudget, _clean_upload_name, _estimated_peak_bytes)
+from arduscope.web.state import (
+    ANALYSIS_MEMORY_BUDGET_BYTES,  # noqa: F401 - re-exported for tests
+    MAX_JOBS,
+    STATE,
+)
 from arduscope.lib.web_pages import (_build_fleet_shell,
                            build_airframe_html as _build_airframe_html,
                            build_fleet_html, build_index_html,
@@ -204,23 +209,17 @@ def _set_security_headers():
                         else _APP_CSP)
 
 
-JOBS: dict[str, dict] = {}          # job_id -> job info dict
-_JOBS_LOCK = threading.Lock()       # protect JOBS dict against concurrent access
 # The limit follows peak memory: a log of this size has to fit the budget
 # below. It stood at 500 MB while the largest corpus log, 813 MB, peaked at
 # 8.9 GB. The file was being read again for each message type nobody had
 # declared, and pymavlink kept the index of the read before. The same log
 # now peaks at 3.0 GB in a new server and 4.1 GB in one that has run it.
 MAX_UPLOAD_BYTES = 1024 * 1024 * 1024
-MAX_JOBS = 200                      # evict oldest done/error jobs beyond this
 # An upload holds a thread and its file on disk until its analysis ends.
 # 64 covers a long field day dropped in as one folder, while at the upload
 # limit it still bounds the disk taken by waiting files.
-MAX_PENDING_ANALYSES = 64
-_PENDING_SLOTS = threading.BoundedSemaphore(MAX_PENDING_ANALYSES)
 # What running analyses may use together: leaves room for the system and a
 # browser on a 16 GB field laptop.
-ANALYSIS_MEMORY_BUDGET_BYTES = 8 * 1024 * 1024 * 1024
 # 0 keeps every report: they are the user's work, and only --keep-reports
 # may delete them. It has to stay above MAX_JOBS, or the job list would
 # link to deleted pages.
@@ -235,7 +234,6 @@ MAX_JSON_BYTES = 64 * 1024
 # only files older than an hour are swept at startup.
 ORPHAN_UPLOAD_AGE_S = 3600
 
-_ANALYSIS_BUDGET = _MemoryBudget(ANALYSIS_MEMORY_BUDGET_BYTES)
 
 
 def _finite(value):
@@ -255,25 +253,22 @@ def _finite(value):
 
 
 def _evict_finished_jobs():
-    """Make room for one job. Caller holds _JOBS_LOCK."""
-    if len(JOBS) >= MAX_JOBS:
-        done = [k for k, v in JOBS.items()
+    """Make room for one job. Caller holds STATE.jobs.lock."""
+    if len(STATE.jobs.jobs) >= MAX_JOBS:
+        done = [k for k, v in STATE.jobs.jobs.items()
                 if v.get('status') in ('done', 'error')]
-        done.sort(key=lambda k: JOBS[k].get('start_time', 0))
-        for k in done[:len(JOBS) - MAX_JOBS + 1]:
-            del JOBS[k]
+        done.sort(key=lambda k: STATE.jobs.jobs[k].get('start_time', 0))
+        for k in done[:len(STATE.jobs.jobs) - MAX_JOBS + 1]:
+            del STATE.jobs.jobs[k]
 
 
 def _update_job(job_id: str, **fields):
     """Atomically update multiple fields on a job entry."""
-    with _JOBS_LOCK:
-        job = JOBS.get(job_id)
+    with STATE.jobs.lock:
+        job = STATE.jobs.jobs.get(job_id)
         if job:
             job.update(fields)
 REPORT_DIR: str = ""                # set in main()
-HISTORY: list[dict] = []            # persistent history of completed analyses
-HISTORY_FILE: str = ""              # path to history.json
-_HISTORY_LOCK = threading.Lock()
 
 # =========================================================================
 # Routes
@@ -433,7 +428,7 @@ def _analyze_then_free_slot(*args) -> None:
     try:
         _run_analysis(*args)
     finally:
-        _PENDING_SLOTS.release()
+        STATE.jobs.pending.release()
 
 
 def _start_job(job_id: str, save_path: str, filename: str, written: int,
@@ -443,9 +438,9 @@ def _start_job(job_id: str, save_path: str, filename: str, written: int,
     The caller holds a pending slot, and the thread gives it back. If the
     thread cannot start nothing ever will, so the job and its file go.
     """
-    with _JOBS_LOCK:
+    with STATE.jobs.lock:
         _evict_finished_jobs()
-        JOBS[job_id] = {
+        STATE.jobs.jobs[job_id] = {
             'id': job_id,
             'filename': filename,
             'status': 'queued',
@@ -472,8 +467,8 @@ def _start_job(job_id: str, save_path: str, filename: str, written: int,
     try:
         worker.start()
     except BaseException:
-        with _JOBS_LOCK:
-            JOBS.pop(job_id, None)
+        with STATE.jobs.lock:
+            STATE.jobs.jobs.pop(job_id, None)
         _discard(save_path)
         raise
 
@@ -521,7 +516,7 @@ def upload():
     refused = _refuse_upload_length()
     if refused:
         return refused
-    if not _PENDING_SLOTS.acquire(blocking=False):
+    if not STATE.jobs.pending.acquire(blocking=False):
         return _json_error(429, t("web.queue_full"))
 
     job_id = uuid.uuid4().hex[:8]
@@ -541,7 +536,7 @@ def upload():
         # Whatever went wrong, the slot goes back: each one that leaked
         # was gone until the server restarted, and there are 64.
         if not handed_over:
-            _PENDING_SLOTS.release()
+            STATE.jobs.pending.release()
 
     response.content_type = 'application/json'
     return json.dumps({'job_id': job_id})
@@ -569,7 +564,7 @@ def upload_batch():
         if not filename.upper().endswith('.BIN'):
             errors.append({"filename": filename, "error": t("web.not_bin_file", filename=filename)})
             continue
-        if not _PENDING_SLOTS.acquire(blocking=False):
+        if not STATE.jobs.pending.acquire(blocking=False):
             errors.append({"filename": filename, "error": t("web.queue_full")})
             continue
 
@@ -589,7 +584,7 @@ def upload_batch():
             continue
         finally:
             if not handed_over:
-                _PENDING_SLOTS.release()
+                STATE.jobs.pending.release()
         job_ids.append({"job_id": job_id, "filename": filename})
 
     response.content_type = 'application/json'
@@ -600,11 +595,11 @@ def upload_batch():
 def list_jobs():
     """List all analysis jobs."""
     response.content_type = 'application/json'
-    # Snapshot each job inside the lock — list(JOBS.values()) only captures
+    # Snapshot each job inside the lock — list(STATE.jobs.jobs.values()) only captures
     # references, so concurrent _update_job() can mutate dicts mid-serialize,
     # raising RuntimeError or producing torn reads. Same race as get_job.
-    with _JOBS_LOCK:
-        jobs = [dict(j) for j in JOBS.values()]
+    with STATE.jobs.lock:
+        jobs = [dict(j) for j in STATE.jobs.jobs.values()]
     return json.dumps(_finite({'jobs': jobs}))
 
 
@@ -612,8 +607,8 @@ def list_jobs():
 def get_job(job_id):
     """Get single job status."""
     response.content_type = 'application/json'
-    with _JOBS_LOCK:
-        raw = JOBS.get(job_id)
+    with STATE.jobs.lock:
+        raw = STATE.jobs.jobs.get(job_id)
         job = dict(raw) if raw is not None else None
     if job is None:
         response.status = 404
@@ -634,9 +629,9 @@ def compare():
     log_names: list[str] = []
     all_metrics: list[dict] = []
     all_params: list[dict] = []
-    with _JOBS_LOCK:
+    with STATE.jobs.lock:
         for jid in job_ids:
-            job = JOBS.get(jid) if isinstance(jid, str) else None
+            job = STATE.jobs.jobs.get(jid) if isinstance(jid, str) else None
             if job and job['status'] == 'done' and job.get('metrics'):
                 log_names.append(job['filename'])
                 all_metrics.append(job['metrics'])
@@ -677,10 +672,10 @@ def compare_history():
     log_names: list[str] = []
     all_metrics: list[dict] = []
     all_params: list[dict] = []
-    with _HISTORY_LOCK:
+    with STATE.history.lock:
         # Archive order: the page posts newest first, and a log with no
         # GPS time has nothing else to be placed by.
-        for entry in HISTORY:
+        for entry in STATE.history.entries:
             if entry.get('id') in wanted and entry.get('metrics'):
                 log_names.append(entry.get('filename', ''))
                 all_metrics.append(entry['metrics'])
@@ -887,16 +882,16 @@ def fleet_set_alias(key):
 def get_history():
     """Return persistent analysis history."""
     response.content_type = 'application/json'
-    with _HISTORY_LOCK:
-        snapshot = list(HISTORY)
+    with STATE.history.lock:
+        snapshot = list(STATE.history.entries)
     return json.dumps(_finite({'history': snapshot}))
 
 
 @app.route('/api/history', method='DELETE')
 def clear_history():
     """Clear analysis history."""
-    with _HISTORY_LOCK:
-        HISTORY.clear()
+    with STATE.history.lock:
+        STATE.history.entries.clear()
         _save_history()
     response.content_type = 'application/json'
     return json.dumps({'ok': True})
@@ -904,26 +899,25 @@ def clear_history():
 
 def _load_history():
     """Load history from disk."""
-    global HISTORY
-    if HISTORY_FILE and os.path.isfile(HISTORY_FILE):
+    if STATE.history.path and os.path.isfile(STATE.history.path):
         try:
-            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+            with open(STATE.history.path, 'r', encoding='utf-8') as f:
                 loaded = json.load(f)
             if not isinstance(loaded, list):
                 raise ValueError(type(loaded).__name__)
             for entry in loaded:
                 entry.setdefault('id', uuid.uuid4().hex[:8])
-            HISTORY = loaded
+            STATE.history.entries = loaded
         except Exception as e:
             # Set it aside: the next save would overwrite the only copy.
-            aside = HISTORY_FILE + ".corrupt"
+            aside = STATE.history.path + ".corrupt"
             try:
-                os.replace(HISTORY_FILE, aside)
+                os.replace(STATE.history.path, aside)
             except OSError:
-                aside = HISTORY_FILE
+                aside = STATE.history.path
             print(t("web.history_unreadable", path=aside, detail=e),
                   file=sys.stderr)
-            HISTORY = []
+            STATE.history.entries = []
 
 
 def _save_history():
@@ -932,15 +926,15 @@ def _save_history():
     Written beside the file and swapped in. Rewriting in place truncates
     first, so a kill or a full disk mid-write lost all of it.
     """
-    if not HISTORY_FILE:
+    if not STATE.history.path:
         return
-    temp = f"{HISTORY_FILE}.{os.getpid()}.tmp"
+    temp = f"{STATE.history.path}.{os.getpid()}.tmp"
     try:
         with open(temp, 'w', encoding='utf-8') as f:
-            json.dump(_finite(HISTORY), f, ensure_ascii=False, indent=2)
+            json.dump(_finite(STATE.history.entries), f, ensure_ascii=False, indent=2)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(temp, HISTORY_FILE)
+        os.replace(temp, STATE.history.path)
     except (OSError, TypeError, ValueError) as e:
         print(t("web.history_save_failed", detail=e), file=sys.stderr)
         try:
@@ -963,10 +957,10 @@ def _append_history(job: dict):
         'metrics': job.get('metrics'),
         'analyzer_results': job.get('analyzer_results'),
     }
-    with _HISTORY_LOCK:
-        HISTORY.append(entry)
-        if len(HISTORY) > 100:
-            HISTORY[:] = HISTORY[-100:]
+    with STATE.history.lock:
+        STATE.history.entries.append(entry)
+        if len(STATE.history.entries) > 100:
+            STATE.history.entries[:] = STATE.history.entries[-100:]
         _save_history()
 
 
@@ -993,7 +987,7 @@ def _run_analysis(job_id: str, filepath: str, original_name: str,
     memory = 0
     try:
         memory = _estimated_peak_bytes(os.path.getsize(filepath))
-        _ANALYSIS_BUDGET.acquire(memory)
+        STATE.jobs.budget.acquire(memory)
         _update_job(job_id, status='running',
                     message=t("web.reading_log"), progress=5)
 
@@ -1121,8 +1115,8 @@ def _run_analysis(job_id: str, filepath: str, original_name: str,
                 'summary': r.summary,
             })
 
-        with _JOBS_LOCK:
-            job = JOBS.get(job_id)
+        with STATE.jobs.lock:
+            job = STATE.jobs.jobs.get(job_id)
             start_time = job.get('start_time', 0) if job else 0
         elapsed = round(time.time() - start_time, 1)
 
@@ -1134,9 +1128,9 @@ def _run_analysis(job_id: str, filepath: str, original_name: str,
                     health_score=health_score)
 
         # Read job snapshot under lock, then append history outside lock
-        # (history write does file I/O, shouldn't hold _JOBS_LOCK).
-        with _JOBS_LOCK:
-            job_snapshot = JOBS.get(job_id)
+        # (history write does file I/O, shouldn't hold STATE.jobs.lock).
+        with STATE.jobs.lock:
+            job_snapshot = STATE.jobs.jobs.get(job_id)
         if job_snapshot:
             _append_history(job_snapshot)
 
@@ -1145,7 +1139,7 @@ def _run_analysis(job_id: str, filepath: str, original_name: str,
                     message=t("web.analysis_failed", detail=e))
 
     finally:
-        _ANALYSIS_BUDGET.release(memory)
+        STATE.jobs.budget.release(memory)
         try:
             os.remove(filepath)
         except FileNotFoundError:
@@ -1231,7 +1225,7 @@ def main():
     MAX_KEPT_REPORTS = args.keep_reports
 
     from arduscope.lib.i18n import set_locale
-    global _UI_LOCALE, REPORT_DIR, HISTORY_FILE, _ALLOW_SETTINGS
+    global _UI_LOCALE, REPORT_DIR, _ALLOW_SETTINGS
     _UI_LOCALE = args.lang
     _ALLOW_SETTINGS = _is_loopback(args.host)
     set_locale(args.lang)
@@ -1242,7 +1236,7 @@ def main():
     os.makedirs(REPORT_DIR, exist_ok=True)
     _sweep_orphaned_uploads()
 
-    HISTORY_FILE = os.path.join(REPORT_DIR, "history.json")
+    STATE.history.path = os.path.join(REPORT_DIR, "history.json")
     _load_history()
     _configure_allowed_hosts(args.host, args.allow_host)
     _warn_if_exposed(args.host)

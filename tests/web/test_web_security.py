@@ -25,9 +25,9 @@ from arduscope.lib.vehicle_detect import VehicleInfo
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(web_app, "REPORT_DIR", str(tmp_path))
-    monkeypatch.setattr(web_app, "HISTORY_FILE", str(tmp_path / "history.json"))
-    monkeypatch.setattr(web_app, "HISTORY", [])
-    monkeypatch.setattr(web_app, "JOBS", {})
+    monkeypatch.setattr(web_app.STATE.history, "path", str(tmp_path / "history.json"))
+    monkeypatch.setattr(web_app.STATE.history, "entries", [])
+    monkeypatch.setattr(web_app.STATE.jobs, "jobs", {})
     yield TestApp(web_app.app)
     set_locale("zh")
 
@@ -96,7 +96,7 @@ class TestOriginHeader:
     """CSRF: a foreign page can POST here without reading the response."""
 
     def _jobs(self):
-        return dict(web_app.JOBS)
+        return dict(web_app.STATE.jobs.jobs)
 
     @pytest.mark.parametrize("origin", [
         "https://evil.example", "http://127.0.0.1:3000", "http://localhost:8080",
@@ -263,9 +263,10 @@ class TestNetworkBindWarning:
         # main() sets all of these, so give monkeypatch something to restore.
         for name, value in (("_ALLOWED_HOST_NAMES", set()),
                             ("_ACCEPT_ANY_IP", False), ("_UI_LOCALE", "zh"),
-                            ("REPORT_DIR", ""), ("HISTORY_FILE", ""),
-                            ("HISTORY", [])):
+                            ("REPORT_DIR", "")):
             monkeypatch.setattr(web_app, name, value)
+        monkeypatch.setattr(web_app.STATE.history, "path", "")
+        monkeypatch.setattr(web_app.STATE.history, "entries", [])
         web_app.main()
         set_locale("zh")
         assert len(started) == 1

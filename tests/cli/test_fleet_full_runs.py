@@ -155,12 +155,12 @@ class TestArchiveFailureIsVisible:
     def test_web_job_carries_it(self, unusable_archive, log_path,
                                 monkeypatch, capsys):
         monkeypatch.setattr(web_app, "REPORT_DIR", unusable_archive)
-        monkeypatch.setattr(web_app, "HISTORY_FILE", "")
+        monkeypatch.setattr(web_app.STATE.history, "path", "")
         upload = os.path.join(unusable_archive, "upload_x_a.bin")
         shutil.copy(log_path, upload)
-        monkeypatch.setitem(web_app.JOBS, "x", {"id": "x", "start_time": 0.0})
+        monkeypatch.setitem(web_app.STATE.jobs.jobs, "x", {"id": "x", "start_time": 0.0})
         web_app._run_analysis("x", upload, "a.bin")
-        job = web_app.JOBS["x"]
+        job = web_app.STATE.jobs.jobs["x"]
         assert job["status"] == "done"
         assert job["archive_warning"]
         assert job["archive_warning"] in capsys.readouterr().err
@@ -170,22 +170,22 @@ class TestArchiveFailureIsVisible:
 
     def test_partial_web_run_says_why(self, tmp_path, log_path, monkeypatch):
         monkeypatch.setattr(web_app, "REPORT_DIR", str(tmp_path))
-        monkeypatch.setattr(web_app, "HISTORY_FILE", "")
+        monkeypatch.setattr(web_app.STATE.history, "path", "")
         upload = str(tmp_path / "upload_y_a.bin")
         shutil.copy(log_path, upload)
-        monkeypatch.setitem(web_app.JOBS, "y", {"id": "y", "start_time": 0.0})
+        monkeypatch.setitem(web_app.STATE.jobs.jobs, "y", {"id": "y", "start_time": 0.0})
         web_app._run_analysis("y", upload, "a.bin", "copter-factory")
-        assert t("fleet.partial_run") in web_app.JOBS["y"]["archive_warning"]
+        assert t("fleet.partial_run") in web_app.STATE.jobs.jobs["y"]["archive_warning"]
 
 
 class TestArchivedLogName:
     def test_web_flight_keeps_the_name_it_was_uploaded_under(
             self, tmp_path, log_path, monkeypatch):
         monkeypatch.setattr(web_app, "REPORT_DIR", str(tmp_path))
-        monkeypatch.setattr(web_app, "HISTORY_FILE", "")
+        monkeypatch.setattr(web_app.STATE.history, "path", "")
         upload = str(tmp_path / "upload_1a2b3c4d_log_88.bin")
         shutil.copy(log_path, upload)
-        monkeypatch.setitem(web_app.JOBS, "z", {"id": "z", "start_time": 0.0})
+        monkeypatch.setitem(web_app.STATE.jobs.jobs, "z", {"id": "z", "start_time": 0.0})
         web_app._run_analysis("z", upload, "log_88.bin")
         conn = sqlite3.connect(str(tmp_path / "fleet.db"))
         names = conn.execute("SELECT log_name FROM flights").fetchall()

@@ -31,23 +31,23 @@ def app():
     import web_app
 
     original_report_dir = web_app.REPORT_DIR
-    original_history_file = web_app.HISTORY_FILE
-    original_history = web_app.HISTORY[:]
-    original_jobs = dict(web_app.JOBS)
+    original_history_file = web_app.STATE.history.path
+    original_history = web_app.STATE.history.entries[:]
+    original_jobs = dict(web_app.STATE.jobs.jobs)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         web_app.REPORT_DIR = tmpdir
-        web_app.HISTORY_FILE = os.path.join(tmpdir, "history.json")
-        web_app.HISTORY = []
-        web_app.JOBS = {}
+        web_app.STATE.history.path = os.path.join(tmpdir, "history.json")
+        web_app.STATE.history.entries = []
+        web_app.STATE.jobs.jobs = {}
 
         yield TestApp(web_app.app)
 
         # Restore original state
         web_app.REPORT_DIR = original_report_dir
-        web_app.HISTORY_FILE = original_history_file
-        web_app.HISTORY = original_history
-        web_app.JOBS = original_jobs
+        web_app.STATE.history.path = original_history_file
+        web_app.STATE.history.entries = original_history
+        web_app.STATE.jobs.jobs = original_jobs
 
     # Reset locale to zh so other tests are not affected
     set_locale("zh")
@@ -156,7 +156,7 @@ def test_compare_needs_two_jobs(app):
 
     # Only one fake "done" job
     import web_app
-    web_app.JOBS["fake1"] = {
+    web_app.STATE.jobs.jobs["fake1"] = {
         "id": "fake1",
         "filename": "test.BIN",
         "status": "done",
@@ -220,7 +220,7 @@ def _compare_rows(app, url):
 def test_compare_history_in_page_order_reads_oldest_first(app):
     """The page lists newest first and posts in that order."""
     import web_app
-    web_app.HISTORY[:] = [_history_entry("old.BIN", 40.0, 1_780_000_000.0),
+    web_app.STATE.history.entries[:] = [_history_entry("old.BIN", 40.0, 1_780_000_000.0),
                           _history_entry("new.BIN", 20.0, 1_780_090_000.0)]
     resp = app.post_json("/api/compare-history",
                          {"ids": ["new.BIN", "old.BIN"]})
@@ -229,7 +229,7 @@ def test_compare_history_in_page_order_reads_oldest_first(app):
 
 def test_compare_history_without_gps_time_uses_archive_order(app):
     import web_app
-    web_app.HISTORY[:] = [_history_entry("old.BIN", 40.0),
+    web_app.STATE.history.entries[:] = [_history_entry("old.BIN", 40.0),
                           _history_entry("new.BIN", 20.0)]
     resp = app.post_json("/api/compare-history",
                          {"ids": ["new.BIN", "old.BIN"]})
@@ -248,12 +248,12 @@ def _compared_names(url):
 def test_compare_history_survives_the_100_entry_trim(app):
     """An open page must compare what it shows, after the list has moved."""
     import web_app
-    web_app.HISTORY[:] = [_history_entry(f"flight_{i}.BIN", float(i))
+    web_app.STATE.history.entries[:] = [_history_entry(f"flight_{i}.BIN", float(i))
                           for i in range(100)]
-    chosen = [web_app.HISTORY[40]["id"], web_app.HISTORY[50]["id"]]
+    chosen = [web_app.STATE.history.entries[40]["id"], web_app.STATE.history.entries[50]["id"]]
     web_app._append_history({"id": "next", "filename": "flight_100.BIN",
                              "metrics": {"max_vibe": 1.0}})
-    assert web_app.HISTORY[0]["filename"] == "flight_1.BIN"  # precondition
+    assert web_app.STATE.history.entries[0]["filename"] == "flight_1.BIN"  # precondition
     resp = app.post_json("/api/compare-history", {"ids": chosen})
     assert _compared_names(resp.json["url"]) == ["flight_40.BIN",
                                                  "flight_50.BIN"]
@@ -261,9 +261,9 @@ def test_compare_history_survives_the_100_entry_trim(app):
 
 def test_compare_history_entry_gone_from_the_list_is_an_error(app):
     import web_app
-    web_app.HISTORY[:] = [_history_entry(f"flight_{i}.BIN", float(i))
+    web_app.STATE.history.entries[:] = [_history_entry(f"flight_{i}.BIN", float(i))
                           for i in range(100)]
-    chosen = [web_app.HISTORY[0]["id"], web_app.HISTORY[1]["id"]]
+    chosen = [web_app.STATE.history.entries[0]["id"], web_app.STATE.history.entries[1]["id"]]
     for i in range(100, 102):
         web_app._append_history({"id": str(i), "filename": f"flight_{i}.BIN",
                                  "metrics": {"max_vibe": 1.0}})
@@ -276,17 +276,17 @@ def test_history_entries_get_stable_ids(app):
     import web_app
     web_app._append_history({"id": "job1", "filename": "a.BIN",
                              "metrics": {}})
-    assert web_app.HISTORY[0]["id"] == "job1"
+    assert web_app.STATE.history.entries[0]["id"] == "job1"
 
 
 def test_old_history_entries_gain_ids_on_load(app):
     """A file written before entries had ids must stay comparable."""
     import web_app
-    with open(web_app.HISTORY_FILE, "w", encoding="utf-8") as f:
+    with open(web_app.STATE.history.path, "w", encoding="utf-8") as f:
         json.dump([{"filename": "a.BIN", "metrics": {"max_vibe": 9.0}},
                    {"filename": "b.BIN", "metrics": {"max_vibe": 8.0}}], f)
     web_app._load_history()
-    ids = [e["id"] for e in web_app.HISTORY]
+    ids = [e["id"] for e in web_app.STATE.history.entries]
     assert len(set(ids)) == 2 and all(ids)
     assert app.post_json("/api/compare-history", {"ids": ids}).status_int == 200
 
@@ -300,7 +300,7 @@ def test_page_selects_history_by_id_not_position(app):
 def test_compare_history_does_not_claim_identical_parameters(app):
     """History keeps no parameters, so it has nothing to compare."""
     import web_app
-    web_app.HISTORY[:] = [_history_entry("a.BIN", 40.0),
+    web_app.STATE.history.entries[:] = [_history_entry("a.BIN", 40.0),
                           _history_entry("b.BIN", 20.0)]
     resp = app.post_json("/api/compare-history",
                          {"ids": ["a.BIN", "b.BIN"]})
@@ -314,15 +314,15 @@ def test_compare_history_does_not_claim_identical_parameters(app):
 
 def _reload_history():
     import web_app
-    web_app.HISTORY[:] = []
+    web_app.STATE.history.entries[:] = []
     web_app._load_history()
-    return [e["filename"] for e in web_app.HISTORY]
+    return [e["filename"] for e in web_app.STATE.history.entries]
 
 
 def test_interrupted_history_write_keeps_the_old_file(app, monkeypatch):
     """Dying mid-write used to leave a truncated file that loads as empty."""
     import web_app
-    web_app.HISTORY[:] = [_history_entry("a.BIN", 10.0)]
+    web_app.STATE.history.entries[:] = [_history_entry("a.BIN", 10.0)]
     web_app._save_history()
     assert _reload_history() == ["a.BIN"]            # precondition
 
@@ -330,7 +330,7 @@ def test_interrupted_history_write_keeps_the_old_file(app, monkeypatch):
         f.write('[{"filename": "b.B')
         raise OSError("disk full")
 
-    web_app.HISTORY.append(_history_entry("b.BIN", 20.0))
+    web_app.STATE.history.entries.append(_history_entry("b.BIN", 20.0))
     monkeypatch.setattr(web_app.json, "dump", die_halfway)
     web_app._save_history()
     monkeypatch.undo()
@@ -344,7 +344,7 @@ def test_interrupted_history_write_keeps_the_old_file(app, monkeypatch):
 def test_unserializable_entry_does_not_break_the_caller(app):
     """A finished job must not turn into an error over its history entry."""
     import web_app
-    web_app.HISTORY[:] = [_history_entry("a.BIN", 10.0)]
+    web_app.STATE.history.entries[:] = [_history_entry("a.BIN", 10.0)]
     web_app._save_history()
     web_app._append_history({"filename": "b.BIN", "metrics": {"x": object()}})
     assert _reload_history() == ["a.BIN"]
@@ -352,9 +352,9 @@ def test_unserializable_entry_does_not_break_the_caller(app):
 
 def test_saved_history_replaces_the_previous_one(app):
     import web_app
-    web_app.HISTORY[:] = [_history_entry("a.BIN", 10.0)]
+    web_app.STATE.history.entries[:] = [_history_entry("a.BIN", 10.0)]
     web_app._save_history()
-    web_app.HISTORY.append(_history_entry("b.BIN", 20.0))
+    web_app.STATE.history.entries.append(_history_entry("b.BIN", 20.0))
     web_app._save_history()
     assert _reload_history() == ["a.BIN", "b.BIN"]
 
@@ -364,11 +364,11 @@ def test_saved_history_replaces_the_previous_one(app):
 def test_unreadable_history_file_is_kept_aside(app, content):
     """The next save must not destroy the only copy of what it held."""
     import web_app
-    with open(web_app.HISTORY_FILE, "w", encoding="utf-8") as f:
+    with open(web_app.STATE.history.path, "w", encoding="utf-8") as f:
         f.write(content)
     assert _reload_history() == []
     web_app._append_history({"filename": "new.BIN", "metrics": {}})
-    with open(web_app.HISTORY_FILE + ".corrupt", encoding="utf-8") as f:
+    with open(web_app.STATE.history.path + ".corrupt", encoding="utf-8") as f:
         assert f.read() == content
     assert _reload_history() == ["new.BIN"]
 
@@ -376,7 +376,7 @@ def test_unreadable_history_file_is_kept_aside(app, content):
 def test_unreadable_history_that_cannot_be_moved_does_not_stop_startup(
         app, monkeypatch):
     import web_app
-    with open(web_app.HISTORY_FILE, "w", encoding="utf-8") as f:
+    with open(web_app.STATE.history.path, "w", encoding="utf-8") as f:
         f.write('[{"filename": "a.B')
 
     def refuse(*_args):
@@ -384,7 +384,7 @@ def test_unreadable_history_that_cannot_be_moved_does_not_stop_startup(
 
     monkeypatch.setattr(web_app.os, "replace", refuse)
     web_app._load_history()
-    assert web_app.HISTORY == []
+    assert web_app.STATE.history.entries == []
 
 
 def _start_server(monkeypatch, *args):
@@ -402,9 +402,11 @@ def home(tmp_path, monkeypatch):
     import web_app
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
-    for name in ("REPORT_DIR", "HISTORY_FILE", "_UI_LOCALE"):
+    for name in ("REPORT_DIR", "_UI_LOCALE"):
         monkeypatch.setattr(web_app, name, getattr(web_app, name))
-    monkeypatch.setattr(web_app, "HISTORY", [])
+    monkeypatch.setattr(web_app.STATE.history, "path",
+                        web_app.STATE.history.path)
+    monkeypatch.setattr(web_app.STATE.history, "entries", [])
     yield tmp_path
     set_locale("zh")
 
@@ -414,11 +416,11 @@ def test_default_report_dir_survives_a_restart(home, monkeypatch):
     import web_app
     first = _start_server(monkeypatch)
     web_app._append_history({"filename": "a.BIN", "metrics": {}})
-    web_app.HISTORY[:] = []
+    web_app.STATE.history.entries[:] = []
     second = _start_server(monkeypatch)
     assert first == second
     assert first == str(home / ".arduscope" / "reports")
-    assert [e["filename"] for e in web_app.HISTORY] == ["a.BIN"]
+    assert [e["filename"] for e in web_app.STATE.history.entries] == ["a.BIN"]
 
 
 def test_default_report_dir_does_not_depend_on_the_working_dir(
@@ -468,9 +470,9 @@ def test_batch_upload_still_rejects_other_files(app, no_worker):
 
 def _full_job_table():
     import web_app
-    web_app.JOBS.clear()
+    web_app.STATE.jobs.jobs.clear()
     for i in range(web_app.MAX_JOBS):
-        web_app.JOBS[f"done{i}"] = {"id": f"done{i}", "status": "done",
+        web_app.STATE.jobs.jobs[f"done{i}"] = {"id": f"done{i}", "status": "done",
                                     "start_time": float(i)}
 
 
@@ -485,24 +487,24 @@ def test_uploads_keep_the_job_table_within_its_limit(app, no_worker, upload):
     _full_job_table()
     for _ in range(5):
         upload(app)
-    assert len(web_app.JOBS) == web_app.MAX_JOBS
-    assert "done0" not in web_app.JOBS               # oldest went first
-    assert f"done{web_app.MAX_JOBS - 1}" in web_app.JOBS
+    assert len(web_app.STATE.jobs.jobs) == web_app.MAX_JOBS
+    assert "done0" not in web_app.STATE.jobs.jobs               # oldest went first
+    assert f"done{web_app.MAX_JOBS - 1}" in web_app.STATE.jobs.jobs
 
 
 def test_unfinished_jobs_are_never_evicted(app, no_worker):
     import web_app
     _full_job_table()
-    web_app.JOBS["done0"]["status"] = "running"
+    web_app.STATE.jobs.jobs["done0"]["status"] = "running"
     app.post("/api/upload-batch", upload_files=[("files", "a.BIN", b"x" * 40)])
-    assert "done0" in web_app.JOBS
-    assert "done1" not in web_app.JOBS
+    assert "done0" in web_app.STATE.jobs.jobs
+    assert "done1" not in web_app.STATE.jobs.jobs
 
 
 def test_compare_jobs_ignores_upload_order(app):
     """Parallel uploads finish in any order; the flights did not."""
     import web_app
-    web_app.JOBS.update({
+    web_app.STATE.jobs.jobs.update({
         "new": {"status": "done", "filename": "new.BIN",
                 "metrics": {"max_vibe": 20.0,
                             "flight_time": 1_780_090_000.0}},
@@ -577,8 +579,8 @@ class TestNonFiniteValues:
 
     def test_job_list(self, app):
         import web_app
-        with web_app._JOBS_LOCK:
-            web_app.JOBS["nan-job"] = {
+        with web_app.STATE.jobs.lock:
+            web_app.STATE.jobs.jobs["nan-job"] = {
                 "id": "nan-job", "status": "done",
                 "params": {"X": float("nan"), "Y": float("inf"), "Z": 1.5},
             }
@@ -589,17 +591,17 @@ class TestNonFiniteValues:
             one = self._strict(app.get("/api/jobs/nan-job").body)
             assert one["params"]["X"] is None
         finally:
-            with web_app._JOBS_LOCK:
-                del web_app.JOBS["nan-job"]
+            with web_app.STATE.jobs.lock:
+                del web_app.STATE.jobs.jobs["nan-job"]
 
     def test_history(self, app):
         import web_app
-        with web_app._HISTORY_LOCK:
-            web_app.HISTORY.append({"metrics": {"max_vibe": float("nan")}})
+        with web_app.STATE.history.lock:
+            web_app.STATE.history.entries.append({"metrics": {"max_vibe": float("nan")}})
         try:
             history = self._strict(app.get("/api/history").body)["history"]
             assert history[-1]["metrics"]["max_vibe"] is None
         finally:
-            with web_app._HISTORY_LOCK:
-                web_app.HISTORY.pop()
+            with web_app.STATE.history.lock:
+                web_app.STATE.history.entries.pop()
 
