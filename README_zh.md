@@ -224,16 +224,17 @@ arduscope/
 ├── batch_report.py       批量处理 CLI
 ├── fleet_report.py       机队历史 CLI
 ├── web_app.py            Web 界面 (Bottle + Waitress)
-├── src/arduscope/lib/                  核心库
-│   ├── pipeline.py       统一分析管线
-│   ├── log_reader.py     pymavlink .BIN 解析器
-│   ├── html_report.py    HTML 报告生成器
-│   ├── ai_diagnosis.py   交叉关联引擎 (27 条规则)
-│   ├── thresholds.py     阈值配置
-│   ├── i18n.py           国际化
-│   └── ...
-├── src/arduscope/analyzers/            32 个自动发现的分析器
-├── src/arduscope/locales/              zh.json + en.json
+├── src/arduscope/        Python 包
+│   ├── lib/              核心库
+│   │   ├── pipeline.py   统一分析管线
+│   │   ├── log_reader.py pymavlink .BIN 解析器
+│   │   ├── html_report.py  HTML 报告生成器
+│   │   ├── ai_diagnosis.py  交叉关联引擎 (27 条规则)
+│   │   ├── thresholds.py 阈值配置
+│   │   ├── i18n.py       国际化
+│   │   └── ...
+│   ├── analyzers/        32 个自动发现的分析器
+│   └── locales/          zh.json + en.json
 ├── tools/                CI、lint、release、baseline 工具
 ├── tests/                pytest 测试套件（fast、合成、真实日志、SITL 四层）
 └── docs/                 阈值溯源、建议依据、SITL 覆盖、已知限制

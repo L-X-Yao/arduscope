@@ -231,16 +231,17 @@ arduscope/
 ├── batch_report.py       Batch processing CLI
 ├── fleet_report.py       Fleet history CLI
 ├── web_app.py            Web interface (Bottle + Waitress)
-├── src/arduscope/lib/                  Core libraries
-│   ├── pipeline.py       Unified analysis pipeline
-│   ├── log_reader.py     pymavlink .BIN parser
-│   ├── html_report.py    HTML report generator
-│   ├── ai_diagnosis.py   Cross-correlation engine (27 rules)
-│   ├── thresholds.py     Threshold configuration
-│   ├── i18n.py           Internationalization
-│   └── ...
-├── src/arduscope/analyzers/            32 auto-discovered analyzers
-├── src/arduscope/locales/              zh.json + en.json
+├── src/arduscope/        Python package
+│   ├── lib/              Core libraries
+│   │   ├── pipeline.py   Unified analysis pipeline
+│   │   ├── log_reader.py pymavlink .BIN parser
+│   │   ├── html_report.py  HTML report generator
+│   │   ├── ai_diagnosis.py  Cross-correlation engine (27 rules)
+│   │   ├── thresholds.py Threshold configuration
+│   │   ├── i18n.py       Internationalization
+│   │   └── ...
+│   ├── analyzers/        32 auto-discovered analyzers
+│   └── locales/          zh.json + en.json
 ├── tools/                CI, lint, release, baseline utilities
 ├── tests/                pytest suite (fast, synthetic, real-log and SITL tiers)
 └── docs/                 Threshold traceability, suggestion evidence, SITL coverage, limitations

@@ -60,7 +60,7 @@ uses `src/arduscope/lib/fleet_history.py`; both are entry points, not library la
   `docs/suggestion_evidence.md` if it suggests a parameter.
 - **New page**: add a pure builder to `src/arduscope/lib/web_pages.py`, a thin route in
   `web_app.py`. Keep request/state reads in the route, not the builder.
-- **New entry point**: import `lib.pipeline`, then add it to
+- **New entry point**: import `arduscope.lib.pipeline`, then add it to
   `pyproject.toml` (`py-modules`, `project.scripts`) and to
   `build_windows_package.py` (`INCLUDE_FILES`, `NUITKA_ENTRY_POINTS`).
   `tests/test_packaging.py` checks all three.

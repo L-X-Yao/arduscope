@@ -30,52 +30,53 @@ Hard rules for every session in this repository; the details are in
 ## Project structure
 
 ```
-src/arduscope/analyzers/           32 auto-discovered analyzer modules
-  __init__.py        BaseAnalyzer, AnalysisResult, discover_analyzers()
-src/arduscope/lib/                 Core library
-  results.py         AnalysisResult dataclass (canonical location, re-exported by src/arduscope/analyzers/)
-  pipeline.py        Unified analysis pipeline: run_analysis() → PipelineResult
-  param_conflict.py  Cross-analyzer parameter conflict detection
-  thresholds.py      Thresholds dataclass (all analysis thresholds with sources)
-  i18n.py            Internationalization: t(_key, **kwargs), set_locale()
-  ai_diagnosis.py    Cross-correlation diagnosis engine (27 rules)
-  log_reader.py      ArduPilot .BIN log parser (pymavlink)
-  html_report.py     HTML report generator (Plotly)
-  pdf_export.py      PDF export via weasyprint (optional dep)
-  executive_summary.py  Health score + action-level aggregation
-  vehicle_detect.py  Vehicle type / firmware detection
-  trend_analyzer.py  Multi-log trend analysis
-  fleet_history.py   Per-airframe flight archive (sqlite, serial-keyed)
-  fft_helpers.py     FFT spectrum utilities for notch tuning
-  templates.py       Scenario templates (analyzer subsets, stricter thresholds)
-  outputs.py         Motor channels from SERVOn_FUNCTION, RCOU/RCO2/RCO3 reads
-  param_limits.py    @Range of suggested parameters, applied in AnalysisResult
-  ekf_lanes.py       Primary EKF lane from XKF4.PI
-  gps_velocity.py    GPS velocity, with the VZ placeholder handled
-  battery_packs.py   BAT instances that measure current, their combined power
-  plane_phase.py     Rows a Plane flew on its wing: STAT lookups, VTOL windows
-  hover.py           Rows where the lift motors carry the aircraft, level-hover thrust
-  csv_safe.py        Spreadsheet-safe CSV cells
-  np_helpers.py      Numpy helpers shared by analyzers and report builders
-  web_pages.py       HTML pages served by web_app
-  web_limits.py      Upload-name and memory-budget helpers for the web app
-  multi_metrics.py   Per-log metrics for the multi-log comparison report
-  comparison_report.py  HTML report that compares several logs
-  agent/             Optional online analysis agent (read-only tools)
-    tools.py         Bounded, read-only tool layer over the pipeline
-    loop.py          Predefined workflow, tool budgets, submit_analysis
-    providers.py     Anthropic Messages and OpenAI chat-completions adapters
-    citations.py     Checks claims against the tool calls they cite
-    config.py        ~/.arduscope/agent.json, environment key precedence
-    egress.py        GPS/serial/STATUSTEXT redaction defaults
-    card.py          AnalysisResult card and fallback chain
-src/arduscope/locales/             i18n string files
-  zh.json            Chinese (primary/fallback locale)
-  en.json            English
+src/arduscope/
+  analyzers/         32 auto-discovered analyzer modules
+    __init__.py      BaseAnalyzer, AnalysisResult, discover_analyzers()
+  lib/               Core library
+    pipeline.py      Unified analysis pipeline: run_analysis() -> PipelineResult
+    results.py       AnalysisResult dataclass (canonical location)
+    log_reader.py    ArduPilot .BIN log parser (pymavlink)
+    vehicle_detect.py  Vehicle type / firmware detection
+    thresholds.py    Thresholds dataclass (all analysis thresholds with sources)
+    i18n.py          Internationalization: t(_key, **kwargs), set_locale()
+    ai_diagnosis.py  Cross-correlation diagnosis engine (27 rules)
+    html_report.py   HTML report generator (Plotly)
+    comparison_report.py  Multi-log comparison HTML
+    pdf_export.py    PDF export via weasyprint (optional dep)
+    executive_summary.py  Health score + action-level aggregation
+    fleet_history.py Per-airframe flight archive (sqlite, serial-keyed)
+    trend_analyzer.py  Multi-log trend analysis
+    param_conflict.py  Cross-analyzer parameter conflict detection
+    param_limits.py  Range limits for suggested parameters
+    templates.py     Scenario templates (analyzer subsets, stricter thresholds)
+    outputs.py       Motor channels from SERVOn_FUNCTION, RCOU/RCO2/RCO3
+    ekf_lanes.py     Primary EKF lane from XKF4.PI
+    ekf_failsafe.py  Firmware EKF failsafe state-machine replay
+    gps_velocity.py  GPS velocity, VZ placeholder handled
+    battery_packs.py Battery packs that measure current
+    plane_phase.py   Plane wing/VTOL phase rows
+    hover.py         Level-hover thrust rows
+    csv_safe.py      Spreadsheet-safe CSV cells
+    np_helpers.py    Shared numpy helpers
+    fft_helpers.py   FFT spectrum utilities
+    web_pages.py     HTML pages served by web_app
+    web_limits.py    Upload-name and memory-budget helpers
+    multi_metrics.py Per-log metrics for comparison
+    agent/           Optional online analysis agent (read-only tools)
+      tools.py       Bounded read-only tool layer
+      loop.py        Predefined workflow and tool budgets
+      providers.py   Anthropic/OpenAI adapters
+      citations.py   Citation validation
+      config.py      ~/.arduscope/agent.json and env precedence
+      egress.py      GPS/serial/STATUSTEXT redaction
+      card.py        Agent result card and fallback chain
+  locales/           i18n string files
+    zh.json          Chinese (primary/fallback)
+    en.json          English
 tests/               pytest suite, grouped by the code each test exercises
-  src/arduscope/analyzers/ src/arduscope/lib/ web/ agent/ cli/ tools/ integration/  test folders
-  binlog.py          Writes real-format .BIN files, the only way CI reaches the parser
-  sitl/              SITL integration test framework
+  analyzers/ lib/ web/ agent/ cli/ tools/ integration/ sitl/  test folders
+  binlog.py          Writes real-format .BIN files for CI
 docs/                Documentation
   architecture.md    Layers, dependency rules, extension points, known debt
   history/           Point-in-time audit and rescan records
@@ -83,11 +84,12 @@ docs/                Documentation
   suggestion_evidence.md   Source and flight record of every suggestion
   known_limitations.md     What the tool does not do or does not get right
   online_agent.md          Online analysis: usage, tools, egress, fallbacks
-flight_report.py     CLI entry point (single log)
-multi_report.py      Multi-log comparison CLI
-batch_report.py      Batch processing CLI
-fleet_report.py      Fleet history CLI (per-airframe trends)
-web_app.py           Web interface (Bottle + optional Waitress)
+  sitl.md                  SITL scenario matrix and coverage gaps
+flight_report.py     Thin CLI shim (single log)
+multi_report.py      Thin CLI shim (multi-log comparison)
+batch_report.py      Thin CLI shim (batch processing)
+fleet_report.py      Thin CLI shim (fleet history)
+web_app.py           Thin CLI shim (web interface)
 ```
 
 ## Key files

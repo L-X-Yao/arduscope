@@ -42,8 +42,8 @@ who reviewed the diff. The logs and gate corpora are not shared.
 Minimal skeleton:
 
 ```python
-from analyzers import BaseAnalyzer, AnalysisResult
-from lib.i18n import t
+from arduscope.analyzers import BaseAnalyzer, AnalysisResult
+from arduscope.lib.i18n import t
 
 class MyCheckAnalyzer(BaseAnalyzer):
     registry_key = "my_check"
