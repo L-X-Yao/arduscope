@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.13.1] - 2026-11-21
 
 ### Changed
 - The CLI, batch and web entry points now share a `ReportSession` for the
