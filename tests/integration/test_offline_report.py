@@ -12,7 +12,7 @@ import plotly.offline
 import pytest
 
 from lib.html_report import HtmlReportGenerator
-from lib.i18n import t
+from lib.i18n import set_locale, t
 from lib.results import AnalysisResult
 from lib.vehicle_detect import VehicleInfo
 
@@ -23,6 +23,24 @@ def _report(gps_track=None) -> str:
     result = AnalysisResult(title="Summary", status="good", summary="ok")
     return HtmlReportGenerator(_VEHICLE, [result],
                                gps_track=gps_track).generate()
+
+
+@pytest.mark.fast
+def test_unknown_vehicle_identity_is_localized():
+    """A log without a board name must not show the English sentinel in a
+    Chinese report."""
+    vehicle = VehicleInfo("Unknown", "Unknown", "Unknown", 0, 0, 0, False)
+    result = AnalysisResult(title="Summary", status="good", summary="ok")
+    try:
+        set_locale("zh")
+        page = HtmlReportGenerator(vehicle, [result]).generate()
+        assert "飞控板: 未知" in page
+        assert "飞控板: Unknown" not in page
+        set_locale("en")
+        page = HtmlReportGenerator(vehicle, [result]).generate()
+        assert "Board: Unknown" in page
+    finally:
+        set_locale("zh")
 
 
 @pytest.mark.fast

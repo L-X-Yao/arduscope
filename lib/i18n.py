@@ -87,6 +87,14 @@ def t(_key: str, **kwargs) -> str:
         return template
 
 
+def localized_value(value: object, _key: str = "report.unknown") -> str:
+    """A user-facing identity value; the Unknown sentinel takes the locale's word."""
+    text = "" if value is None else str(value).strip()
+    if not text or text == "Unknown":
+        return t(_key)
+    return text
+
+
 def available_locales() -> list[str]:
     if not os.path.isdir(_LOCALE_DIR):
         return ["zh"]

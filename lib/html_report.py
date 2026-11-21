@@ -25,7 +25,7 @@ from .executive_summary import (
     build_executive_summary,
     get_level_display,
 )
-from .i18n import t
+from .i18n import localized_value, t
 from .param_conflict import distinct_values, merge_suggestions
 from .vehicle_detect import VehicleInfo
 
@@ -343,6 +343,9 @@ class HtmlReportGenerator:
     def _render_header(self) -> str:
         """Render the dark header bar."""
         duration_str = self._format_duration(self.flight_duration)
+        vehicle_type = html.escape(localized_value(self.vehicle.vehicle_type))
+        firmware = html.escape(localized_value(self.vehicle.firmware_version))
+        board = html.escape(localized_value(self.vehicle.board_name))
         return f"""
 <header class="header">
     <div class="header-content">
@@ -352,9 +355,9 @@ class HtmlReportGenerator:
         </div>
         <div class="header-info">
             <span class="tag">{t('report.tag_log', filename=html.escape(self.log_filename))}</span>
-            <span class="tag">{html.escape(self.vehicle.vehicle_type)} {html.escape(self.vehicle.firmware_version)}</span>
+            <span class="tag">{vehicle_type} {firmware}</span>
             <span class="tag">{t('report.tag_duration', duration=duration_str)}</span>
-            <span class="tag">{t('report.tag_board', board=html.escape(self.vehicle.board_name))}</span>
+            <span class="tag">{t('report.tag_board', board=board)}</span>
         </div>
     </div>
 </header>"""
@@ -702,7 +705,8 @@ class HtmlReportGenerator:
         """
         ctx_lines = [
             t('report.feedback_ctx_log', filename=self.log_filename),
-            t('report.feedback_ctx_vehicle', vehicle=self.vehicle.vehicle_type),
+            t('report.feedback_ctx_vehicle',
+              vehicle=localized_value(self.vehicle.vehicle_type)),
             t('report.feedback_ctx_duration', duration=f"{self.flight_duration:.0f}"),
             t('report.feedback_ctx_score', score=self.health_score if self.health_score >= 0 else 'N/A'),
             t('report.feedback_ctx_version', version=_get_version(), date=datetime.now().strftime('%Y-%m-%d')),

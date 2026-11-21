@@ -1514,6 +1514,7 @@
   "report.pdf_exported": "PDF report exported: {path}",
   "report.pdf_requires_weasyprint": "PDF export requires weasyprint. Install: pip install arduscope[pdf]",
   "report.score_label": "Health Score",
+  "report.unknown": "Unknown",
   "report.tag_board": "Board: {board}",
   "report.tag_duration": "Flight duration: {duration}",
   "report.tag_log": "Log: {filename}",

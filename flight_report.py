@@ -29,7 +29,7 @@ if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
 
 from lib.csv_safe import SafeWriter
-from lib.i18n import set_locale, t
+from lib.i18n import localized_value, set_locale, t
 from lib.log_reader import LogReader
 from lib.html_report import ChartRenderError, HtmlReportGenerator
 from lib.ai_diagnosis import generate_diagnosis
@@ -390,7 +390,9 @@ def main():
     param_conflicts = pipeline.conflicts
     gps_track = pipeline.gps_track
 
-    print(t("cli.vehicle_info", vehicle=f"{vehicle_info.vehicle_type} {vehicle_info.firmware_version}"))
+    vehicle = (f"{localized_value(vehicle_info.vehicle_type)} "
+               f"{localized_value(vehicle_info.firmware_version)}")
+    print(t("cli.vehicle_info", vehicle=vehicle))
     print(t("cli.analyzer_count", count=len(results_by_key), score=health_score))
     if param_conflicts:
         print(t("cli.param_conflicts", count=len(param_conflicts)))

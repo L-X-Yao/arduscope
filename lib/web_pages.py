@@ -606,6 +606,7 @@ const I18N = """
                                max_mb=max_upload_bytes // 1024 // 1024),
         "js.agent_confirm": t("web.agent_egress_confirm"),
         "js.agent_tag": t("web.agent_tag"),
+        "js.unknown": t("report.unknown"),
     }, ensure_ascii=False)
     + f";\nconst MAX_UPLOAD_BYTES = {max_upload_bytes};"
     + r"""
@@ -801,7 +802,7 @@ function renderJobCard(job) {
     /* vehicle info */
     let veh = '';
     if (job.vehicle_info) {
-        veh = `<span class="vehicle-tag">${esc(job.vehicle_info.type)} | ${esc(job.vehicle_info.board)}</span>`;
+        veh = `<span class="vehicle-tag">${esc(displayValue(job.vehicle_info.type))} | ${esc(displayValue(job.vehicle_info.board))}</span>`;
     }
 
     /* health score */
@@ -870,6 +871,13 @@ function esc(s) {
     if (s === null || s === undefined) return '';
     const map = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'};
     return String(s).replace(/[&<>"']/g, c => map[c]);
+}
+
+function displayValue(s) {
+    if (s === null || s === undefined || String(s).trim() === '' || s === 'Unknown') {
+        return I18N['js.unknown'];
+    }
+    return s;
 }
 
 /* =================== Compare =================== */
@@ -955,7 +963,7 @@ function renderHistory(items) {
         groups[date].forEach(h => {
             const sc = h.health_score;
             const scColor = sc >= 80 ? '#67c23a' : sc >= 50 ? '#e6a23c' : '#f56c6c';
-            const veh = h.vehicle_info ? h.vehicle_info.type : '';
+            const veh = h.vehicle_info ? displayValue(h.vehicle_info.type) : '';
             const hasMetrics = h.metrics && Object.keys(h.metrics).length > 0;
             html += '<div class="history-item">'
                 + (hasMetrics ? '<label class="history-check"><input type="checkbox" data-hist-id="' + esc(h.id) + '" onchange="updateHistoryCompareBar()"></label>' : '')

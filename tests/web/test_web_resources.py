@@ -142,6 +142,20 @@ def test_waitress_refuses_oversize_bodies_itself(monkeypatch):
 
 
 @pytest.mark.fast
+def test_index_page_localizes_unknown_vehicle_identity():
+    try:
+        set_locale("zh")
+        page = web_app._build_index_html()
+        assert '"js.unknown"' in page
+        assert "function displayValue" in page
+        assert "displayValue(job.vehicle_info.type)" in page
+        assert "displayValue(h.vehicle_info.type)" in page
+        assert "未知" in page
+    finally:
+        set_locale("zh")
+
+
+@pytest.mark.fast
 def test_index_page_checks_size_before_sending():
     """A browser still sending the body sees the early refusal as a network
     error, so the page has to catch it first."""
