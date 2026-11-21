@@ -903,11 +903,20 @@ def _load_history():
         try:
             with open(STATE.history.path, 'r', encoding='utf-8') as f:
                 loaded = json.load(f)
-            if not isinstance(loaded, list):
+            if isinstance(loaded, dict):
+                version = loaded.get('version', 0)
+                if version > 1:
+                    raise ValueError(f"history schema {version}")
+                entries = loaded.get('entries')
+            elif isinstance(loaded, list):
+                entries = loaded
+            else:
                 raise ValueError(type(loaded).__name__)
-            for entry in loaded:
+            if not isinstance(entries, list):
+                raise ValueError(type(entries).__name__)
+            for entry in entries:
                 entry.setdefault('id', uuid.uuid4().hex[:8])
-            STATE.history.entries = loaded
+            STATE.history.entries = entries
         except Exception as e:
             # Set it aside: the next save would overwrite the only copy.
             aside = STATE.history.path + ".corrupt"
@@ -931,7 +940,8 @@ def _save_history():
     temp = f"{STATE.history.path}.{os.getpid()}.tmp"
     try:
         with open(temp, 'w', encoding='utf-8') as f:
-            json.dump(_finite(STATE.history.entries), f, ensure_ascii=False, indent=2)
+            json.dump({"version": 1, "entries": _finite(STATE.history.entries)},
+                      f, ensure_ascii=False, indent=2)
             f.flush()
             os.fsync(f.fileno())
         os.replace(temp, STATE.history.path)

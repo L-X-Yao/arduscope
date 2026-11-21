@@ -159,12 +159,40 @@ CREATE INDEX IF NOT EXISTS idx_flights_serial
     ON flights(serial, flight_date);
 """
 
+SCHEMA_VERSION = 1
+
+
+def _check_version(conn: sqlite3.Connection) -> int:
+    version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+    if version > SCHEMA_VERSION:
+        raise RuntimeError(
+            f"fleet.db schema {version} is newer than this ArduScope "
+            f"({SCHEMA_VERSION}); update ArduScope")
+    return version
+
 
 def _connect(db_path: str) -> sqlite3.Connection:
     os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
     conn = sqlite3.connect(db_path, timeout=10.0)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.executescript(_SCHEMA)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        version = _check_version(conn)
+        if version < SCHEMA_VERSION:
+            conn.executescript(_SCHEMA)
+            conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+    except Exception:
+        conn.close()
+        raise
+    return conn
+
+
+def _read_conn(db_path: str) -> sqlite3.Connection:
+    conn = sqlite3.connect(db_path, timeout=10.0)
+    try:
+        _check_version(conn)
+    except Exception:
+        conn.close()
+        raise
     return conn
 
 
@@ -252,7 +280,7 @@ def record(db_path: str, pipeline_result, log_path: str,
 def _archived_sha1s(db_path: str) -> set[str]:
     if not os.path.isfile(db_path):
         return set()
-    conn = sqlite3.connect(db_path, timeout=10.0)
+    conn = _read_conn(db_path)
     try:
         return {r[0] for r in conn.execute("SELECT log_sha1 FROM flights")}
     finally:
@@ -331,7 +359,7 @@ def query_history(db_path: str, serial: str,
     """Most recent `limit` flights for a serial, oldest first."""
     if not os.path.isfile(db_path):
         return []
-    conn = sqlite3.connect(db_path, timeout=10.0)
+    conn = _read_conn(db_path)
     try:
         rows = conn.execute(
             "SELECT f.log_name, f.flight_date, f.duration_s, f.health_score,"
@@ -356,7 +384,7 @@ def query_history(db_path: str, serial: str,
 def list_airframes(db_path: str) -> list[dict]:
     if not os.path.isfile(db_path):
         return []
-    conn = sqlite3.connect(db_path, timeout=10.0)
+    conn = _read_conn(db_path)
     try:
         rows = conn.execute(
             "SELECT a.serial, a.alias, a.board, COUNT(f.id), MAX(f.flight_date),"

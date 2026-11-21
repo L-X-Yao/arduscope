@@ -19,6 +19,8 @@ releases are not published.
   the linter rejects new ones.
 - Web job and history state live in a `WebState` store instead of module
   globals; the tests address the store directly.
+- `fleet.db` and `history.json` carry schema versions; old data upgrades in
+  place, and a file from a newer ArduScope version is refused or set aside.
 
 ### Fixed
 - A failed analyzer import, metrics extraction or diagnosis no longer leaves a
