@@ -219,6 +219,11 @@ def check_analyzer_count() -> list[str]:
 # ---------------------------------------------------------------------------
 # Check 4: Import shadowing check
 # ---------------------------------------------------------------------------
+_I18N_IMPORT_RE = re.compile(
+    r"^from\s+(?:arduscope\.)?lib\.i18n\s+import\s+([^\n#]+)",
+    re.MULTILINE)
+
+
 def check_import_shadowing() -> list[str]:
     section("4. Import shadowing check")
     errors: list[str] = []
@@ -229,8 +234,7 @@ def check_import_shadowing() -> list[str]:
     # list (`import t`, `import set_locale, t`, ...) — the old
     # exact-line pattern missed multi-name imports entirely. `t as _t`
     # aliases are intentionally exempt.
-    import_pat = re.compile(
-        r"^from\s+lib\.i18n\s+import\s+([^\n#]+)", re.MULTILINE)
+    import_pat = _I18N_IMPORT_RE
 
     def imports_bare_t(text: str) -> bool:
         for m in import_pat.finditer(text):
@@ -369,13 +373,15 @@ LAZY_ANALYZER_FILES = {"src/arduscope/lib/pipeline.py", "src/arduscope/lib/fleet
 ENTRY_MODULES = ("web_app", "flight_report", "multi_report", "batch_report",
                  "fleet_report")
 _ANALYZER_IMPORT = re.compile(
-    r"^\s*(?:from\s+analyzers(?:\.|\s|$)|import\s+analyzers(?:\.|\s|$))")
+    r"^\s*(?:from\s+(?:arduscope\.)?analyzers(?:\.|\s|$)"
+    r"|import\s+(?:arduscope\.)?analyzers(?:\.|\s|$))")
 _ENTRY_IMPORT = re.compile(
     r"^\s*(?:from\s+(?:%s)(?:\.|\s|$)|import\s+(?:%s)(?:\.|\s|$))"
     % ("|".join(ENTRY_MODULES), "|".join(ENTRY_MODULES)))
 _AGENT_IMPORT = re.compile(
-    r"^\s*(?:from\s+lib\.agent(?:\.|\s|$)|import\s+lib\.agent(?:\.|\s|$)"
-    r"|from\s+lib\s+import\s+agent(?:\.|\s|$))")
+    r"^\s*(?:from\s+(?:arduscope\.)?lib\.agent(?:\.|\s|$)"
+    r"|import\s+(?:arduscope\.)?lib\.agent(?:\.|\s|$)"
+    r"|from\s+(?:arduscope\.)?lib\s+import\s+agent(?:\.|\s|$))")
 
 
 def check_dependency_direction() -> list[str]:

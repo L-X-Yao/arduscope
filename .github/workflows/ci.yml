@@ -51,8 +51,8 @@ jobs:
         run: |
           python -c "
           import json, re, glob
-          zh = json.load(open('locales/zh.json', encoding='utf-8'))
-          en = json.load(open('locales/en.json', encoding='utf-8'))
+          zh = json.load(open('src/arduscope/locales/zh.json', encoding='utf-8'))
+          en = json.load(open('src/arduscope/locales/en.json', encoding='utf-8'))
           assert set(zh) == set(en), f'Key mismatch: zh-only={set(zh)-set(en)}, en-only={set(en)-set(zh)}'
           print(f'Locale OK: {len(zh)} keys, zh/en matched')
           "

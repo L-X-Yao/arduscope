@@ -14,8 +14,35 @@ sys.path.insert(0, _TOOLS)
 
 import check_analyzers  # noqa: E402
 import check_msg_fields  # noqa: E402
+import lint_project  # noqa: E402
 
 pytestmark = pytest.mark.fast
+
+
+@pytest.mark.parametrize("line", [
+    "from lib.i18n import t, set_locale",
+    "from arduscope.lib.i18n import t, set_locale",
+])
+def test_i18n_shadow_regex_matches_both_namespaces(line):
+    assert lint_project._I18N_IMPORT_RE.match(line)
+
+
+@pytest.mark.parametrize("line", [
+    "from analyzers import discover_analyzers",
+    "from arduscope.analyzers import discover_analyzers",
+])
+def test_analyzer_import_regex_matches_both_namespaces(line):
+    assert lint_project._ANALYZER_IMPORT.match(line)
+
+
+@pytest.mark.parametrize("line", [
+    "from lib.agent import analyze_with_agent",
+    "from arduscope.lib.agent import analyze_with_agent",
+    "from lib import agent",
+    "from arduscope.lib import agent",
+])
+def test_agent_import_regex_matches_both_namespaces(line):
+    assert lint_project._AGENT_IMPORT.match(line)
 
 
 class TestEvidenceSource:
