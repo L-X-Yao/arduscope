@@ -154,7 +154,7 @@ tests that don't need `.BIN` files.
 
 ## Releasing
 
-Version is in `src/arduscope/lib/__init__.py`. Notes go under `## [Unreleased]` in
+Version is in `src/arduscope/__init__.py`. Notes go under `## [Unreleased]` in
 `CHANGELOG.md` as changes land.
 
 ```
