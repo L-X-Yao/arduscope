@@ -112,5 +112,6 @@ jobs:
 
       - name: Run synthetic tests on Windows
         run: >-
-          python -m pytest tests/analyzers tests/lib tests/tools
-          tests/test_synthetic_coverage.py -q --tb=short -m "not sitl"
+          python -m pytest tests/analyzers tests/lib
+          tests/test_synthetic_coverage.py tests/tools/test_packaging.py
+          tests/tools/test_win_package_check.py -q --tb=short -m "not sitl"
