@@ -254,11 +254,11 @@ def _finite(value):
 
 def _evict_finished_jobs():
     """Make room for one job. Caller holds STATE.jobs.lock."""
-    if len(STATE.jobs.jobs) >= MAX_JOBS:
+    if len(STATE.jobs.jobs) >= STATE.jobs.max_jobs:
         done = [k for k, v in STATE.jobs.jobs.items()
                 if v.get('status') in ('done', 'error')]
         done.sort(key=lambda k: STATE.jobs.jobs[k].get('start_time', 0))
-        for k in done[:len(STATE.jobs.jobs) - MAX_JOBS + 1]:
+        for k in done[:len(STATE.jobs.jobs) - STATE.jobs.max_jobs + 1]:
             del STATE.jobs.jobs[k]
 
 
