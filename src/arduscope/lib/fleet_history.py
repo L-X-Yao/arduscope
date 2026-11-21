@@ -231,6 +231,10 @@ def _is_full_run(pipeline_result) -> bool:
     Decided from the result, so no entry point has to remember to say.
     """
     from arduscope.analyzers import discover_analyzers  # heavy, and imports lib
+    if getattr(pipeline_result, "issues", None):
+        return False
+    if any(result.failed for result in pipeline_result.results):
+        return False
     reader = pipeline_result.reader
     standard = Thresholds.from_params(
         reader.params, reader.canonical_vehicle_type)

@@ -287,7 +287,7 @@ def run_analysis(
             results_by_key[key] = result
 
     if issues:
-        results.insert(0, AnalysisResult(
+        load_card = AnalysisResult(
             title=t("pipeline.analyzer_load_title"),
             status="info",
             summary=t("pipeline.analyzer_load_summary", count=len(issues)),
@@ -295,7 +295,9 @@ def run_analysis(
             action_level=ACTION_PHYSICAL_CHECK,
             failed=True,
             registry_key="analyzer_load",
-        ))
+        )
+        results.insert(0, load_card)
+        results_by_key["analyzer_load"] = load_card
 
     health_score = compute_health_score(results)
     conflicts = detect_param_conflicts(results)

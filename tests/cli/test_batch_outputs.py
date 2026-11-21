@@ -80,7 +80,8 @@ class TestRecursiveCollision:
     def test_csv_points_each_row_at_its_own_report(self, run):
         with open(run / "batch_summary.csv", encoding="utf-8-sig") as f:
             rows = list(csv.reader(f))
-        linked = {row[0]: row[9] for row in rows[1:]}
+        report_col = rows[0].index("Report File")
+        linked = {row[0]: row[report_col] for row in rows[1:]}
         assert linked == {
             os.path.join("flightA", "00000012.BIN"):
                 os.path.join("flightA", "00000012_report.html"),

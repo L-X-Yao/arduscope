@@ -246,6 +246,7 @@ def write_summary_csv(results: list[dict], output_path: str):
         t("batch.csv_filename"), t("batch.csv_vehicle"), t("batch.csv_firmware"),
         t("batch.csv_board"), t("batch.csv_duration"), t("batch.csv_score"),
         t("batch.csv_warnings"), t("batch.csv_criticals"),
+        t("batch.csv_issues"),
         t("batch.csv_elapsed"), t("batch.csv_report_file"),
     ] + [t(METRIC_CONFIG[k]["label_key"]) for k in metric_keys] + [
         t("batch.csv_error"),
@@ -267,6 +268,7 @@ def write_summary_csv(results: list[dict], output_path: str):
                 "" if failed else r["health_score"],
                 "" if failed else r["n_warnings"],
                 "" if failed else r["n_criticals"],
+                "" if failed else len(r.get("issues", [])),
                 r["elapsed"],
                 _report_link(r, output_path),
             ]
@@ -285,12 +287,18 @@ def write_summary_html(results: list[dict], output_path: str,
                        compare_path: str | None = None):
     """Write a standalone HTML overview table."""
     n_total = len(results)
-    n_ok = sum(1 for r in results if r["health_score"] >= 80 and not r["error"])
+    n_ok = sum(1 for r in results
+               if r["health_score"] >= 80 and not r["error"]
+               and not r.get("issues"))
     n_warn = sum(1 for r in results
-                 if 50 <= r["health_score"] < 80 and not r["error"])
+                 if 50 <= r["health_score"] < 80 and not r["error"]
+                 and not r.get("issues"))
     n_bad = sum(1 for r in results
-                if r["health_score"] < 50 and not r["error"])
+                if r["health_score"] < 50 and not r["error"]
+                and not r.get("issues"))
     n_err = sum(1 for r in results if r["error"])
+    n_incomplete = sum(1 for r in results
+                       if not r["error"] and r.get("issues"))
     avg_score = (
         round(sum(r["health_score"] for r in results if not r["error"])
               / max(n_total - n_err, 1))
@@ -329,10 +337,15 @@ def write_summary_html(results: list[dict], output_path: str,
             rname = quote(_report_link(r, output_path).replace(os.sep, "/"))
             link = f'<a href="{rname}" target="_blank">{t("batch.view_link")}</a>'
         _v = lambda v, fmt: f'<td>{v:{fmt}}</td>' if v is not None else '<td>—</td>'
+        issue_badge = (
+            f' <span style="color:#e6a23c">'
+            f'{t("batch.issue_badge", count=len(r["issues"]))}</span>'
+            if r.get("issues") else ""
+        )
         rows.append(
             f'<tr>'
             f'<td>{i}</td>'
-            f'<td class="fname">{_html.escape(r["filename"])}</td>'
+            f'<td class="fname">{_html.escape(r["filename"])}{issue_badge}</td>'
             f'<td>{_html.escape(r["vehicle_type"])}</td>'
             f'<td>{_fmt_duration(r["duration"])}</td>'
             f'<td style="color:{sc_color};font-weight:700">{sc}</td>'
@@ -394,6 +407,7 @@ a:hover{{text-decoration:underline}}
         <span class="stat" style="color:#67c23a">{t("batch.stat_ok")}: {n_ok}</span>
         <span class="stat" style="color:#e6a23c">{t("batch.stat_warn")}: {n_warn}</span>
         <span class="stat" style="color:#f56c6c">{t("batch.stat_bad")}: {n_bad}</span>
+        {('<span class="stat" style="color:#e6a23c">' + t("batch.stat_incomplete") + ': ' + str(n_incomplete) + '</span>') if n_incomplete else ''}
         {'<span class="stat" style="color:#f56c6c">' + t("batch.stat_failed") + ': ' + str(n_err) + '</span>' if n_err else ''}
     </div>
 </div>
@@ -520,6 +534,10 @@ def main():
 
         if r["error"]:
             print(t("batch.progress_err", error=r["error"]))
+        elif r.get("issues"):
+            print(t("batch.progress_incomplete",
+                     count=len(r["issues"]), score=r["health_score"],
+                     elapsed=r["elapsed"]))
         else:
             sc = r["health_score"]
             icon = "OK" if sc >= 80 else "!!" if sc >= 50 else "XX"
