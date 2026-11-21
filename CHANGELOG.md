@@ -7,13 +7,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [0.13.0] - 2026-11-21
+## [Unreleased]
 
 ### Changed
-- The Python packages now live under `src/arduscope/`; the five CLI commands
-  and the Windows package entry points are unchanged.
-- The armed-window, primary-lane and LTTB helpers now have one implementation
-  shared by the analyzers, the comparison report and the fleet metrics.
 - The CLI, batch and web entry points now share a `ReportSession` for the
   pipeline, diagnosis and fleet order; entry-to-entry imports are gone and
   the linter rejects new ones.
@@ -21,6 +17,19 @@ releases are not published.
   globals; the tests address the store directly.
 - `fleet.db` and `history.json` carry schema versions; old data upgrades in
   place, and a file from a newer ArduScope version is refused or set aside.
+
+### Fixed
+- A run with a failed diagnosis is no longer written to the fleet history.
+- When a newer `history.json` cannot be set aside, the web app keeps it
+  read-only instead of overwriting it.
+
+## [0.13.0] - 2026-11-21
+
+### Changed
+- The Python packages now live under `src/arduscope/`; the five CLI commands
+  and the Windows package entry points are unchanged.
+- The armed-window, primary-lane and LTTB helpers now have one implementation
+  shared by the analyzers, the comparison report and the fleet metrics.
 
 ### Fixed
 - A failed analyzer import, metrics extraction or diagnosis no longer leaves a
