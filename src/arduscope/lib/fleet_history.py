@@ -32,7 +32,12 @@ import numpy as np
 import plotly.graph_objects as go
 
 from arduscope.lib.i18n import t
-from arduscope.lib.log_metadata import extract_flight_date, extract_identity
+from arduscope.lib.log_metadata import (  # noqa: F401 - two re-exported
+    extract_flight_date,
+    extract_flight_time,
+    extract_identity,
+    format_flight_time,
+)
 from arduscope.lib.results import AnalysisResult
 from arduscope.lib.series import armed_mask
 from arduscope.lib.thresholds import Thresholds

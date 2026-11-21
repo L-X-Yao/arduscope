@@ -16,6 +16,11 @@ import fleet_report
 from arduscope.analyzers import discover_analyzers
 from arduscope.lib import fleet_history
 from arduscope.lib import log_metadata
+
+def test_moved_metadata_helpers_stay_importable():
+    """Callers used fleet_history's helpers before log_metadata existed."""
+    assert fleet_history.extract_flight_time is log_metadata.extract_flight_time
+    assert fleet_history.format_flight_time is log_metadata.format_flight_time
 from arduscope.lib.i18n import t
 from arduscope.lib.log_reader import TextMessage
 from arduscope.lib.thresholds import Thresholds
