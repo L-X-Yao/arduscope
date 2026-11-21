@@ -14,6 +14,10 @@ entry points
         │                  │              │
         └──────────────┬───┴──────────────┘
                        ▼
+             src/arduscope/lib/report_session.py
+                  ReportSession.run()
+                       │
+                       ▼
              src/arduscope/lib/pipeline.py  run_analysis()
                        │
         ┌──────────────┼──────────────┐
@@ -35,21 +39,29 @@ uses `src/arduscope/lib/fleet_history.py`; both are entry points, not library la
    are allowlisted. `tools/lint_project.py` check 8 enforces this rule.
 2. `lib` and `analyzers` must not import an entry module. `analyzers` must not
    import `src/arduscope/lib/agent`. The same check enforces both.
-3. Single-log analysis goes through `src/arduscope/lib/pipeline.run_analysis()`. The batch,
-   web and flight CLIs all call it. Do not add a second analyzer loop in an
-   entry point.
+3. Single-log analysis goes through `ReportSession` in
+   `src/arduscope/lib/report_session.py`, which calls
+   `src/arduscope/lib/pipeline.run_analysis()`, runs the diagnosis and archives
+   the result. The batch, web and flight CLIs all use it. Do not add a second
+   analyzer loop in an entry point.
 4. `AnalysisResult` lives in `src/arduscope/lib/results.py`; `src/arduscope/analyzers/__init__.py`
    re-exports it for analyzer authors. Constants that both layers need go to
    `lib`, never to `analyzers`.
-5. `web_app.py` owns mutable HTTP state: jobs, uploads, history, settings and
-   fleet routes. Page rendering is pure and lives in `src/arduscope/lib/web_pages.py`;
-   upload-name and memory-budget helpers live in `src/arduscope/lib/web_limits.py`.
+5. `web_app.py` owns the HTTP routes, uploads, settings and security. Mutable
+   job and history state lives in `src/arduscope/web/state.py` (`WebState`,
+   `JobStore`, `HistoryStore`). Page rendering is pure and lives in
+   `src/arduscope/lib/web_pages.py`; upload-name and memory-budget helpers live
+   in `src/arduscope/lib/web_limits.py`.
 6. Reports: `src/arduscope/lib/html_report.py` builds the single-log page,
    `src/arduscope/lib/comparison_report.py` the multi-log page. Both read thresholds from
    `src/arduscope/lib/thresholds.py`; a report never invents a threshold.
 7. The optional agent is `src/arduscope/lib/agent/`. It reads `PipelineResult` through
    read-only tools and cannot change a status, score, action level or
    suggestion.
+8. A failure is never swallowed: the pipeline records an `AnalysisIssue`, the
+   report shows a failed card and marks the run incomplete, and the fleet
+   archive refuses an incomplete run. `ReportSession` does the same for a
+   diagnosis failure and reports an archive error.
 
 ## Extending
 
@@ -60,21 +72,25 @@ uses `src/arduscope/lib/fleet_history.py`; both are entry points, not library la
   `docs/suggestion_evidence.md` if it suggests a parameter.
 - **New page**: add a pure builder to `src/arduscope/lib/web_pages.py`, a thin route in
   `web_app.py`. Keep request/state reads in the route, not the builder.
-- **New entry point**: import `arduscope.lib.pipeline`, then add it to
+- **New entry point**: import `arduscope.lib.report_session` (or
+  `arduscope.lib.pipeline` for a metrics-only tool), then add it to
   `pyproject.toml` (`py-modules`, `project.scripts`) and to
   `build_windows_package.py` (`INCLUDE_FILES`, `NUITKA_ENTRY_POINTS`).
   `tests/test_packaging.py` checks all three.
 
 ## Known debt
 
-- Top-level package names are generic: `lib`, `analyzers`, `locales` install
-  at the root of site-packages. Give ArduScope its own virtual environment,
-  or use the Windows package. S9-03/D7 deferred a rename; it is a 2-3 day
-  change across imports, entry points, build scripts and docs.
-- `src/arduscope/lib/pipeline.py` is both the orchestration layer and part of `lib`; the
-  analyzer imports are the visible exception.
-- `web_app.py` still holds the stateful HTTP core; presentation was moved out,
-  not the job/upload/history state.
+- Phases 7-9 of the 2026-11-21 architecture overhaul are not done: typed
+  `ParamSuggestion` and a `ThresholdSource` data map, removal of
+  `inspect.getsource`, moving `lib/agent/` to `arduscope/agent/`, a shared
+  report theme/CSS, and a full ADR and contributor-doc rewrite. v0.13.1 stops
+  at the end of Phase 6.
+- `src/arduscope/lib/pipeline.py` is both the orchestration layer and part of
+  `lib`; `ReportSession` is the application boundary, but it too lives in
+  `lib`, and the pipeline's analyzer imports are the visible exception.
+- `web_app.py` still holds the upload, settings and security routes; job and
+  history state moved to `src/arduscope/web/state.py`. Extracting those routes
+  is deferred.
 - `tests/` mirrors the source area (`src/arduscope/analyzers/`, `src/arduscope/lib/`, `web/`, `agent/`,
   `cli/`, `tools/`, `integration/`, `sitl/`); shared helpers stay at the
   root. Put a new test in the folder of the code it exercises.

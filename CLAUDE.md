@@ -35,7 +35,11 @@ src/arduscope/
     __init__.py      BaseAnalyzer, AnalysisResult, discover_analyzers()
   lib/               Core library
     pipeline.py      Unified analysis pipeline: run_analysis() -> PipelineResult
+    report_session.py  Application boundary: pipeline -> diagnosis -> archive
     results.py       AnalysisResult dataclass (canonical location)
+    issues.py        AnalysisIssue and failed-card helpers
+    series.py        Armed masks, primary-lane selection and LTTB
+    log_metadata.py  Identity, serial and flight-time extraction
     log_reader.py    ArduPilot .BIN log parser (pymavlink)
     vehicle_detect.py  Vehicle type / firmware detection
     thresholds.py    Thresholds dataclass (all analysis thresholds with sources)
@@ -71,6 +75,8 @@ src/arduscope/
       config.py      ~/.arduscope/agent.json and env precedence
       egress.py      GPS/serial/STATUSTEXT redaction
       card.py        Agent result card and fallback chain
+  web/
+    state.py         WebState, JobStore and HistoryStore for web_app
   locales/           i18n string files
     zh.json          Chinese (primary/fallback)
     en.json          English
@@ -102,7 +108,12 @@ web_app.py           Thin CLI shim (web interface)
 - `src/arduscope/lib/i18n.py` -- `t(_key, **kwargs)` for all user-facing strings.
   Locale files are in `src/arduscope/locales/`. Thread-safe via `threading.local()`.
 - `src/arduscope/lib/pipeline.py` -- `run_analysis(filepath, ...) -> PipelineResult`.
-  Single entry point used by flight_report, batch_report, and web_app.
+  Called by `ReportSession`, not directly by the entry points.
+- `src/arduscope/lib/report_session.py` -- `ReportSession` owns the order after
+  the pipeline: diagnosis, then the fleet archive. flight_report, batch_report
+  and web_app call it.
+- `src/arduscope/lib/issues.py` -- `AnalysisIssue`; a failed stage becomes a
+  failed `AnalysisResult` card and marks the run incomplete.
 
 ## Important invariants
 
