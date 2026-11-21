@@ -35,12 +35,16 @@ def test_a_version_zero_database_upgrades_in_place(tmp_path):
         conn.close()
 
 
+@pytest.mark.parametrize("open_db", [
+    fleet_history._connect,
+    fleet_history._read_conn,
+])
 @pytest.mark.fast
-def test_a_newer_schema_is_refused(tmp_path):
+def test_a_newer_schema_is_refused(tmp_path, open_db):
     db = tmp_path / "fleet.db"
     conn = sqlite3.connect(db)
     conn.execute("PRAGMA user_version=2")
     conn.close()
 
     with pytest.raises(RuntimeError, match="newer than this ArduScope"):
-        fleet_history._connect(str(db))
+        open_db(str(db))

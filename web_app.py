@@ -917,13 +917,17 @@ def _load_history():
             for entry in entries:
                 entry.setdefault('id', uuid.uuid4().hex[:8])
             STATE.history.entries = entries
+            STATE.history.read_only = False
         except Exception as e:
             # Set it aside: the next save would overwrite the only copy.
             aside = STATE.history.path + ".corrupt"
             try:
                 os.replace(STATE.history.path, aside)
+                STATE.history.read_only = False
             except OSError:
+                # The file from a newer version is still the only copy.
                 aside = STATE.history.path
+                STATE.history.read_only = True
             print(t("web.history_unreadable", path=aside, detail=e),
                   file=sys.stderr)
             STATE.history.entries = []
@@ -935,7 +939,7 @@ def _save_history():
     Written beside the file and swapped in. Rewriting in place truncates
     first, so a kill or a full disk mid-write lost all of it.
     """
-    if not STATE.history.path:
+    if not STATE.history.path or STATE.history.read_only:
         return
     temp = f"{STATE.history.path}.{os.getpid()}.tmp"
     try:
@@ -1247,6 +1251,7 @@ def main():
     _sweep_orphaned_uploads()
 
     STATE.history.path = os.path.join(REPORT_DIR, "history.json")
+    STATE.history.read_only = False
     _load_history()
     _configure_allowed_hosts(args.host, args.allow_host)
     _warn_if_exposed(args.host)

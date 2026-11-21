@@ -26,6 +26,7 @@ class HistoryStore:
     def __init__(self, path: str = ""):
         self.entries: list[dict] = []
         self.path = path
+        self.read_only = False
         self.lock = threading.Lock()
 
 
