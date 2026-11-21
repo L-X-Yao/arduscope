@@ -28,8 +28,8 @@ who reviewed the diff. The logs and gate corpora are not shared.
 
 ## Adding a new analyzer
 
-1. Create a new file in `analyzers/`, e.g. `analyzers/my_check.py`.
-2. Subclass `BaseAnalyzer` from `analyzers/__init__.py`.
+1. Create a new file in `src/arduscope/analyzers/`, e.g. `src/arduscope/analyzers/my_check.py`.
+2. Subclass `BaseAnalyzer` from `src/arduscope/analyzers/__init__.py`.
 3. Set three class attributes:
    - `registry_key` -- unique string identifier (used by `--skip`/`--only`).
    - `required_messages` -- list of ArduPilot message types the analyzer needs.
@@ -37,7 +37,7 @@ who reviewed the diff. The logs and gate corpora are not shared.
 4. Implement `analyze()` and return an `AnalysisResult` via `self.make_result()`.
 5. No registration boilerplate is needed. `discover_analyzers()` auto-discovers
    every `BaseAnalyzer` subclass with a non-empty `registry_key` in the
-   `analyzers/` package at import time.
+   `src/arduscope/analyzers/` package at import time.
 
 Minimal skeleton:
 
@@ -90,7 +90,7 @@ back anything that looks missing.
 
 ## Adding thresholds
 
-Add a new field to the `Thresholds` dataclass in `lib/thresholds.py`.
+Add a new field to the `Thresholds` dataclass in `src/arduscope/lib/thresholds.py`.
 
 - Name the field as `<category>_<metric>_<level>` (e.g. `gps_hdop_warn`).
 - Cite the source in an inline comment using the prefix convention:
@@ -110,7 +110,7 @@ gps_hdop_warn: float = 1.5       # D: quality target, stricter than pre-arm 2.0
 ## Adding cross-correlation rules
 
 Add a new `_Rule` instance to the list returned by `_build_cross_rules()`
-in `lib/ai_diagnosis.py`:
+in `src/arduscope/lib/ai_diagnosis.py`:
 
 ```python
 _Rule(
@@ -131,9 +131,9 @@ statuses simultaneously.
 
 ## i18n
 
-All user-facing strings go through `lib/i18n.py`. When adding a new key:
+All user-facing strings go through `src/arduscope/lib/i18n.py`. When adding a new key:
 
-1. Add the key to **both** `locales/zh.json` and `locales/en.json`
+1. Add the key to **both** `src/arduscope/locales/zh.json` and `src/arduscope/locales/en.json`
    simultaneously. Missing keys in either locale will fall back to
    Chinese, which breaks the English experience.
 2. Use `t("key", **kwargs)` in source code.

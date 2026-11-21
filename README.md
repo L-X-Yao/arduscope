@@ -13,7 +13,7 @@ ArduPilot .BIN flight log diagnostic tool. Turns "it flies bad" into "change thi
 ArduScope reads ArduPilot `.BIN` logs and runs 32 analyzers to produce actionable parameter recommendations, plus a descriptive flight-envelope summary. Every warning cites its source: METHODIC, which is the [ArduPilot Methodic Configurator's tuning guide](https://ardupilot.github.io/MethodicConfigurator/TUNING_GUIDE_ArduCopter.html), the ArduPilot wiki, or the ArduPilot source code.
 
 **Key features:**
-- **32 auto-discovered analyzers** — drop a new analyzer into `analyzers/` and it works
+- **32 auto-discovered analyzers** — drop a new analyzer into `src/arduscope/analyzers/` and it works
 - **Structured parameter suggestions** — concrete param names + values, exportable as `.param` files for Mission Planner
 - **METHODIC-backed thresholds** — every warning and critical cites its source. The limits that have none yet are listed in the [known limitations](docs/known_limitations.md)
 - **Cross-correlation diagnosis** — 27 rules detect multi-system fault patterns
@@ -190,7 +190,7 @@ Custom overrides via `--thresholds custom.json`:
 
 ## Adding a new analyzer
 
-Auto-discovery — just create a `.py` file in `analyzers/`:
+Auto-discovery — just create a `.py` file in `src/arduscope/analyzers/`:
 
 ```python
 from . import AnalysisResult, BaseAnalyzer
@@ -208,7 +208,7 @@ class MyAnalyzer(BaseAnalyzer):
         )
 ```
 
-No entry-point changes needed. Automatically registered in CLI, Web, and multi-log comparison. User-facing strings go through `lib/i18n.py`; add the key to both `locales/zh.json` and `locales/en.json`.
+No entry-point changes needed. Automatically registered in CLI, Web, and multi-log comparison. User-facing strings go through `src/arduscope/lib/i18n.py`; add the key to both `src/arduscope/locales/zh.json` and `src/arduscope/locales/en.json`.
 
 ## Positioning
 
@@ -231,7 +231,7 @@ arduscope/
 ├── batch_report.py       Batch processing CLI
 ├── fleet_report.py       Fleet history CLI
 ├── web_app.py            Web interface (Bottle + Waitress)
-├── lib/                  Core libraries
+├── src/arduscope/lib/                  Core libraries
 │   ├── pipeline.py       Unified analysis pipeline
 │   ├── log_reader.py     pymavlink .BIN parser
 │   ├── html_report.py    HTML report generator
@@ -239,8 +239,8 @@ arduscope/
 │   ├── thresholds.py     Threshold configuration
 │   ├── i18n.py           Internationalization
 │   └── ...
-├── analyzers/            32 auto-discovered analyzers
-├── locales/              zh.json + en.json
+├── src/arduscope/analyzers/            32 auto-discovered analyzers
+├── src/arduscope/locales/              zh.json + en.json
 ├── tools/                CI, lint, release, baseline utilities
 ├── tests/                pytest suite (fast, synthetic, real-log and SITL tiers)
 └── docs/                 Threshold traceability, suggestion evidence, SITL coverage, limitations

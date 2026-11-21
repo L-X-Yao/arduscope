@@ -18,14 +18,15 @@ import numpy as np
 import pytest
 
 import binlog
-from analyzers.notch_tuning import NotchTuningAnalyzer
-from lib import log_reader as log_reader_module
-from lib.log_reader import LogReader
-from lib.pipeline import run_analysis
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import detect_vehicle
+from arduscope.analyzers.notch_tuning import NotchTuningAnalyzer
+from arduscope.lib import log_reader as log_reader_module
+from arduscope.lib.log_reader import LogReader
+from arduscope.lib.pipeline import run_analysis
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import detect_vehicle
 
 _ROOT = str(REPO_ROOT)
+_SRC = str(REPO_ROOT / "src")
 
 
 @pytest.fixture(scope="module")
@@ -254,7 +255,8 @@ def test_malformed_fmt_does_not_end_the_process(tmp_path):
     script = textwrap.dedent(f"""
         import sys
         sys.path.insert(0, {_ROOT!r})
-        from lib.log_reader import LogReader
+        sys.path.insert(0, {_SRC!r})
+        from arduscope.lib.log_reader import LogReader
         try:
             LogReader({path!r})
         except Exception:

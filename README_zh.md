@@ -13,7 +13,7 @@ ArduPilot `.BIN` 飞行日志诊断工具。把"飞得不好"翻译成"改哪个
 ArduScope 读取 ArduPilot `.BIN` 日志，运行 32 个分析器，生成可执行的参数调整建议，并附一份描述性飞行包络摘要。每条警告都引用来源：METHODIC（即 [ArduPilot Methodic Configurator 的调参指南](https://ardupilot.github.io/MethodicConfigurator/TUNING_GUIDE_ArduCopter.html)）、ArduPilot wiki 或 ArduPilot 源码。
 
 **核心特性：**
-- **32 个分析维度** — 自动发现，在 `analyzers/` 下新建 `.py` 文件即可扩展
+- **32 个分析维度** — 自动发现，在 `src/arduscope/analyzers/` 下新建 `.py` 文件即可扩展
 - **结构化参数建议** — 具体参数名 + 建议值，可导出 `.param` 文件直接导入 Mission Planner
 - **METHODIC 标准阈值** — 每条 warning 和 critical 都附来源引用。还没有出处的限值列在[已知限制](docs/known_limitations.md)里
 - **交叉关联诊断** — 27 条规则检测多系统联合故障模式
@@ -183,7 +183,7 @@ ANTHROPIC_API_KEY=... python3 flight_report.py --ai-agent --ai-provider anthropi
 
 ## 添加分析器
 
-自动发现：在 `analyzers/` 下新建 `.py` 文件即可：
+自动发现：在 `src/arduscope/analyzers/` 下新建 `.py` 文件即可：
 
 ```python
 from . import AnalysisResult, BaseAnalyzer
@@ -201,7 +201,7 @@ class MyAnalyzer(BaseAnalyzer):
         )
 ```
 
-不需要改入口。CLI、Web 和多日志对比会自动注册。实际提交时，用户可见字符串走 `lib/i18n.py`，并在 `locales/zh.json` 和 `locales/en.json` 同时加键。
+不需要改入口。CLI、Web 和多日志对比会自动注册。实际提交时，用户可见字符串走 `src/arduscope/lib/i18n.py`，并在 `src/arduscope/locales/zh.json` 和 `src/arduscope/locales/en.json` 同时加键。
 
 ## 项目定位
 
@@ -224,7 +224,7 @@ arduscope/
 ├── batch_report.py       批量处理 CLI
 ├── fleet_report.py       机队历史 CLI
 ├── web_app.py            Web 界面 (Bottle + Waitress)
-├── lib/                  核心库
+├── src/arduscope/lib/                  核心库
 │   ├── pipeline.py       统一分析管线
 │   ├── log_reader.py     pymavlink .BIN 解析器
 │   ├── html_report.py    HTML 报告生成器
@@ -232,8 +232,8 @@ arduscope/
 │   ├── thresholds.py     阈值配置
 │   ├── i18n.py           国际化
 │   └── ...
-├── analyzers/            32 个自动发现的分析器
-├── locales/              zh.json + en.json
+├── src/arduscope/analyzers/            32 个自动发现的分析器
+├── src/arduscope/locales/              zh.json + en.json
 ├── tools/                CI、lint、release、baseline 工具
 ├── tests/                pytest 测试套件（fast、合成、真实日志、SITL 四层）
 └── docs/                 阈值溯源、建议依据、SITL 覆盖、已知限制

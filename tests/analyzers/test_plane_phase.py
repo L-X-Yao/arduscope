@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lib.plane_phase import covered_seconds, stat_at, vtol_windows_mask
+from arduscope.lib.plane_phase import covered_seconds, stat_at, vtol_windows_mask
 from tests.test_synthetic_coverage import SyntheticReader
 
 pytestmark = pytest.mark.fast

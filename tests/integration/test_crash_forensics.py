@@ -12,11 +12,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from analyzers.log_health import LogHealthAnalyzer
-from analyzers.rc_input import RCInputAnalyzer
-from analyzers.throttle_collapse import ThrottleCollapseAnalyzer
-from lib.i18n import t as _t
-from lib.log_reader import Event, ModeChange
+from arduscope.analyzers.log_health import LogHealthAnalyzer
+from arduscope.analyzers.rc_input import RCInputAnalyzer
+from arduscope.analyzers.throttle_collapse import ThrottleCollapseAnalyzer
+from arduscope.lib.i18n import t as _t
+from arduscope.lib.log_reader import Event, ModeChange
 from tests.test_synthetic_coverage import SyntheticReader, _thresholds, _vehicle
 
 pytestmark = pytest.mark.fast

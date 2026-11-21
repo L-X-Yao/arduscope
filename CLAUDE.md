@@ -30,10 +30,10 @@ Hard rules for every session in this repository; the details are in
 ## Project structure
 
 ```
-analyzers/           32 auto-discovered analyzer modules
+src/arduscope/analyzers/           32 auto-discovered analyzer modules
   __init__.py        BaseAnalyzer, AnalysisResult, discover_analyzers()
-lib/                 Core library
-  results.py         AnalysisResult dataclass (canonical location, re-exported by analyzers/)
+src/arduscope/lib/                 Core library
+  results.py         AnalysisResult dataclass (canonical location, re-exported by src/arduscope/analyzers/)
   pipeline.py        Unified analysis pipeline: run_analysis() → PipelineResult
   param_conflict.py  Cross-analyzer parameter conflict detection
   thresholds.py      Thresholds dataclass (all analysis thresholds with sources)
@@ -69,11 +69,11 @@ lib/                 Core library
     config.py        ~/.arduscope/agent.json, environment key precedence
     egress.py        GPS/serial/STATUSTEXT redaction defaults
     card.py          AnalysisResult card and fallback chain
-locales/             i18n string files
+src/arduscope/locales/             i18n string files
   zh.json            Chinese (primary/fallback locale)
   en.json            English
 tests/               pytest suite, grouped by the code each test exercises
-  analyzers/ lib/ web/ agent/ cli/ tools/ integration/  test folders
+  src/arduscope/analyzers/ src/arduscope/lib/ web/ agent/ cli/ tools/ integration/  test folders
   binlog.py          Writes real-format .BIN files, the only way CI reaches the parser
   sitl/              SITL integration test framework
 docs/                Documentation
@@ -92,14 +92,14 @@ web_app.py           Web interface (Bottle + optional Waitress)
 
 ## Key files
 
-- `analyzers/__init__.py` -- `BaseAnalyzer` base class and `AnalysisResult`
+- `src/arduscope/analyzers/__init__.py` -- `BaseAnalyzer` base class and `AnalysisResult`
   dataclass. All analyzers subclass `BaseAnalyzer`, set `registry_key`,
   `required_messages`, `sort_order`, and implement `analyze()`.
-- `lib/thresholds.py` -- `Thresholds` dataclass with every analysis threshold.
+- `src/arduscope/lib/thresholds.py` -- `Thresholds` dataclass with every analysis threshold.
   Each field has an inline comment citing its source (A:/D:/E: prefix).
-- `lib/i18n.py` -- `t(_key, **kwargs)` for all user-facing strings.
-  Locale files are in `locales/`. Thread-safe via `threading.local()`.
-- `lib/pipeline.py` -- `run_analysis(filepath, ...) -> PipelineResult`.
+- `src/arduscope/lib/i18n.py` -- `t(_key, **kwargs)` for all user-facing strings.
+  Locale files are in `src/arduscope/locales/`. Thread-safe via `threading.local()`.
+- `src/arduscope/lib/pipeline.py` -- `run_analysis(filepath, ...) -> PipelineResult`.
   Single entry point used by flight_report, batch_report, and web_app.
 
 ## Important invariants
@@ -109,8 +109,8 @@ web_app.py           Web interface (Bottle + optional Waitress)
    ArduPilot source code, or derivation from the above.
 2. When `param_suggestions` is non-empty, `action_level` **must** be
    set to `"apply_param"`.
-3. Locale keys **must** exist in both `locales/zh.json` and
-   `locales/en.json`. Missing keys fall back to Chinese, breaking the
+3. Locale keys **must** exist in both `src/arduscope/locales/zh.json` and
+   `src/arduscope/locales/en.json`. Missing keys fall back to Chinese, breaking the
    English experience.
 4. Threshold fields follow `<category>_<metric>_<level>` naming and must
    have a source citation comment.
@@ -152,7 +152,7 @@ tests that don't need `.BIN` files.
 
 ## Releasing
 
-Version is in `lib/__init__.py`. Notes go under `## [Unreleased]` in
+Version is in `src/arduscope/lib/__init__.py`. Notes go under `## [Unreleased]` in
 `CHANGELOG.md` as changes land.
 
 ```

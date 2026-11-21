@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from lib.agent.citations import ToolRecord, validate
+from arduscope.lib.agent.citations import ToolRecord, validate
 
 pytestmark = pytest.mark.fast
 

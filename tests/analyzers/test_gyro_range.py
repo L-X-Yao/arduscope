@@ -11,11 +11,11 @@ import math
 import pytest
 
 import binlog
-from analyzers.gyro_saturation import GyroSaturationAnalyzer
-from lib.i18n import t as _t
-from lib.log_reader import LogReader
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import detect_vehicle
+from arduscope.analyzers.gyro_saturation import GyroSaturationAnalyzer
+from arduscope.lib.i18n import t as _t
+from arduscope.lib.log_reader import LogReader
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import detect_vehicle
 
 pytestmark = pytest.mark.fast
 

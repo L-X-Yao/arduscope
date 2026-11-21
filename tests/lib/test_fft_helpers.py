@@ -13,7 +13,7 @@ import pytest
 
 pytestmark = pytest.mark.fast
 
-from lib.fft_helpers import do_fft, find_flight_window, find_peaks
+from arduscope.lib.fft_helpers import do_fft, find_flight_window, find_peaks
 
 
 def _make_sine(freq_hz: float, fs: float, duration_s: float,

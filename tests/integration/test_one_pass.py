@@ -10,12 +10,12 @@ from __future__ import annotations
 import pytest
 
 import binlog
-from analyzers.flight_profile import FlightProfileAnalyzer
-from analyzers.log_health import LogHealthAnalyzer
-from analyzers.pid_tuning import PIDTuningAnalyzer
-from lib import log_reader as log_reader_module
-from lib import pipeline
-from lib.pipeline import run_analysis
+from arduscope.analyzers.flight_profile import FlightProfileAnalyzer
+from arduscope.analyzers.log_health import LogHealthAnalyzer
+from arduscope.analyzers.pid_tuning import PIDTuningAnalyzer
+from arduscope.lib import log_reader as log_reader_module
+from arduscope.lib import pipeline
+from arduscope.lib.pipeline import run_analysis
 
 
 @pytest.fixture

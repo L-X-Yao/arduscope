@@ -42,7 +42,7 @@ import sys
 from dataclasses import dataclass
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ANALYZER_DIR = os.path.join(REPO_ROOT, "analyzers")
+ANALYZER_DIR = os.path.join(REPO_ROOT, "src", "arduscope", "analyzers")
 REGISTRY_PATH = os.path.join(REPO_ROOT, "docs", "suggestion_evidence.md")
 
 GREEN = "\033[92m"

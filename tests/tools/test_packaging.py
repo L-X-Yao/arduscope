@@ -40,7 +40,7 @@ def _imports_our_packages(node: ast.stmt) -> bool:
         names = [alias.name for alias in node.names]
     else:
         return False
-    return any(n.split(".")[0] in ("lib", "analyzers", "locales") for n in names)
+    return any(n.split(".")[0] == "arduscope" for n in names)
 
 
 def _extends_sys_path(node: ast.stmt) -> bool:
@@ -83,9 +83,9 @@ def test_ships_in_the_windows_package(module):
 
 
 def test_report_assets_reach_every_package():
-    assert "lib/vendor" in re.search(
-        r"INCLUDE_DATA_DIRS = \[(.*?)\]", WINDOWS).group(1)
-    assert "lib/vendor" in PYPROJECT or "vendor/" in PYPROJECT
+    assert "arduscope/lib/vendor" in re.search(
+        r"INCLUDE_DATA_DIRS = \[(.*?)\]", WINDOWS, re.S).group(1)
+    assert "arduscope/lib/vendor" in PYPROJECT or "vendor/" in PYPROJECT
 
 
 def test_declared_python_matches_the_ci_matrix():
@@ -98,10 +98,10 @@ def test_declared_python_matches_the_ci_matrix():
 def test_the_version_lives_in_the_library_package():
     """The root __init__ was an importable module named __init__ in
     site-packages; the version now lives with the package it describes."""
-    assert 'version = { attr = "lib.__version__" }' in PYPROJECT
+    assert 'version = { attr = "arduscope.__version__" }' in PYPROJECT
     py_modules = re.search(r"py-modules = \[(.*?)\]", PYPROJECT).group(1)
     assert '"__init__"' not in py_modules
-    from lib import __version__
+    from arduscope import __version__
     assert re.fullmatch(r"\d+\.\d+\.\d+", __version__)
 
 
@@ -113,8 +113,8 @@ def test_the_package_check_sees_subpackages():
     import win_package_check
 
     modules = win_package_check.source_modules(str(ROOT))
-    assert "lib/agent/__init__" in modules
-    assert "lib/agent/tools" in modules
+    assert "arduscope/lib/agent/__init__" in modules
+    assert "arduscope/lib/agent/tools" in modules
 
 
 def test_the_windows_build_copies_subpackages(tmp_path):
@@ -122,16 +122,17 @@ def test_the_windows_build_copies_subpackages(tmp_path):
     sys.path.insert(0, str(ROOT))
     import build_windows_package as builder
 
-    (tmp_path / "lib" / "agent").mkdir(parents=True)
-    (tmp_path / "lib" / "agent" / "__init__.py").write_text("")
-    (tmp_path / "lib" / "agent" / "tools.py").write_text("")
-    (tmp_path / "analyzers").mkdir()
-    (tmp_path / "analyzers" / "one.py").write_text("")
+    package = tmp_path / "src" / "arduscope"
+    (package / "lib" / "agent").mkdir(parents=True)
+    (package / "lib" / "agent" / "__init__.py").write_text("")
+    (package / "lib" / "agent" / "tools.py").write_text("")
+    (package / "analyzers").mkdir()
+    (package / "analyzers" / "one.py").write_text("")
 
     out = tmp_path / "out"
     copied = builder.copy_module_files(str(tmp_path), str(out))
 
     assert copied == 3
-    assert (out / "lib" / "agent" / "__init__.py").is_file()
-    assert (out / "lib" / "agent" / "tools.py").is_file()
-    assert (out / "analyzers" / "one.py").is_file()
+    assert (out / "arduscope" / "lib" / "agent" / "__init__.py").is_file()
+    assert (out / "arduscope" / "lib" / "agent" / "tools.py").is_file()
+    assert (out / "arduscope" / "analyzers" / "one.py").is_file()

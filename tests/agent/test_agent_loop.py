@@ -5,15 +5,15 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lib.agent import card as card_mod
-from lib.agent.card import analyze_with_agent
-from lib.agent.config import AgentConfig
-from lib.agent.loop import AgentError, SUBMIT_SPEC, run_agent
-from lib.agent.providers import NoToolSupport, ToolCall, Turn
-from lib.pipeline import PipelineResult
-from lib.results import ACTION_SAFETY_STOP, AnalysisResult
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.lib.agent import card as card_mod
+from arduscope.lib.agent.card import analyze_with_agent
+from arduscope.lib.agent.config import AgentConfig
+from arduscope.lib.agent.loop import AgentError, SUBMIT_SPEC, run_agent
+from arduscope.lib.agent.providers import NoToolSupport, ToolCall, Turn
+from arduscope.lib.pipeline import PipelineResult
+from arduscope.lib.results import ACTION_SAFETY_STOP, AnalysisResult
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
 
 pytestmark = pytest.mark.fast
@@ -152,11 +152,11 @@ def test_submit_spec_is_offered_with_the_tools():
 def test_the_card_states_the_worst_action_under_the_summary():
     """The model's sentence can soften a safety_stop to "inspect and
     retune"; the card adds the analyser's own level so it is not lost."""
-    from lib.agent.citations import Submission
-    from lib.agent.card import _build_card
-    from lib.agent.loop import AgentRun
-    from lib.executive_summary import get_level_display
-    from lib.i18n import t
+    from arduscope.lib.agent.citations import Submission
+    from arduscope.lib.agent.card import _build_card
+    from arduscope.lib.agent.loop import AgentRun
+    from arduscope.lib.executive_summary import get_level_display
+    from arduscope.lib.i18n import t
 
     pipeline = _pipeline()
     ekf = AnalysisResult(
@@ -178,9 +178,9 @@ def test_the_card_states_the_worst_action_under_the_summary():
 
 
 def test_an_unverified_summary_is_marked_on_the_card():
-    from lib.agent.citations import Observation, Submission
-    from lib.agent.card import _build_card
-    from lib.agent.loop import AgentRun
+    from arduscope.lib.agent.citations import Observation, Submission
+    from arduscope.lib.agent.card import _build_card
+    from arduscope.lib.agent.loop import AgentRun
     run = AgentRun(
         submission=Submission(summary="the peak was 99", observations=[
             Observation(text="vibration is high", cites=[1])],

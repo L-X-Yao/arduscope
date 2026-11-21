@@ -8,7 +8,7 @@ import pytest
 
 pytestmark = pytest.mark.fast
 
-from analyzers import (
+from arduscope.analyzers import (
     AnalysisResult,
     ACTION_OK,
     ACTION_APPLY_PARAM,
@@ -16,12 +16,12 @@ from analyzers import (
     ACTION_RUN_AUTOTUNE,
     ACTION_SAFETY_STOP,
 )
-from lib.executive_summary import (
+from arduscope.lib.executive_summary import (
     build_executive_summary,
     get_level_display,
 )
-from lib.i18n import t as _t
-from lib.vehicle_detect import VehicleInfo
+from arduscope.lib.i18n import t as _t
+from arduscope.lib.vehicle_detect import VehicleInfo
 
 
 def _vehicle(**overrides) -> VehicleInfo:

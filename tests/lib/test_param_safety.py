@@ -13,12 +13,12 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from analyzers.ekf import EKFAnalyzer
-from analyzers.mission import MissionAnalyzer
-from analyzers.vtol_transition import VTOLTransitionAnalyzer
-from lib.i18n import t
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers.ekf import EKFAnalyzer
+from arduscope.analyzers.mission import MissionAnalyzer
+from arduscope.analyzers.vtol_transition import VTOLTransitionAnalyzer
+from arduscope.lib.i18n import t
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.analyzers.test_ekf_primary_lane import (
     _CLEAN, _SPIKE, _analyzer, _variance_log)
 from tests.analyzers.test_rescan_e import _qtun_reader

@@ -69,7 +69,7 @@ def scan_references() -> dict[str, set[str]]:
     """Map ALL-CAPS quoted tokens -> set of repo files referencing them."""
     refs: dict[str, set[str]] = {}
     pattern = re.compile(r'["\']([A-Z][A-Z0-9_]{1,5})["\']')
-    for rel_dir in ("analyzers", "lib"):
+    for rel_dir in ("src/arduscope/analyzers", "src/arduscope/lib"):
         for path in glob.glob(os.path.join(REPO_ROOT, rel_dir, "*.py")):
             rel = os.path.relpath(path, REPO_ROOT)
             text = open(path, encoding="utf-8").read()

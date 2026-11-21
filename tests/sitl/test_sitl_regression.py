@@ -44,7 +44,7 @@ def _log_path(scenario_name: str) -> str:
 @functools.cache
 def _run_pipeline(log_file: str):
     """Run the full ArduScope analysis pipeline on a log file, once."""
-    from lib.pipeline import run_analysis
+    from arduscope.lib.pipeline import run_analysis
     return run_analysis(log_file)
 
 
@@ -152,7 +152,7 @@ class TestSitlPipeline:
             pytest.skip("No cross-rule expectations")
         result = _run_pipeline(scenario["_log_path"])
 
-        from lib.ai_diagnosis import _build_cross_rules, _match_cross_rules
+        from arduscope.lib.ai_diagnosis import _build_cross_rules, _match_cross_rules
         rules = {r.name: set(r.conditions) for r in _build_cross_rules()}
         fired = [set(m.related_keys)
                  for m in _match_cross_rules(result.results_by_key)]

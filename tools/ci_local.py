@@ -83,9 +83,10 @@ def main():
     results.append(_run(
         "Import check (all modules)",
         [sys.executable, "-c",
-         "from lib.pipeline import run_analysis; "
+         "import sys; sys.path.insert(0, 'src'); "
+         "from arduscope.lib.pipeline import run_analysis; "
          "from web_app import app; "
-         "from analyzers import discover_analyzers; "
+         "from arduscope.analyzers import discover_analyzers; "
          "a = discover_analyzers(); "
          f"assert len(a) >= 28, f'Only {{len(a)}} analyzers'; "
          "print(f'  {{len(a)}} analyzers OK')"],
@@ -102,8 +103,8 @@ def main():
         "Locale key count",
         [sys.executable, "-c",
          "import json; "
-         "zh = json.load(open('locales/zh.json', encoding='utf-8')); "
-         "en = json.load(open('locales/en.json', encoding='utf-8')); "
+         "zh = json.load(open('src/arduscope/locales/zh.json', encoding='utf-8')); "
+         "en = json.load(open('src/arduscope/locales/en.json', encoding='utf-8')); "
          "assert len(zh) == len(en), "
          f"f'zh={{len(zh)}} != en={{len(en)}}'; "
          "print(f'  {{len(zh)}} keys, symmetric')"],

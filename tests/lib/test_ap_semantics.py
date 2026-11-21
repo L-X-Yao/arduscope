@@ -19,12 +19,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from analyzers.airspeed import AirspeedAnalyzer
-from analyzers.failsafe import FailsafeAnalyzer, _FS_SUBSYS_KEYS
-from analyzers.summary import EVENT_NAMES, ERROR_SUBSYS_NAMES
-from lib.log_reader import ErrorEvent, LogReader
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers.airspeed import AirspeedAnalyzer
+from arduscope.analyzers.failsafe import FailsafeAnalyzer, _FS_SUBSYS_KEYS
+from arduscope.analyzers.summary import EVENT_NAMES, ERROR_SUBSYS_NAMES
+from arduscope.lib.log_reader import ErrorEvent, LogReader
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
 
 pytestmark = pytest.mark.fast

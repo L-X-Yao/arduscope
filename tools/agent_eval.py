@@ -28,10 +28,10 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from lib.agent.config import AgentConfig  # noqa: E402
-from lib.agent.loop import run_agent  # noqa: E402
-from lib.i18n import set_locale  # noqa: E402
-from lib.pipeline import run_analysis  # noqa: E402
+from arduscope.lib.agent.config import AgentConfig  # noqa: E402
+from arduscope.lib.agent.loop import run_agent  # noqa: E402
+from arduscope.lib.i18n import set_locale  # noqa: E402
+from arduscope.lib.pipeline import run_analysis  # noqa: E402
 
 DEFAULT_LOG_DIR = os.path.join(_ROOT, "tests", "sitl", "logs")
 DEFAULT_OUT_DIR = os.path.join(_ROOT, "reports", "agent-eval")

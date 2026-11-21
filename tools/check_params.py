@@ -41,10 +41,10 @@ YELLOW = "\033[93m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
 
-CODE_DIRS = ("analyzers", "lib")
+CODE_DIRS = ("src/arduscope/analyzers", "src/arduscope/lib")
 ENTRY_FILES = ("flight_report.py", "multi_report.py", "batch_report.py",
                "fleet_report.py", "web_app.py")
-LOCALE_FILES = ("locales/zh.json", "locales/en.json")
+LOCALE_FILES = ("src/arduscope/locales/zh.json", "src/arduscope/locales/en.json")
 
 # Strings that look like a parameter but are not one. Each needs a
 # reason: this list is the escape hatch, so it has to stay short.

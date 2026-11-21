@@ -11,10 +11,10 @@ import re
 import plotly.offline
 import pytest
 
-from lib.html_report import HtmlReportGenerator
-from lib.i18n import set_locale, t
-from lib.results import AnalysisResult
-from lib.vehicle_detect import VehicleInfo
+from arduscope.lib.html_report import HtmlReportGenerator
+from arduscope.lib.i18n import set_locale, t
+from arduscope.lib.results import AnalysisResult
+from arduscope.lib.vehicle_detect import VehicleInfo
 
 _VEHICLE = VehicleInfo("ArduCopter", "CubeOrange", "V4.6.3", 1, 4, 2, False)
 
@@ -59,7 +59,7 @@ def test_plotly_is_inline_and_loads_from_nowhere():
 
 _TRACK = {"lat": [34.10, 34.11, 34.12], "lng": [108.90, 108.91, 108.92],
           "alt": [400.0, 410.0, 420.0], "time_s": [0.0, 1.0, 2.0]}
-_VENDOR = REPO_ROOT / "lib" / "vendor" / "leaflet"
+_VENDOR = REPO_ROOT / "src" / "arduscope" / "lib" / "vendor" / "leaflet"
 
 # Published with Leaflet 1.9.4: integrity_hash_uglified and integrity_hash_css
 # in docs/_config.yml on the v1 branch of github.com/Leaflet/Leaflet.
@@ -88,11 +88,11 @@ class TestLeaflet:
     @pytest.mark.fast
     def test_vendored_files_are_package_data(self):
         tomllib = pytest.importorskip("tomllib")
-        root = _VENDOR.parent.parent.parent
+        root = REPO_ROOT
         with open(root / "pyproject.toml", "rb") as f:
             package_data = tomllib.load(f)["tool"]["setuptools"]["package-data"]
-        shipped = {p.name for pattern in package_data["lib"]
-                   for p in (root / "lib").glob(pattern)}
+        shipped = {p.name for pattern in package_data["arduscope.lib"]
+                   for p in (root / "src" / "arduscope" / "lib").glob(pattern)}
         assert {"leaflet.js", "leaflet.css", "LICENSE"} <= shipped
 
     @pytest.mark.fast

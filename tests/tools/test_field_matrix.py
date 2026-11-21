@@ -16,7 +16,7 @@ import sys
 import numpy as np
 import pytest
 
-from lib.log_reader import LogReader
+from arduscope.lib.log_reader import LogReader
 
 pytestmark = pytest.mark.fast
 

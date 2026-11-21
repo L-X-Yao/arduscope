@@ -57,19 +57,22 @@ arduscope-web = "web_app:main"
 arduscope-fleet = "fleet_report:main"
 
 [tool.setuptools.dynamic]
-version = { attr = "lib.__version__" }
+version = { attr = "arduscope.__version__" }
 
 [tool.setuptools.packages.find]
-include = ["lib", "lib.*", "analyzers", "analyzers.*", "locales", "locales.*"]
+where = ["src"]
+include = ["arduscope", "arduscope.*"]
 
 [tool.setuptools]
+package-dir = { "" = ".", "arduscope" = "src/arduscope" }
 py-modules = ["flight_report", "multi_report", "batch_report", "fleet_report", "web_app"]
 
 [tool.setuptools.package-data]
-lib = ["vendor/leaflet/*"]
-locales = ["*.json"]
+"arduscope.lib" = ["vendor/leaflet/*"]
+"arduscope.locales" = ["*.json"]
 
 [tool.pytest.ini_options]
+pythonpath = ["src"]
 markers = [
     "fast: Pure logic tests, no synthetic log generation (<10s total)",
     "sitl: SITL integration tests, require pre-generated SITL logs",

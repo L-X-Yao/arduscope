@@ -9,7 +9,7 @@ that would make an analyzer throw an exception on real data.
 import os
 import pytest
 from conftest import REAL_LOG_ROOT, _load
-from analyzers import discover_analyzers
+from arduscope.analyzers import discover_analyzers
 
 ANALYZERS = discover_analyzers()
 ANALYZER_IDS = [key for key, _ in ANALYZERS]

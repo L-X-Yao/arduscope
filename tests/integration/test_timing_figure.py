@@ -5,11 +5,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from analyzers.log_health import LogHealthAnalyzer
-from lib.html_report import MAX_POINTS_PER_TRACE, HtmlReportGenerator
-from lib.results import AnalysisResult
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers.log_health import LogHealthAnalyzer
+from arduscope.lib.html_report import MAX_POINTS_PER_TRACE, HtmlReportGenerator
+from arduscope.lib.results import AnalysisResult
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
 
 pytestmark = pytest.mark.fast

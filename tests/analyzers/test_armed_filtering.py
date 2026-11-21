@@ -6,10 +6,10 @@ control case. Analyzers should NOT report critical on a ground-only log.
 """
 
 from conftest import LOG_QUADPLANE_GROUND, LOG_QUADPLANE_FLIGHT, run_analyzer
-from analyzers.vibration import VibrationAnalyzer
-from analyzers.motor import MotorAnalyzer
-from analyzers.ekf import EKFAnalyzer
-from analyzers.attitude import AttitudeAnalyzer
+from arduscope.analyzers.vibration import VibrationAnalyzer
+from arduscope.analyzers.motor import MotorAnalyzer
+from arduscope.analyzers.ekf import EKFAnalyzer
+from arduscope.analyzers.attitude import AttitudeAnalyzer
 
 
 class TestGroundLogNotCritical:

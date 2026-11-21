@@ -7,12 +7,12 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from lib.agent.config import AgentConfig
-from lib.agent.tools import MAX_RESULT_BYTES, ToolBox, _json_size
-from lib.pipeline import PipelineResult
-from lib.results import AnalysisResult
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.lib.agent.config import AgentConfig
+from arduscope.lib.agent.tools import MAX_RESULT_BYTES, ToolBox, _json_size
+from arduscope.lib.pipeline import PipelineResult
+from arduscope.lib.results import AnalysisResult
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
 
 pytestmark = pytest.mark.fast

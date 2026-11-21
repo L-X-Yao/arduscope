@@ -11,9 +11,9 @@ from unittest import mock
 import pytest
 
 import flight_report
-from lib.i18n import set_locale, t
-from lib.param_conflict import detect_param_conflicts
-from lib.results import AnalysisResult
+from arduscope.lib.i18n import set_locale, t
+from arduscope.lib.param_conflict import detect_param_conflicts
+from arduscope.lib.results import AnalysisResult
 from tests.binlog import flight_log
 
 
@@ -52,7 +52,7 @@ class TestOutputDirectory:
             with open(path, "wb") as f:
                 f.write(b"%PDF")
 
-        with mock.patch("lib.pdf_export.html_to_pdf", fake_pdf), \
+        with mock.patch("arduscope.lib.pdf_export.html_to_pdf", fake_pdf), \
              mock.patch("plotly.io.to_image", return_value=b"\x89PNG"):
             _main(log, "--format", "pdf", "--only", "summary", "--no-open",
                   "--no-fleet-record", "--no-ai", "-o", str(out))

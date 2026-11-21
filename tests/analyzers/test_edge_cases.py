@@ -14,11 +14,11 @@ from tests._repo import REPO_ROOT
 import numpy as np
 import pytest
 
-from analyzers import AnalysisResult
-from lib.ai_diagnosis import _build_cross_rules, _is_measured
-from lib.i18n import t
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers import AnalysisResult
+from arduscope.lib.ai_diagnosis import _build_cross_rules, _is_measured
+from arduscope.lib.i18n import t
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader, _vehicle, _thresholds
 
 
@@ -29,7 +29,7 @@ class TestVtolTransitionNoTransitions:
     """When there are no VTOL transitions, param_advice must not NameError."""
 
     def test_no_transitions_returns_ok(self):
-        from analyzers.vtol_transition import VTOLTransitionAnalyzer
+        from arduscope.analyzers.vtol_transition import VTOLTransitionAnalyzer
         n = 100
         # QTUN with Trn stuck at 0 (AIRSPEED_WAIT never entered TIMER):
         # a hover-only log with zero transitions.
@@ -67,7 +67,7 @@ class TestFailsafeNoBattery:
     failsafe must not crash on empty BAT array."""
 
     def test_critical_without_bat(self):
-        from analyzers.failsafe import FailsafeAnalyzer
+        from arduscope.analyzers.failsafe import FailsafeAnalyzer
         # EKF variance high enough to trigger critical, but NO BAT data
         reader = SyntheticReader(
             messages={
@@ -114,7 +114,7 @@ class TestEkfNanVariance:
 
     def test_all_nan_sv_sp_sh_sm_does_not_crash(self):
         """np.nanmax on all-NaN raises ValueError without the fix."""
-        from analyzers.ekf import EKFAnalyzer
+        from arduscope.analyzers.ekf import EKFAnalyzer
         n = 50
         reader = SyntheticReader(
             messages={
@@ -144,7 +144,7 @@ class TestEkfNanSS:
     """EKF SS field is all NaN — must not crash on int(NaN)."""
 
     def test_all_nan_ss(self):
-        from analyzers.ekf import EKFAnalyzer
+        from arduscope.analyzers.ekf import EKFAnalyzer
         n = 50
         reader = SyntheticReader(
             messages={
@@ -184,7 +184,7 @@ class TestGpsEmptyArmed:
     """GPS data exists but armed intervals have no matching samples."""
 
     def test_no_armed_samples(self):
-        from analyzers.gps import GPSAnalyzer
+        from arduscope.analyzers.gps import GPSAnalyzer
         n = 50
         reader = SyntheticReader(
             messages={
@@ -225,7 +225,7 @@ class TestTemperatureAllNaN:
     """All IMU temperatures are NaN — must not crash on max(empty)."""
 
     def test_all_nan_temps(self):
-        from analyzers.temperature import TemperatureAnalyzer
+        from arduscope.analyzers.temperature import TemperatureAnalyzer
         n = 50
         reader = SyntheticReader(
             messages={
@@ -264,7 +264,7 @@ class TestExtractMetricsAllNaN:
     def test_all_nan_vibe_returns_none(self):
         import multi_report
         from tests.test_synthetic_coverage import SyntheticReader
-        from lib.thresholds import Thresholds
+        from arduscope.lib.thresholds import Thresholds
         n = 50
         ts = np.linspace(0, 25, n)
         reader = SyntheticReader(messages={
@@ -286,7 +286,7 @@ class TestExtractMetricsAllNaN:
     def test_all_nan_ekf_returns_none(self):
         import multi_report
         from tests.test_synthetic_coverage import SyntheticReader
-        from lib.thresholds import Thresholds
+        from arduscope.lib.thresholds import Thresholds
         n = 50
         ts = np.linspace(0, 25, n)
         reader = SyntheticReader(messages={
@@ -331,7 +331,7 @@ class TestTrendConvergenceStrict:
     have insufficient data."""
 
     def test_partial_data_not_converged(self):
-        from lib.trend_analyzer import analyze_trends
+        from arduscope.lib.trend_analyzer import analyze_trends
         t = Thresholds()
         # Only provide max_vibe — other tracked metrics missing
         metrics = [
@@ -345,7 +345,7 @@ class TestTrendConvergenceStrict:
         assert "max_vibe" in report.convergence.converged_metric_keys
 
     def test_all_tracked_present_and_good(self):
-        from lib.trend_analyzer import analyze_trends
+        from arduscope.lib.trend_analyzer import analyze_trends
         t = Thresholds()
         _good = {
             "max_vibe": 8.0, "max_clip": 5, "max_rate_out": 0.04,
@@ -363,7 +363,7 @@ class TestLogReaderEmpty:
     """Empty files must raise ValueError, not mmap error."""
 
     def test_empty_file_raises(self, tmp_path):
-        from lib.log_reader import LogReader
+        from arduscope.lib.log_reader import LogReader
         empty = tmp_path / "empty.BIN"
         empty.write_bytes(b"")
         with pytest.raises(ValueError, match="empty"):
@@ -383,7 +383,7 @@ class TestLogReaderModeStringParsing:
 
     def test_string_mode_num_converts_safely(self):
         """Simulate the mode_num conversion in _prescan: string must not crash."""
-        from lib.log_reader import ModeChange
+        from arduscope.lib.log_reader import ModeChange
 
         for mode_val in ('LOITER', 'STABILIZE', 'AUTO', '', 'UNKNOWN_MODE'):
             try:
@@ -565,7 +565,7 @@ class TestInvariantTriggers:
     def test_attitude_partial_autotune_axes(self):
         """AUTOTUNE_AXES=1 (roll-only) + warning attitude RMS used to be
         run_autotune + suggestion → invariant violation. Must be apply_param."""
-        from analyzers.attitude import AttitudeAnalyzer
+        from arduscope.analyzers.attitude import AttitudeAnalyzer
         n = 300
         ts = np.linspace(0, 120, n)
         reader = SyntheticReader(
@@ -591,7 +591,7 @@ class TestInvariantTriggers:
     def test_gps_dual_with_auto_switch_disabled(self):
         """Dual-GPS + warning + GPS_AUTO_SWITCH=0 used to be physical_check
         + suggestion → invariant violation. Must be apply_param."""
-        from analyzers.gps import GPSAnalyzer
+        from arduscope.analyzers.gps import GPSAnalyzer
         n = 400
         ts = np.linspace(0, 200, n)
         # Two GPS instances, low NSats to trigger warning
@@ -622,7 +622,7 @@ class TestInvariantTriggers:
         """Motor interference > warn threshold with COMPASS_MOTCT off. It
         takes CompassMot either way: AP_Compass.cpp says not to set MOTCT by
         hand, and without a vector it does nothing."""
-        from analyzers.compass import CompassAnalyzer
+        from arduscope.analyzers.compass import CompassAnalyzer
         n = 500
         ts = np.linspace(0, 250, n)
         # Mag readings rise monotonically with throttle so that field
@@ -673,7 +673,7 @@ class TestInvariantTriggers:
     def test_airspeed_disagreement_with_arspd_use(self):
         """Critical airspeed/GPS disagreement + ARSPD_USE=1 (default)
         used to be physical_check + suggestion → invariant violation."""
-        from analyzers.airspeed import AirspeedAnalyzer
+        from arduscope.analyzers.airspeed import AirspeedAnalyzer
         n = 400
         ts = np.linspace(0, 200, n)
         # Persistent 11 m/s underread vs GPS groundspeed.
@@ -713,7 +713,7 @@ class TestInvariantTriggers:
         """Warning-path SPIN_MIN suggestion + status escalated to critical
         by motor imbalance used to be physical_check + suggestion →
         invariant violation."""
-        from analyzers.motor import MotorAnalyzer
+        from arduscope.analyzers.motor import MotorAnalyzer
         n = 600
         ts = np.linspace(0, 300, n)
         # spin_gap tight (warning) + motor imbalance crosses 20% crit threshold.

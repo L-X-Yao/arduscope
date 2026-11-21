@@ -5,9 +5,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lib.hover import airborne, hover_thrust
-from lib.log_reader import Event
-from lib.thresholds import Thresholds
+from arduscope.lib.hover import airborne, hover_thrust
+from arduscope.lib.log_reader import Event
+from arduscope.lib.thresholds import Thresholds
 from tests.test_synthetic_coverage import SyntheticReader
 
 pytestmark = pytest.mark.fast

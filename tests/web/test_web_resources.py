@@ -13,7 +13,7 @@ import pytest
 from webtest import TestApp
 
 import web_app
-from lib.i18n import set_locale
+from arduscope.lib.i18n import set_locale
 from tests.binlog import flight_log
 
 

@@ -37,8 +37,8 @@ class TestEvidenceSource:
 
 
 def test_annotated_empty_required_messages_is_caught(tmp_path, monkeypatch):
-    pkg = tmp_path / "analyzers"
-    pkg.mkdir()
+    pkg = tmp_path / "src" / "arduscope" / "analyzers"
+    pkg.mkdir(parents=True)
     (pkg / "fake.py").write_text(
         "class FakeAnalyzer(BaseAnalyzer):\n"
         "    registry_key = 'fake'\n"

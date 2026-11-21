@@ -18,14 +18,14 @@ import math
 import numpy as np
 import pytest
 
-from analyzers.ekf import EKFAnalyzer
-from analyzers.failsafe import FailsafeAnalyzer
-from lib.ekf_failsafe import (
+from arduscope.analyzers.ekf import EKFAnalyzer
+from arduscope.analyzers.failsafe import FailsafeAnalyzer
+from arduscope.lib.ekf_failsafe import (
     ekf_failsafe_replay, in_modes, lowpass_filtered, over_threshold,
     plane_posvel_mask, sustained, vehicle_kind)
-from lib.i18n import t
-from lib.log_reader import ErrorEvent, ModeChange
-from lib.vehicle_detect import VehicleInfo
+from arduscope.lib.i18n import t
+from arduscope.lib.log_reader import ErrorEvent, ModeChange
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import (
     SyntheticReader, _thresholds, _vehicle)
 
@@ -376,7 +376,7 @@ class TestDigitalLPFReplica:
     """The FS_EKF_FILT filter, against hand-computed DigitalLPF values."""
 
     def test_alpha_formula(self):
-        from lib.ekf_failsafe import _lowpass_alpha
+        from arduscope.lib.ekf_failsafe import _lowpass_alpha
         alpha = 0.1 / (0.1 + 1.0 / (2.0 * math.pi * 5.0))
         assert _lowpass_alpha(0.1, 5.0) == pytest.approx(alpha)
 
@@ -420,7 +420,7 @@ class TestCopterReplay:
         sv = kf4["SV"]
         sv[:] = 1.7                      # velocity at twice the threshold
         sv[9::10] = 0.1                  # a good row every second
-        from lib.ekf_failsafe import over_threshold, sustained
+        from arduscope.lib.ekf_failsafe import over_threshold, sustained
         raw_over = over_threshold(sv, kf4["SP"], kf4["SM"], 0.8)
         assert not sustained(raw_over, kf4["_timestamp"]).any()
         assert _failsafe(reader).status == "critical"

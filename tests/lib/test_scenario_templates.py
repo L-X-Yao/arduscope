@@ -8,14 +8,14 @@ import re
 
 import pytest
 
-from lib.html_report import HtmlReportGenerator
-from lib.i18n import set_locale, t
-from lib.pipeline import compute_health_score, run_analysis
-from lib.templates import _TEMPLATE_DEFS, get_template
-from lib.thresholds import Thresholds
+from arduscope.lib.html_report import HtmlReportGenerator
+from arduscope.lib.i18n import set_locale, t
+from arduscope.lib.pipeline import compute_health_score, run_analysis
+from arduscope.lib.templates import _TEMPLATE_DEFS, get_template
+from arduscope.lib.thresholds import Thresholds
 from tests.binlog import flight_log
 
-_TEMPLATES_PY = str(REPO_ROOT / "lib" / "templates.py")
+_TEMPLATES_PY = str(REPO_ROOT / "src" / "arduscope" / "lib" / "templates.py")
 _OVERRIDES = [(d["name"], k, v) for d in _TEMPLATE_DEFS
               for k, v in d["thresholds"].items()]
 

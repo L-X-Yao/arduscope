@@ -6,18 +6,18 @@ import numpy as np
 import pytest
 
 import flight_report
-from analyzers.compass_consistency import CompassConsistencyAnalyzer
-from analyzers.log_health import LogHealthAnalyzer
-from lib.log_reader import Event
-from lib.param_conflict import (
+from arduscope.analyzers.compass_consistency import CompassConsistencyAnalyzer
+from arduscope.analyzers.log_health import LogHealthAnalyzer
+from arduscope.lib.log_reader import Event
+from arduscope.lib.param_conflict import (
     detect_param_conflicts,
     distinct_values,
     merge_suggestions,
 )
-from lib.param_limits import limit_suggestions, param_range
-from lib.results import AnalysisResult
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.lib.param_limits import limit_suggestions, param_range
+from arduscope.lib.results import AnalysisResult
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
 
 pytestmark = pytest.mark.fast

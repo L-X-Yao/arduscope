@@ -65,9 +65,10 @@ INCLUDE_FILES = [
 # Files needed during build but NOT shipped in the package
 _BUILD_ONLY_FILES: list[str] = []
 # Subdirectories to include (all .py files are copied automatically)
-INCLUDE_DIRS = ["lib", "analyzers"]
+INCLUDE_DIRS = [("src/arduscope", "arduscope")]
 # Data directories to copy verbatim (all files, preserving structure)
-INCLUDE_DATA_DIRS = ["locales", "lib/vendor"]
+INCLUDE_DATA_DIRS = [("src/arduscope/locales", "arduscope/locales"),
+                     ("src/arduscope/lib/vendor", "arduscope/lib/vendor")]
 
 # The Python the package carries. 3.12 stopped at 3.12.10: its later releases
 # are source only, with no embeddable. The runner that builds the release has
@@ -92,7 +93,7 @@ _NOT_BUNDLED = {
 # library packages get compiled as --module .pyd extensions.
 NUITKA_ENTRY_POINTS = ["web_app.py", "flight_report.py", "batch_report.py",
                        "multi_report.py", "fleet_report.py"]
-NUITKA_MODULES = ["lib", "analyzers"]
+NUITKA_MODULES = ["arduscope"]
 
 # Launcher bat: no first-run compilation needed (all .pyc pre-built)
 _LAUNCHER_BAT = r"""@echo off
@@ -346,13 +347,13 @@ def copy_module_files(script_dir: str, la_dir: str) -> int:
     compile step walks the whole tree afterwards.
     """
     file_count = 0
-    for subdir in INCLUDE_DIRS:
-        src_dir = os.path.join(script_dir, subdir)
+    for src_subdir, dest_subdir in INCLUDE_DIRS:
+        src_dir = os.path.join(script_dir, src_subdir)
         for root, dirs, files in os.walk(src_dir):
             dirs[:] = sorted(d for d in dirs if d != "__pycache__")
             rel = os.path.relpath(root, src_dir)
-            dst_dir = (os.path.join(la_dir, subdir) if rel == "."
-                       else os.path.join(la_dir, subdir, rel))
+            dst_dir = (os.path.join(la_dir, dest_subdir) if rel == "."
+                       else os.path.join(la_dir, dest_subdir, rel))
             os.makedirs(dst_dir, exist_ok=True)
             for fname in sorted(files):
                 if fname.endswith(".py"):
@@ -691,9 +692,9 @@ def main():
 
     # Copy data directories (locales, etc.) preserving structure
     data_count = 0
-    for subdir in INCLUDE_DATA_DIRS:
-        src_dir = os.path.join(script_dir, subdir)
-        dst_dir = os.path.join(la_dir, subdir)
+    for src_subdir, dest_subdir in INCLUDE_DATA_DIRS:
+        src_dir = os.path.join(script_dir, src_subdir)
+        dst_dir = os.path.join(la_dir, dest_subdir)
         if os.path.isdir(src_dir):
             shutil.copytree(src_dir, dst_dir, dirs_exist_ok=True,
                             ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "__init__.py"))
@@ -779,9 +780,9 @@ def main():
     output_name = os.path.basename(output_path)
 
     # Diagnostic: verify .pyc files in analyzers/ before zipping
-    _ana_dir = os.path.join(la_dir, "analyzers")
+    _ana_dir = os.path.join(la_dir, "arduscope", "analyzers")
     _pyc_count = len([f for f in os.listdir(_ana_dir) if f.endswith(".pyc")]) if os.path.isdir(_ana_dir) else 0
-    print(f"  [diag] analyzers/*.pyc: {_pyc_count} files")
+    print(f"  [diag] arduscope/analyzers/*.pyc: {_pyc_count} files")
 
     print(f"\nPackaging as {output_name}...")
     shutil.make_archive(

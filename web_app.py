@@ -35,6 +35,9 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PARENT_DIR = os.path.dirname(_SCRIPT_DIR)
 if _PARENT_DIR not in sys.path:
     sys.path.insert(0, _PARENT_DIR)
+_SRC_DIR = os.path.join(_SCRIPT_DIR, "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
 # Embedded Python (._pth) may strip the script directory from sys.path
 if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
@@ -54,19 +57,19 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Local imports
 # ---------------------------------------------------------------------------
-from lib.i18n import available_locales, get_locale, set_locale, t
-from lib import fleet_history
-from lib.html_report import HtmlReportGenerator
-from lib.ai_diagnosis import generate_diagnosis
-from lib.agent import analyze_with_agent
-from lib.agent.config import ConfigError, load_config, update_config
-from lib.agent.providers import NoProviderPackage, test_connection
-from lib.pipeline import run_analysis
-from lib.templates import get_template
-from lib.web_limits import (  # noqa: F401 - two re-exported for tests
+from arduscope.lib.i18n import available_locales, get_locale, set_locale, t
+from arduscope.lib import fleet_history
+from arduscope.lib.html_report import HtmlReportGenerator
+from arduscope.lib.ai_diagnosis import generate_diagnosis
+from arduscope.lib.agent import analyze_with_agent
+from arduscope.lib.agent.config import ConfigError, load_config, update_config
+from arduscope.lib.agent.providers import NoProviderPackage, test_connection
+from arduscope.lib.pipeline import run_analysis
+from arduscope.lib.templates import get_template
+from arduscope.lib.web_limits import (  # noqa: F401 - two re-exported for tests
     ANALYSIS_BASE_BYTES, ANALYSIS_PEAK_PER_LOG_BYTE,
     _MemoryBudget, _clean_upload_name, _estimated_peak_bytes)
-from lib.web_pages import (_build_fleet_shell,
+from arduscope.lib.web_pages import (_build_fleet_shell,
                            build_airframe_html as _build_airframe_html,
                            build_fleet_html, build_index_html,
                            build_settings_html as _build_settings_html)
@@ -727,7 +730,7 @@ def settings_page():
 
 
 def _empty_agent_config():
-    from lib.agent.config import AgentConfig
+    from arduscope.lib.agent.config import AgentConfig
     return AgentConfig()
 
 
@@ -981,7 +984,7 @@ def _run_analysis(job_id: str, filepath: str, original_name: str,
     # fire here, and the i18n locale is thread-local, so re-apply the UI
     # locale or the whole report renders in the default language.
     if locale:
-        from lib.i18n import set_locale
+        from arduscope.lib.i18n import set_locale
         set_locale(locale)
     _update_job(job_id, message=t("web.status_queued"), progress=0)
     memory = 0
@@ -1220,7 +1223,7 @@ def main():
     global MAX_KEPT_REPORTS
     MAX_KEPT_REPORTS = args.keep_reports
 
-    from lib.i18n import set_locale
+    from arduscope.lib.i18n import set_locale
     global _UI_LOCALE, REPORT_DIR, HISTORY_FILE, _ALLOW_SETTINGS
     _UI_LOCALE = args.lang
     _ALLOW_SETTINGS = _is_loopback(args.host)

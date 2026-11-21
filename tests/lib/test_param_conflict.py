@@ -6,10 +6,10 @@ import pytest
 
 pytestmark = pytest.mark.fast
 
-from analyzers import AnalysisResult
-from lib.param_conflict import detect_param_conflicts
-from lib.html_report import HtmlReportGenerator
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers import AnalysisResult
+from arduscope.lib.param_conflict import detect_param_conflicts
+from arduscope.lib.html_report import HtmlReportGenerator
+from arduscope.lib.vehicle_detect import VehicleInfo
 
 
 def _result(title: str, suggestions: list[dict],
@@ -106,7 +106,7 @@ class TestConflictRenderedInHtml:
     """Verify the HTML report renders the conflict warning box."""
 
     def test_conflict_warning_in_output(self):
-        from lib.i18n import set_locale, get_locale
+        from arduscope.lib.i18n import set_locale, get_locale
         prev = get_locale()
         set_locale("en")
         try:
@@ -134,7 +134,7 @@ class TestConflictRenderedInHtml:
             set_locale(prev)
 
     def test_no_conflict_box_when_none(self):
-        from lib.i18n import set_locale, get_locale
+        from arduscope.lib.i18n import set_locale, get_locale
         prev = get_locale()
         set_locale("en")
         try:

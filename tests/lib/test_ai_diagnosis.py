@@ -15,15 +15,15 @@ import sys
 
 import pytest
 
-from analyzers import discover_analyzers
-from lib.ai_diagnosis import (
+from arduscope.analyzers import discover_analyzers
+from arduscope.lib.ai_diagnosis import (
     _build_cross_rules,
     _build_individual_templates,
     _match_cross_rules,
     generate_diagnosis,
 )
-from lib.results import AnalysisResult
-from lib.vehicle_detect import VehicleInfo
+from arduscope.lib.results import AnalysisResult
+from arduscope.lib.vehicle_detect import VehicleInfo
 
 pytestmark = pytest.mark.fast
 

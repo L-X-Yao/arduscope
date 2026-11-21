@@ -17,12 +17,12 @@ import os
 
 import plotly.graph_objects as go
 
-from analyzers import AnalysisResult
-from lib.ai_diagnosis import generate_diagnosis
-from lib.html_report import HtmlReportGenerator
-from lib.templates import get_template, list_templates
-from lib.i18n import t as _t
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers import AnalysisResult
+from arduscope.lib.ai_diagnosis import generate_diagnosis
+from arduscope.lib.html_report import HtmlReportGenerator
+from arduscope.lib.templates import get_template, list_templates
+from arduscope.lib.i18n import t as _t
+from arduscope.lib.vehicle_detect import VehicleInfo
 
 
 # Resolve source paths relative to this test file so CI and local
@@ -86,7 +86,7 @@ class TestTemplates:
 
     def test_template_threshold_keys_valid(self):
         """Any template threshold overrides must match real Thresholds fields."""
-        from lib.thresholds import Thresholds
+        from arduscope.lib.thresholds import Thresholds
         valid = {f.name for f in Thresholds.__dataclass_fields__.values()}
         for tpl in list_templates():
             for key in tpl.thresholds:
@@ -95,7 +95,7 @@ class TestTemplates:
 
     def test_template_analyzer_keys_valid(self):
         """Any template analyzer list must reference real registry keys."""
-        from analyzers import discover_analyzers
+        from arduscope.analyzers import discover_analyzers
         valid = {k for k, _cls in discover_analyzers()}
         for tpl in list_templates():
             for key in tpl.analyzers:
@@ -459,7 +459,7 @@ class TestHtmlReportExecutiveSummary:
     def test_safety_stop_visible_in_summary(self):
         """A safety_stop critical must turn the exec-summary red and
         list the action."""
-        from analyzers import ACTION_SAFETY_STOP
+        from arduscope.analyzers import ACTION_SAFETY_STOP
         html_out = self._gen([
             _mock_result("summary", "good"),
             AnalysisResult(
@@ -477,7 +477,7 @@ class TestHtmlReportExecutiveSummary:
 
     def test_apply_param_appears_in_summary(self):
         """An apply_param action must render with the gear icon."""
-        from analyzers import ACTION_APPLY_PARAM
+        from arduscope.analyzers import ACTION_APPLY_PARAM
         html_out = self._gen([
             AnalysisResult(
                 title="调参建议",
@@ -493,7 +493,7 @@ class TestHtmlReportExecutiveSummary:
         assert _t("action.apply_param") in html_out
 
     def test_physical_check_appears_in_summary(self):
-        from analyzers import ACTION_PHYSICAL_CHECK
+        from arduscope.analyzers import ACTION_PHYSICAL_CHECK
         html_out = self._gen([
             AnalysisResult(
                 title="振动分析",
@@ -508,7 +508,7 @@ class TestHtmlReportExecutiveSummary:
         assert _t("action.physical_check") in html_out
 
     def test_run_autotune_appears_in_summary(self):
-        from analyzers import ACTION_RUN_AUTOTUNE
+        from arduscope.analyzers import ACTION_RUN_AUTOTUNE
         html_out = self._gen([
             AnalysisResult(
                 title="PID 调参质量",
@@ -524,7 +524,7 @@ class TestHtmlReportExecutiveSummary:
 
     def test_actions_sorted_by_severity_in_html(self):
         """The HTML must render the most severe action first."""
-        from analyzers import ACTION_SAFETY_STOP, ACTION_PHYSICAL_CHECK
+        from arduscope.analyzers import ACTION_SAFETY_STOP, ACTION_PHYSICAL_CHECK
         html_out = self._gen([
             AnalysisResult(
                 title="振动",

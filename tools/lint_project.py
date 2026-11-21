@@ -80,7 +80,7 @@ ENTRY_FILES = ("flight_report.py", "multi_report.py",
 
 
 def load_locale(lang: str) -> dict[str, str]:
-    path = os.path.join(PROJECT_ROOT, "locales", f"{lang}.json")
+    path = os.path.join(PROJECT_ROOT, "src", "arduscope", "locales", f"{lang}.json")
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
@@ -99,7 +99,7 @@ def check_locale_key_completeness() -> list[str]:
 
     # Collect all t("key") and _t("key") calls from analyzers/, lib/
     # and the entry modules
-    py_files = collect_py_files("analyzers", "lib", *ENTRY_FILES)
+    py_files = collect_py_files("src/arduscope/analyzers", "src/arduscope/lib", *ENTRY_FILES)
     # Pattern: t("key") or _t("key") with single or double quotes
     t_call_pat = re.compile(r"""(?:^|(?<=\W))_?t\(\s*["']([^"']+)["']""")
 
@@ -179,8 +179,8 @@ def check_analyzer_count() -> list[str]:
     errors: list[str] = []
 
     # Get actual count via discover_analyzers()
-    sys.path.insert(0, PROJECT_ROOT)
-    from analyzers import discover_analyzers
+    sys.path.insert(0, os.path.join(PROJECT_ROOT, "src"))
+    from arduscope.analyzers import discover_analyzers
     actual_count = len(discover_analyzers())
 
     # Patterns to find hardcoded counts in docs
@@ -223,7 +223,7 @@ def check_import_shadowing() -> list[str]:
     section("4. Import shadowing check")
     errors: list[str] = []
 
-    py_files = collect_py_files("analyzers", "lib", *ENTRY_FILES)
+    py_files = collect_py_files("src/arduscope/analyzers", "src/arduscope/lib", *ENTRY_FILES)
 
     # Check files that import bare `t` in ANY position of the import
     # list (`import t`, `import set_locale, t`, ...) — the old
@@ -305,7 +305,7 @@ def check_param_action_consistency() -> list[str]:
     section("6. param_suggestions / action_level consistency")
     errors: list[str] = []
 
-    analyzer_files = collect_py_files("analyzers")
+    analyzer_files = collect_py_files("src/arduscope/analyzers")
 
     apply_param_pat = re.compile(
         r"""['"]apply_param['"]"""
@@ -365,7 +365,7 @@ def check_untranslated_keys() -> list[str]:
 # analyzers -> lib is the direction. Two lib modules call discover_analyzers()
 # from inside a function to break the import cycle; those are the only
 # allowed references, and they must stay function-local.
-LAZY_ANALYZER_FILES = {"lib/pipeline.py", "lib/fleet_history.py"}
+LAZY_ANALYZER_FILES = {"src/arduscope/lib/pipeline.py", "src/arduscope/lib/fleet_history.py"}
 ENTRY_MODULES = ("web_app", "flight_report", "multi_report", "batch_report",
                  "fleet_report")
 _ANALYZER_IMPORT = re.compile(
@@ -387,7 +387,7 @@ def check_dependency_direction() -> list[str]:
         fail(msg)
         errors.append(msg)
 
-    for fpath in collect_py_files("lib"):
+    for fpath in collect_py_files("src/arduscope/lib"):
         relpath = os.path.relpath(fpath, PROJECT_ROOT)
         with open(fpath, encoding="utf-8") as f:
             for lineno, line in enumerate(f, 1):
@@ -402,7 +402,7 @@ def check_dependency_direction() -> list[str]:
                     report(relpath, lineno,
                            "lib must not import an entry module")
 
-    for fpath in collect_py_files("analyzers"):
+    for fpath in collect_py_files("src/arduscope/analyzers"):
         relpath = os.path.relpath(fpath, PROJECT_ROOT)
         with open(fpath, encoding="utf-8") as f:
             for lineno, line in enumerate(f, 1):

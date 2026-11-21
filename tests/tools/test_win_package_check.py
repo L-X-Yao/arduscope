@@ -81,15 +81,15 @@ class TestUploads:
 
 class TestModules:
     def test_package_names(self):
-        names = ["arduscope/log_analysis/lib/results.pyc",
-                 "arduscope/log_analysis/analyzers/gps.pyc",
+        names = ["arduscope/log_analysis/arduscope/lib/results.pyc",
+                 "arduscope/log_analysis/arduscope/analyzers/gps.pyc",
                  "arduscope/python/python.exe",
                  "arduscope/python/python312.zip"]
-        assert check.package_modules(names) == {"lib/results", "analyzers/gps"}
+        assert check.package_modules(names) == {"arduscope/lib/results", "arduscope/analyzers/gps"}
 
     def test_source_names(self):
         modules = check.source_modules()
-        assert {"lib/results", "analyzers/gps"} <= modules
+        assert {"arduscope/lib/results", "arduscope/analyzers/gps"} <= modules
 
 
 class TestDriver:

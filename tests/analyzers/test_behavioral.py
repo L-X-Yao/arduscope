@@ -16,8 +16,8 @@ import numpy as np
 import pytest
 
 from tests.test_synthetic_coverage import SyntheticReader
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 
 pytestmark = pytest.mark.fast
 
@@ -57,7 +57,7 @@ class TestNotchParamKey:
     def test_param_suggestions_has_current(self):
         """notch_tuning must map 'old' → 'current' in param_suggestions."""
         import inspect
-        from analyzers.notch_tuning import NotchTuningAnalyzer
+        from arduscope.analyzers.notch_tuning import NotchTuningAnalyzer
         src = inspect.getsource(NotchTuningAnalyzer.analyze)
         assert 'r.get("old"' in src
 
@@ -97,7 +97,7 @@ class TestMissionWPRadius:
             params={"WPNAV_RADIUS": 200, "WP_RADIUS": 30},
             vehicle_type=vehicle_info.vehicle_type,
         )
-        from analyzers.mission import MissionAnalyzer
+        from arduscope.analyzers.mission import MissionAnalyzer
         a = MissionAnalyzer(reader, Thresholds(), vehicle_info)
         # Precondition: the offset really is between the two radii
         dist_m = 0.0001 * 111320
@@ -105,14 +105,14 @@ class TestMissionWPRadius:
         return a.analyze()
 
     def test_copter_uses_wpnav_radius(self):
-        from lib.i18n import t
+        from arduscope.lib.i18n import t
         result = self._run(_DEFAULT_VI)
         assert _DEFAULT_VI.is_copter          # precondition
         expected = t("mission.wp_reached", radius="2", reached=0, total=1)
         assert expected in result.details
 
     def test_plane_uses_wp_radius(self):
-        from lib.i18n import t
+        from arduscope.lib.i18n import t
         result = self._run(_QP_VI)
         assert not _QP_VI.is_copter           # precondition
         expected = t("mission.wp_reached", radius="30", reached=1, total=1)
@@ -150,7 +150,7 @@ class TestMissionRadiusGrading:
             vehicle_type=vehicle.vehicle_type,
         )
         reader.mode_list = [SimpleNamespace(mode_name="AUTO")]
-        from analyzers.mission import MissionAnalyzer
+        from arduscope.analyzers.mission import MissionAnalyzer
         return MissionAnalyzer(reader, Thresholds(), vehicle).analyze()
 
     def test_mean_over_20m_inside_wp_radius_is_good(self):
@@ -162,7 +162,7 @@ class TestMissionRadiusGrading:
         assert set(accuracy_fig.data[0].marker.color) == {"#5cb85c"}
         assert len(accuracy_fig.layout.shapes) == 1
         assert accuracy_fig.layout.shapes[0].y0 == 300.0
-        from lib.i18n import t
+        from arduscope.lib.i18n import t
         assert accuracy_fig.layout.annotations[0].text == t(
             "mission.thresh_reached", val="300")
 
@@ -183,7 +183,7 @@ class TestMissionRadiusGrading:
     ])
     def test_zero_radius_returns_info_but_keeps_distances(
             self, params, vehicle, param_name):
-        from lib.i18n import t
+        from arduscope.lib.i18n import t
         result = self._run(0.002, params=params, vehicle=vehicle)
         assert result.status == "info"
         assert result.summary == t("mission.invalid_radius",
@@ -214,8 +214,8 @@ class TestMissionRadiusGrading:
             },
         }, params={"WP_RADIUS": 300.0}, vehicle_type="ArduPlane")
         reader.mode_list = [SimpleNamespace(mode_name="AUTO")]
-        from analyzers.mission import MissionAnalyzer
-        from lib.i18n import t
+        from arduscope.analyzers.mission import MissionAnalyzer
+        from arduscope.lib.i18n import t
         result = MissionAnalyzer(reader, Thresholds(), _QP_VI).analyze()
 
         assert 0.0005 * 111320 < 300.0 < 0.0055 * 111320  # preconditions
@@ -234,7 +234,7 @@ class TestMissionRadiusGrading:
 class TestIMUConsistencyArmedFilter:
     def test_armed_rms_uses_armed_intervals(self):
         """A disagreement only on the bench must not reach the status."""
-        from analyzers.imu_consistency import IMUConsistencyAnalyzer
+        from arduscope.analyzers.imu_consistency import IMUConsistencyAnalyzer
         n = 3000
         ts = np.repeat(np.linspace(0.0, 300.0, n), 2)
         inst = np.tile([0.0, 1.0], n)
@@ -258,13 +258,13 @@ class TestIMUConsistencyArmedFilter:
 
 class TestCompassOffsetCorrection:
     def test_compass_uses_offset(self):
-        from analyzers.compass import CompassAnalyzer
+        from arduscope.analyzers.compass import CompassAnalyzer
         import inspect
         src = inspect.getsource(CompassAnalyzer._motor_interference)
         assert "ofs_x" in src or "OfsX" in src
 
     def test_compass_consistency_uses_offset(self):
-        from analyzers.compass_consistency import CompassConsistencyAnalyzer
+        from arduscope.analyzers.compass_consistency import CompassConsistencyAnalyzer
         import inspect
         src = inspect.getsource(CompassConsistencyAnalyzer.analyze)
         assert "OfsX" in src
@@ -276,7 +276,7 @@ class TestCompassOffsetCorrection:
 
 class TestTrendLabelTranslation:
     def test_next_step_translates_labels(self):
-        from lib.trend_analyzer import _build_next_step
+        from arduscope.lib.trend_analyzer import _build_next_step
         import inspect
         src = inspect.getsource(_build_next_step)
         assert "_t(m.label)" in src
@@ -288,11 +288,11 @@ class TestTrendLabelTranslation:
 
 class TestBaseAnalyzerHelpers:
     def test_get_armed_mask(self):
-        from analyzers import BaseAnalyzer
+        from arduscope.analyzers import BaseAnalyzer
         assert hasattr(BaseAnalyzer, "get_armed_mask")
 
     def test_safe_interp(self):
-        from analyzers import BaseAnalyzer
+        from arduscope.analyzers import BaseAnalyzer
         x = np.array([1.0, 2.0, 3.0])
         xp = np.array([0.0, np.nan, 2.0, 4.0])
         fp = np.array([10.0, np.nan, 20.0, 40.0])
@@ -301,7 +301,7 @@ class TestBaseAnalyzerHelpers:
         assert abs(result[1] - 20.0) < 0.01
 
     def test_safe_interp_all_nan(self):
-        from analyzers import BaseAnalyzer
+        from arduscope.analyzers import BaseAnalyzer
         x = np.array([1.0])
         xp = np.array([np.nan])
         fp = np.array([np.nan])
@@ -309,14 +309,14 @@ class TestBaseAnalyzerHelpers:
         assert np.isnan(result[0])
 
     def test_motor_param_copter(self):
-        from analyzers import BaseAnalyzer
+        from arduscope.analyzers import BaseAnalyzer
         reader = SyntheticReader({}, vehicle_type="ArduCopter")
         th = Thresholds()
         a = BaseAnalyzer(reader, th, _DEFAULT_VI)
         assert a.motor_param("SPIN_MIN") == "MOT_SPIN_MIN"
 
     def test_motor_param_quadplane(self):
-        from analyzers import BaseAnalyzer
+        from arduscope.analyzers import BaseAnalyzer
         reader = SyntheticReader({}, vehicle_type="ArduPlane")
         th = Thresholds()
         a = BaseAnalyzer(reader, th, _QP_VI)
@@ -329,7 +329,7 @@ class TestBaseAnalyzerHelpers:
         sees a uniform single-sensor series — otherwise dt/rate is inflated
         by the instance count and the spectrum gains ghost peaks.
         """
-        from analyzers import BaseAnalyzer
+        from arduscope.analyzers import BaseAnalyzer
         n_cycles = 300
         ts = np.repeat(np.linspace(0, 30, n_cycles), 3)  # 3 samples/cycle
         inst = np.tile([0.0, 1.0, 2.0], n_cycles)
@@ -347,7 +347,7 @@ class TestBaseAnalyzerHelpers:
 
     def test_read_primary_imu_oldstyle_no_instance_field(self):
         """Old-style logs without an I field fall back to unfiltered data."""
-        from analyzers import BaseAnalyzer
+        from arduscope.analyzers import BaseAnalyzer
         n = 400
         ts = np.linspace(0, 30, n)
         reader = SyntheticReader(messages={"IMU": {
@@ -364,14 +364,14 @@ class TestBaseAnalyzerHelpers:
 
 class TestI18nResilience:
     def test_missing_kwarg_no_crash(self):
-        from lib.i18n import t, set_locale
+        from arduscope.lib.i18n import t, set_locale
         set_locale("zh")
         result = t("vibration.good_summary")
         assert "{val}" in result
         assert isinstance(result, str)
 
     def test_normal_call(self):
-        from lib.i18n import t, set_locale
+        from arduscope.lib.i18n import t, set_locale
         set_locale("zh")
         result = t("vibration.good_summary", val="12.3")
         assert "12.3" in result

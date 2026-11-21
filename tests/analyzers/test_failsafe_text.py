@@ -11,9 +11,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from analyzers.failsafe import FailsafeAnalyzer
-from lib.i18n import t
-from lib.log_reader import ErrorEvent, TextMessage
+from arduscope.analyzers.failsafe import FailsafeAnalyzer
+from arduscope.lib.i18n import t
+from arduscope.lib.log_reader import ErrorEvent, TextMessage
 from tests.test_synthetic_coverage import (
     SyntheticReader, _thresholds, _vehicle)
 

@@ -30,11 +30,14 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PARENT_DIR = os.path.dirname(_SCRIPT_DIR)
 if _PARENT_DIR not in sys.path:
     sys.path.insert(0, _PARENT_DIR)
+_SRC_DIR = os.path.join(_SCRIPT_DIR, "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
 if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
 
-from lib.i18n import set_locale, t
-from lib import fleet_history
+from arduscope.lib.i18n import set_locale, t
+from arduscope.lib import fleet_history
 
 
 def _print_list(db_path: str) -> None:

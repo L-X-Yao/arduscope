@@ -37,7 +37,7 @@ them readable, on the current gate baseline.
   failsafe, so it applies the vehicle's mode gate. The card also aggregates
   triggered ERR and STATUSTEXT failsafe events, battery voltage, GPS satellite
   count and the EKF margin (`_FS_SUBSYS_KEYS`, `_battery_margin`,
-  `_gps_margin` and `_ekf_margin` in `analyzers/failsafe.py`). A non-EKF
+  `_gps_margin` and `_ekf_margin` in `src/arduscope/analyzers/failsafe.py`). A non-EKF
   failsafe or a battery breach can therefore make it critical; low GPS
   satellite count is a warning. A STATUSTEXT event in armed flight is
   critical; one outside armed flight, or with no armed window to prove it,
@@ -45,7 +45,7 @@ them readable, on the current gate baseline.
   whether the variance combination itself reaches the failsafe condition, and
   is not downgraded by mode. Its warning only means a variance reached
   `ekf_variance_warn`, not that the sustained failsafe combination was met
-  (`analyzers/ekf.py`). ArduPilot does not run that check in a fixed-wing
+  (`src/arduscope/analyzers/ekf.py`). ArduPilot does not run that check in a fixed-wing
   segment, but this does not make the navigation risk lower.
   The two cards therefore replay at different fidelities on purpose: the
   failsafe card runs the full state machine including Plane's mode gate,
@@ -78,7 +78,7 @@ them readable, on the current gate baseline.
   or not, and a trigger inside armed flight makes the card critical on its
   own. Since 2026-11-18 the variance recomputation is no longer a
   continuous-second approximation either: it replays the firmware's state
-  machine (`lib/ekf_failsafe.py`) — the `FS_EKF_FILT` low-pass (a
+  machine (`src/arduscope/lib/ekf_failsafe.py`) — the `FS_EKF_FILT` low-pass (a
   first-order `DigitalLPF`, Copter only), the `has_position` gate from the
   primary lane's XKF4.SS (armed flight wants `HORIZ_POS_ABS` without
   `CONST_POS_MODE`; disarmed accepts the PRED flags; a relative position
@@ -113,8 +113,8 @@ them readable, on the current gate baseline.
   `AC_ATTITUDE_THRUST_ERROR_ANGLE=30°` is the thrust-angle error hard limit
   above which yaw corrections are limited; a peak above 15 deg is now only a
   warning. The 15, and
-  the 20 and 4.0 beside it in `analyzers/attitude.py`, remain engineering
-  values with no source, outside `lib/thresholds.py` and its checks. The
+  the 20 and 4.0 beside it in `src/arduscope/analyzers/attitude.py`, remain engineering
+  values with no source, outside `src/arduscope/lib/thresholds.py` and its checks. The
   existing RMS criteria can still make sustained tracking error critical.
 - **`notch_tuning` no longer grades attitude by proxies.** Roll/pitch range,
   mean tracking error and peak angular rate remain informational details. The
@@ -223,7 +223,7 @@ them readable, on the current gate baseline.
 - **No login.** It binds to loopback. `--host 0.0.0.0` opens uploads, reports
   and parameters to anyone who can reach the address.
 - **The map has no basemap.** Since v0.12.0 the flight track is drawn on a
-  blank projection (`lib/html_report.py` carries no tile layer); a report is
+  blank projection (`src/arduscope/lib/html_report.py` carries no tile layer); a report is
   fully offline.
 
 ## LLM diagnosis

@@ -13,11 +13,11 @@ import numpy as np
 import pytest
 
 import fleet_report
-from analyzers import discover_analyzers
-from lib import fleet_history
-from lib.i18n import t
-from lib.log_reader import TextMessage
-from lib.thresholds import Thresholds
+from arduscope.analyzers import discover_analyzers
+from arduscope.lib import fleet_history
+from arduscope.lib.i18n import t
+from arduscope.lib.log_reader import TextMessage
+from arduscope.lib.thresholds import Thresholds
 from tests.test_synthetic_coverage import SyntheticReader
 
 pytestmark = pytest.mark.fast

@@ -7,12 +7,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from analyzers.tecs_tuning import TECSTuningAnalyzer
-from analyzers.cruise_efficiency import CruiseEfficiencyAnalyzer
-from analyzers.vtol_transition import VTOLTransitionAnalyzer
-from lib.i18n import t
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers.tecs_tuning import TECSTuningAnalyzer
+from arduscope.analyzers.cruise_efficiency import CruiseEfficiencyAnalyzer
+from arduscope.analyzers.vtol_transition import VTOLTransitionAnalyzer
+from arduscope.lib.i18n import t
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
 
 

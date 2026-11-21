@@ -23,9 +23,9 @@ if _TOOLS_DIR not in sys.path:
     sys.path.insert(0, _TOOLS_DIR)
 
 import local_paths
-from lib.log_reader import LogReader
-from lib.vehicle_detect import detect_vehicle
-from lib.thresholds import Thresholds
+from arduscope.lib.log_reader import LogReader
+from arduscope.lib.vehicle_detect import detect_vehicle
+from arduscope.lib.thresholds import Thresholds
 
 # ---- Real flight logs ----
 # Not in the repository. A machine that has them names them in

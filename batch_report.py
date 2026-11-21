@@ -30,15 +30,18 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PARENT_DIR = os.path.dirname(_SCRIPT_DIR)
 if _PARENT_DIR not in sys.path:
     sys.path.insert(0, _PARENT_DIR)
+_SRC_DIR = os.path.join(_SCRIPT_DIR, "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
 if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
 
-from lib.csv_safe import SafeWriter
-from lib.i18n import t
-from lib.html_report import HtmlReportGenerator
-from lib.ai_diagnosis import generate_diagnosis
-from lib.pipeline import run_analysis
-from lib.templates import get_template
+from arduscope.lib.csv_safe import SafeWriter
+from arduscope.lib.i18n import t
+from arduscope.lib.html_report import HtmlReportGenerator
+from arduscope.lib.ai_diagnosis import generate_diagnosis
+from arduscope.lib.pipeline import run_analysis
+from arduscope.lib.templates import get_template
 from multi_report import (
     extract_metrics, METRIC_CONFIG,
     generate_html as generate_multi_html,
@@ -169,7 +172,7 @@ def analyze_one(
         # Fleet history (archive + trend card); never blocks the batch
         if not no_fleet_record:
             try:
-                from lib import fleet_history
+                from arduscope.lib import fleet_history
                 fleet_db = os.path.join(output_dir, "fleet.db")
                 serial, _n = fleet_history.record(
                     fleet_db, pipeline, filepath)
@@ -451,7 +454,7 @@ def main():
     )
     args = parser.parse_args()
 
-    from lib.i18n import set_locale
+    from arduscope.lib.i18n import set_locale
     set_locale(args.lang)
 
     if not os.path.isdir(args.directory):

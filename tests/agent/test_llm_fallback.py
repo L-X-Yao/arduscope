@@ -7,12 +7,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from lib import ai_diagnosis
-from lib.ai_diagnosis import generate_diagnosis
-from lib.html_report import HtmlReportGenerator
-from lib.i18n import set_locale, t
-from lib.results import AnalysisResult
-from lib.vehicle_detect import VehicleInfo
+from arduscope.lib import ai_diagnosis
+from arduscope.lib.ai_diagnosis import generate_diagnosis
+from arduscope.lib.html_report import HtmlReportGenerator
+from arduscope.lib.i18n import set_locale, t
+from arduscope.lib.results import AnalysisResult
+from arduscope.lib.vehicle_detect import VehicleInfo
 
 VEHICLE = VehicleInfo(vehicle_type="ArduCopter", board_name="b",
                       firmware_version="V4.6.3", frame_class=1, motor_count=4,

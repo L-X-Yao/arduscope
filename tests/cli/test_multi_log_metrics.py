@@ -18,9 +18,9 @@ import pytest
 
 import batch_report
 import binlog
-from lib.i18n import t
-from lib.log_reader import LogReader
-from lib.thresholds import Thresholds
+from arduscope.lib.i18n import t
+from arduscope.lib.log_reader import LogReader
+from arduscope.lib.thresholds import Thresholds
 from multi_report import extract_metrics, generate_html
 from tests.test_synthetic_coverage import SyntheticReader
 

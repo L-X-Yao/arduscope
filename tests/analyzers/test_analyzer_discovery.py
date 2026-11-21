@@ -13,7 +13,7 @@ import warnings
 
 import pytest
 
-import analyzers
+import arduscope.analyzers as analyzers
 
 _REPO = str(REPO_ROOT)
 
@@ -46,20 +46,17 @@ def test_stale_bytecode_is_not_an_analyzer(monkeypatch):
 def test_sourceless_package_is_discovered(tmp_path):
     """The Windows package ships same-directory .pyc files and no .py,
     which is the one compiled layout that has to keep working."""
-    for name in ("lib", "locales"):
-        shutil.copytree(os.path.join(_REPO, name), tmp_path / name,
-                        ignore=shutil.ignore_patterns("__pycache__"))
-    package = tmp_path / "analyzers"
-    shutil.copytree(os.path.join(_REPO, "analyzers"), package,
+    package = tmp_path / "arduscope"
+    shutil.copytree(os.path.join(_REPO, "src", "arduscope"), package,
                     ignore=shutil.ignore_patterns("__pycache__"))
-    for source in package.glob("*.py"):
+    for source in list(package.rglob("*.py")):
         py_compile.compile(str(source), cfile=str(source) + "c", doraise=True)
         source.unlink()
-    assert not list(package.glob("*.py"))
+    assert not list(package.rglob("*.py"))
 
     out = subprocess.run(
         [sys.executable, "-B", "-c",
-         "import analyzers; print(len(analyzers.discover_analyzers()))"],
+         "import arduscope.analyzers as a; print(len(a.discover_analyzers()))"],
         cwd=tmp_path, capture_output=True, text=True, timeout=60)
 
     assert out.returncode == 0, out.stderr

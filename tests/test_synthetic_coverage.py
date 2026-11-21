@@ -34,14 +34,14 @@ from __future__ import annotations
 
 import numpy as np
 
-from analyzers.attitude import AttitudeAnalyzer
-from analyzers.battery import BatteryAnalyzer
-from analyzers.power import PowerAnalyzer
-from analyzers.rangefinder import RangefinderAnalyzer
-from analyzers.vibration import VibrationAnalyzer
-from lib.i18n import t as _t
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers.attitude import AttitudeAnalyzer
+from arduscope.analyzers.battery import BatteryAnalyzer
+from arduscope.analyzers.power import PowerAnalyzer
+from arduscope.analyzers.rangefinder import RangefinderAnalyzer
+from arduscope.analyzers.vibration import VibrationAnalyzer
+from arduscope.lib.i18n import t as _t
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 
 
 class SyntheticReader:

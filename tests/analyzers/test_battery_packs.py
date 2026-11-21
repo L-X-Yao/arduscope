@@ -10,10 +10,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from analyzers.cruise_efficiency import CruiseEfficiencyAnalyzer
-from analyzers.power import PowerAnalyzer
-from lib.battery_packs import read_packs, sum_over_packs
-from lib.i18n import t
+from arduscope.analyzers.cruise_efficiency import CruiseEfficiencyAnalyzer
+from arduscope.analyzers.power import PowerAnalyzer
+from arduscope.lib.battery_packs import read_packs, sum_over_packs
+from arduscope.lib.i18n import t
 from tests.test_synthetic_coverage import (
     SyntheticReader, _thresholds, _vehicle)
 

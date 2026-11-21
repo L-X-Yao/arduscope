@@ -6,17 +6,17 @@ import warnings
 
 import numpy as np
 
-from analyzers.airspeed import AirspeedAnalyzer
-from analyzers.attitude import AttitudeAnalyzer
-from analyzers.cruise_efficiency import CruiseEfficiencyAnalyzer
-from analyzers.battery import BatteryAnalyzer
-from analyzers.vtol_transition import VTOLTransitionAnalyzer
-from analyzers.rangefinder import RangefinderAnalyzer
+from arduscope.analyzers.airspeed import AirspeedAnalyzer
+from arduscope.analyzers.attitude import AttitudeAnalyzer
+from arduscope.analyzers.cruise_efficiency import CruiseEfficiencyAnalyzer
+from arduscope.analyzers.battery import BatteryAnalyzer
+from arduscope.analyzers.vtol_transition import VTOLTransitionAnalyzer
+from arduscope.analyzers.rangefinder import RangefinderAnalyzer
 from types import SimpleNamespace
 
-from lib.i18n import t as _t
-from lib.log_reader import ModeChange
-from lib.vehicle_detect import _detect_board_name
+from arduscope.lib.i18n import t as _t
+from arduscope.lib.log_reader import ModeChange
+from arduscope.lib.vehicle_detect import _detect_board_name
 from tests.test_synthetic_coverage import (
     SyntheticReader, _thresholds, _vehicle,
 )

@@ -7,9 +7,9 @@ import re
 import plotly.graph_objects as go
 import pytest
 
-from lib.html_report import HtmlReportGenerator, downsample_figure
-from lib.results import AnalysisResult
-from lib.vehicle_detect import VehicleInfo
+from arduscope.lib.html_report import HtmlReportGenerator, downsample_figure
+from arduscope.lib.results import AnalysisResult
+from arduscope.lib.vehicle_detect import VehicleInfo
 
 _VEHICLE = VehicleInfo("ArduCopter", "CubeOrange", "V4.6.3", 1, 4, 2, False)
 

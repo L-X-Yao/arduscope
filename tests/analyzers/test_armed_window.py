@@ -13,17 +13,17 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from analyzers.clock_health import ClockHealthAnalyzer
-from analyzers.compass import CompassAnalyzer
-from analyzers.compass_consistency import CompassConsistencyAnalyzer
-from analyzers.flight_profile import FlightProfileAnalyzer
-from analyzers.gps_glitch import GPSGlitchAnalyzer
-from analyzers.imu_consistency import IMUConsistencyAnalyzer
-from analyzers.rc_input import RCInputAnalyzer
-from analyzers.vibration import VibrationAnalyzer
-from lib.i18n import t as _t
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers.clock_health import ClockHealthAnalyzer
+from arduscope.analyzers.compass import CompassAnalyzer
+from arduscope.analyzers.compass_consistency import CompassConsistencyAnalyzer
+from arduscope.analyzers.flight_profile import FlightProfileAnalyzer
+from arduscope.analyzers.gps_glitch import GPSGlitchAnalyzer
+from arduscope.analyzers.imu_consistency import IMUConsistencyAnalyzer
+from arduscope.analyzers.rc_input import RCInputAnalyzer
+from arduscope.analyzers.vibration import VibrationAnalyzer
+from arduscope.lib.i18n import t as _t
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
 
 pytestmark = pytest.mark.fast

@@ -20,8 +20,8 @@ from __future__ import annotations
 
 import pytest
 
-from lib.log_reader import LogReader
-from lib.thresholds import Thresholds
+from arduscope.lib.log_reader import LogReader
+from arduscope.lib.thresholds import Thresholds
 
 pytestmark = pytest.mark.fast
 

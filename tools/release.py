@@ -27,10 +27,10 @@ import release_gate  # noqa: E402
 
 
 def _current_version() -> str:
-    with open("lib/__init__.py", encoding="utf-8") as f:
+    with open("src/arduscope/__init__.py", encoding="utf-8") as f:
         m = re.search(r'__version__\s*=\s*"(.+?)"', f.read())
     if not m:
-        sys.exit("Cannot parse __version__ from lib/__init__.py")
+        sys.exit("Cannot parse __version__ from src/arduscope/__init__.py")
     return m.group(1)
 
 
@@ -44,7 +44,7 @@ def _bump(version: str, part: str) -> str:
 
 
 def _update_version_file(new_ver: str) -> None:
-    path = "lib/__init__.py"
+    path = "src/arduscope/__init__.py"
     with open(path, encoding="utf-8") as f:
         content = f.read()
     content = re.sub(
@@ -135,7 +135,7 @@ def main() -> None:
         return
 
     # Pre-flight checks. Staged content must be checked too: the
-    # release commit stages only lib/__init__.py/CHANGELOG.md but a bare
+    # release commit stages only src/arduscope/__init__.py/CHANGELOG.md but a bare
     # `git commit` sweeps EVERYTHING already staged into the release.
     unstaged = subprocess.run(
         ["git", "diff", "--quiet"], capture_output=True
@@ -168,7 +168,7 @@ def main() -> None:
                  f"Run tools/release_gate.py on this commit first.")
 
     # The notes have to exist before anything is written: this used to bump
-    # lib/__init__.py first and only then find [Unreleased] empty, refusing
+    # src/arduscope/__init__.py first and only then find [Unreleased] empty, refusing
     # the release but leaving a dirty version file behind.
     with open("CHANGELOG.md", encoding="utf-8") as f:
         problem = _unreleased_problem(f.read())
@@ -180,14 +180,14 @@ def main() -> None:
 
     # 1. Bump version
     _update_version_file(new_ver)
-    print(f"  Updated lib/__init__.py -> {new_ver}")
+    print(f"  Updated src/arduscope/__init__.py -> {new_ver}")
 
     # 2. Date the release notes
     _update_changelog(new_ver)
     print(f"  Dated the [Unreleased] section as {new_ver}")
 
     # 3. Commit + tag
-    _run(["git", "add", "lib/__init__.py", "CHANGELOG.md"])
+    _run(["git", "add", "src/arduscope/__init__.py", "CHANGELOG.md"])
     # "chore: " prefix — the commit-msg hook only accepts the conventional
     # type whitelist (feat|fix|...|chore|...); a bare "release:" is rejected.
     _run(["git", "commit", "-m", f"chore: release v{new_ver}"])

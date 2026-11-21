@@ -9,9 +9,9 @@ import re
 import numpy as np
 import pytest
 
-from lib.i18n import t
-from lib.thresholds import Thresholds
-from lib.trend_analyzer import (
+from arduscope.lib.i18n import t
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.trend_analyzer import (
     TREND_IMPROVING,
     TREND_INSUFFICIENT,
     TREND_REGRESSING,

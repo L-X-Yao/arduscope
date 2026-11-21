@@ -21,7 +21,7 @@ if _SCRIPT_DIR not in sys.path:
 
 def _make_vehicle():
     """Create a minimal VehicleInfo for testing."""
-    from lib.vehicle_detect import VehicleInfo
+    from arduscope.lib.vehicle_detect import VehicleInfo
     return VehicleInfo(
         vehicle_type="Copter",
         firmware_version="4.5.0",
@@ -41,7 +41,7 @@ class TestHtmlToPdfImportError:
         """When weasyprint is not installed, html_to_pdf should raise
         ImportError with install instructions."""
         with mock.patch.dict(sys.modules, {"weasyprint": None}):
-            from lib.pdf_export import html_to_pdf
+            from arduscope.lib.pdf_export import html_to_pdf
             with pytest.raises(ImportError, match="pip install arduscope\\[pdf\\]"):
                 html_to_pdf("<html></html>", "/tmp/test.pdf")
 
@@ -54,7 +54,7 @@ class TestStaticImagesFlag:
         """When static_images=True and kaleido is available (mocked),
         _render_static_figure returns an <img> tag with base64 PNG data."""
         import plotly.graph_objects as go
-        from lib.html_report import HtmlReportGenerator
+        from arduscope.lib.html_report import HtmlReportGenerator
 
         fig = go.Figure(go.Scatter(x=[1, 2, 3], y=[4, 5, 6]))
 
@@ -68,7 +68,7 @@ class TestStaticImagesFlag:
     def test_failed_chart_raises(self):
         """A PDF without its charts must not pass as a report."""
         import plotly.graph_objects as go
-        from lib.html_report import ChartRenderError, HtmlReportGenerator
+        from arduscope.lib.html_report import ChartRenderError, HtmlReportGenerator
 
         fig = go.Figure(go.Scatter(x=[1, 2], y=[3, 4]))
 
@@ -81,8 +81,8 @@ class TestStaticImagesFlag:
         """Each attempt searched for Chrome for seconds, so one run spent
         six minutes failing on every figure of a 5 MB log."""
         import plotly.graph_objects as go
-        from lib.html_report import ChartRenderError, HtmlReportGenerator
-        from analyzers import AnalysisResult
+        from arduscope.lib.html_report import ChartRenderError, HtmlReportGenerator
+        from arduscope.analyzers import AnalysisResult
 
         figures = [go.Figure(go.Scatter(x=[1, 2], y=[3, 4]))
                    for _ in range(3)]
@@ -104,8 +104,8 @@ class TestStaticImagesFlag:
         """When static_images=True, generate() uses _render_static_figure
         for figures instead of pio.to_html."""
         import plotly.graph_objects as go
-        from lib.html_report import HtmlReportGenerator
-        from analyzers import AnalysisResult
+        from arduscope.lib.html_report import HtmlReportGenerator
+        from arduscope.analyzers import AnalysisResult
 
         fig = go.Figure(go.Scatter(x=[1, 2, 3], y=[4, 5, 6]))
         result = AnalysisResult(
@@ -138,8 +138,8 @@ class TestStaticImagesFlag:
         """Default (static_images=False) should use interactive Plotly HTML,
         not static <img> tags."""
         import plotly.graph_objects as go
-        from lib.html_report import HtmlReportGenerator
-        from analyzers import AnalysisResult
+        from arduscope.lib.html_report import HtmlReportGenerator
+        from arduscope.analyzers import AnalysisResult
 
         fig = go.Figure(go.Scatter(x=[1, 2], y=[3, 4]))
         result = AnalysisResult(
@@ -200,7 +200,7 @@ class TestLocaleKeys:
     """Verify PDF-related locale keys exist in both zh and en."""
 
     def test_locale_keys_exist(self):
-        from lib.i18n import set_locale, t, get_locale
+        from arduscope.lib.i18n import set_locale, t, get_locale
 
         original = get_locale()
         try:
@@ -224,7 +224,7 @@ class TestLocaleKeys:
 class TestCliChartFailure:
     def test_exits_nonzero_and_names_chrome(self, tmp_path, capsys):
         import flight_report
-        from lib.i18n import set_locale
+        from arduscope.lib.i18n import set_locale
         from tests.binlog import flight_log
 
         log = flight_log(duration_s=8.0).save(tmp_path / "flight.BIN")
@@ -236,7 +236,7 @@ class TestCliChartFailure:
         with mock.patch.object(sys, "argv", argv), \
              mock.patch("plotly.io.to_image",
                         side_effect=RuntimeError("Kaleido requires Chrome")), \
-             mock.patch("lib.pdf_export.html_to_pdf") as to_pdf:
+             mock.patch("arduscope.lib.pdf_export.html_to_pdf") as to_pdf:
             with pytest.raises(SystemExit) as stop:
                 flight_report.main()
         set_locale("zh")

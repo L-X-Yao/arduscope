@@ -9,13 +9,13 @@ from __future__ import annotations
 import pytest
 
 import binlog
-from analyzers.ekf import EKFAnalyzer
-from analyzers.ekf_vel_divergence import EKFVelDivergenceAnalyzer
-from analyzers.failsafe import FailsafeAnalyzer
-from lib.i18n import t as _t
-from lib.log_reader import LogReader
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import detect_vehicle
+from arduscope.analyzers.ekf import EKFAnalyzer
+from arduscope.analyzers.ekf_vel_divergence import EKFVelDivergenceAnalyzer
+from arduscope.analyzers.failsafe import FailsafeAnalyzer
+from arduscope.lib.i18n import t as _t
+from arduscope.lib.log_reader import LogReader
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import detect_vehicle
 
 pytestmark = pytest.mark.fast
 

@@ -50,10 +50,10 @@ import pytest
 
 import local_paths
 from conftest import REAL_LOG_LABELS
-from analyzers import discover_analyzers
-from lib.log_reader import LogReader
-from lib.vehicle_detect import detect_vehicle
-from lib.thresholds import Thresholds
+from arduscope.analyzers import discover_analyzers
+from arduscope.lib.log_reader import LogReader
+from arduscope.lib.vehicle_detect import detect_vehicle
+from arduscope.lib.thresholds import Thresholds
 
 
 _TESTS_DIR = _TESTS_DIR_BOOTSTRAP
@@ -222,7 +222,7 @@ def test_snapshot_file_well_formed():
             assert expected["status"] in (
                 "good", "warning", "critical", "info",
             ), f"{label}/{key} bad status {expected['status']}"
-            from analyzers import VALID_ACTION_LEVELS
+            from arduscope.analyzers import VALID_ACTION_LEVELS
             assert expected["action_level"] in VALID_ACTION_LEVELS, \
                 f"{label}/{key} bad action_level {expected['action_level']}"
             assert isinstance(expected["param_count"], int) \

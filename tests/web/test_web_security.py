@@ -16,10 +16,10 @@ import pytest
 from webtest import TestApp
 
 import web_app
-from lib.html_report import HtmlReportGenerator
-from lib.i18n import set_locale
-from lib.results import AnalysisResult
-from lib.vehicle_detect import VehicleInfo
+from arduscope.lib.html_report import HtmlReportGenerator
+from arduscope.lib.i18n import set_locale
+from arduscope.lib.results import AnalysisResult
+from arduscope.lib.vehicle_detect import VehicleInfo
 
 
 @pytest.fixture

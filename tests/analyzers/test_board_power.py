@@ -10,9 +10,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from analyzers.board_power import BoardPowerAnalyzer
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers.board_power import BoardPowerAnalyzer
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
 
 pytestmark = pytest.mark.fast

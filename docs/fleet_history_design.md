@@ -62,7 +62,7 @@ info 级（无阈值判定，POSITIONING 免罪），除非未来找到有出处
 
 ## 4. 采集路径（已定：默认开启）
 
-pipeline 分析完成后的 post-hook（`lib/fleet_history.py`）：
+pipeline 分析完成后的 post-hook（`src/arduscope/lib/fleet_history.py`）：
 - B1 **默认开启**，`--no-fleet-record` 关闭（档案完整性优先）
 - B2 默认关闭，`--fleet-record` 显式开启（保守）
 
@@ -90,5 +90,5 @@ web 上传与 batch_report 走同一 hook；失败（db 锁/坏日志）只警�
 
 ## 工作量估算
 
-lib/fleet_history.py + pipeline hook + 报告节 + fleet_report.py +
+src/arduscope/lib/fleet_history.py + pipeline hook + 报告节 + fleet_report.py +
 测试 ≈ 1 个工作日；web 机队页再 +半天。

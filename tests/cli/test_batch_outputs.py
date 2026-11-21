@@ -14,7 +14,7 @@ import pytest
 
 import batch_report
 import binlog
-from lib.i18n import t
+from arduscope.lib.i18n import t
 
 _ROOT = str(REPO_ROOT)
 

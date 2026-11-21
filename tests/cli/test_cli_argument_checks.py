@@ -8,7 +8,7 @@ from unittest import mock
 import pytest
 
 import flight_report
-from lib.i18n import set_locale
+from arduscope.lib.i18n import set_locale
 from tests.binlog import flight_log
 
 
@@ -86,7 +86,7 @@ class TestThresholdsFile:
 
     @pytest.mark.fast
     def test_valid_file_is_applied(self, tmp_path):
-        from lib.thresholds import Thresholds
+        from arduscope.lib.thresholds import Thresholds
         path = tmp_path / "custom.json"
         path.write_text('{"vibe_warn": 20.0, "gps_nsats_warn": 8}',
                         encoding="utf-8")
@@ -133,7 +133,7 @@ class TestApiKey:
             seen.append(api_key)
             return "All clear."
 
-        monkeypatch.setattr("lib.ai_diagnosis._call_anthropic", fake_call)
+        monkeypatch.setattr("arduscope.lib.ai_diagnosis._call_anthropic", fake_call)
 
         _main(log_path, "--ai-provider", "anthropic", "--ai-model", "m",
               "--only", "summary", "--no-open", "--no-fleet-record", "-o",
@@ -158,8 +158,8 @@ class TestLlmEndpoint:
             seen.append((api_key, model, base_url))
             return "All clear."
 
-        monkeypatch.setattr("lib.ai_diagnosis._call_anthropic", fake_call)
-        monkeypatch.setattr("lib.ai_diagnosis._call_openai", fake_call)
+        monkeypatch.setattr("arduscope.lib.ai_diagnosis._call_anthropic", fake_call)
+        monkeypatch.setattr("arduscope.lib.ai_diagnosis._call_openai", fake_call)
         return seen
 
     @pytest.mark.parametrize("provider", ["anthropic", "openai"])

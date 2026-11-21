@@ -11,18 +11,18 @@ import sys
 import pytest
 
 import binlog
-from analyzers.motor import MotorAnalyzer
-from lib.ai_diagnosis import generate_diagnosis
-from lib.executive_summary import build_executive_summary
-from lib.i18n import t
-from lib.pipeline import (
+from arduscope.analyzers.motor import MotorAnalyzer
+from arduscope.lib.ai_diagnosis import generate_diagnosis
+from arduscope.lib.executive_summary import build_executive_summary
+from arduscope.lib.i18n import t
+from arduscope.lib.pipeline import (
     CRITICAL_SCORE_CAP,
     NO_SCORE,
     NotAFlightLog,
     compute_health_score,
     run_analysis,
 )
-from lib.results import AnalysisResult
+from arduscope.lib.results import AnalysisResult
 
 _ROOT = str(REPO_ROOT)
 

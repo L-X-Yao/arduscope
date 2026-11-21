@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from lib.thresholds import Thresholds
-from lib.trend_analyzer import (
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.trend_analyzer import (
     analyze_trends,
     get_metric_specs,
     TREND_IMPROVING,
@@ -269,7 +269,7 @@ class TestEdgeCases:
         """Headline n_insuf must equal the number of convergence-threshold
         metrics, not the total insufficient_metric_keys (which always
         includes informational metrics)."""
-        from lib.trend_analyzer import get_metric_specs
+        from arduscope.lib.trend_analyzer import get_metric_specs
         n_threshold = sum(1 for s in get_metric_specs() if s.convergence_attr)
         report = analyze_trends([{"max_vibe": 10.0}], ["log"], _t())
         assert len(report.convergence.threshold_insufficient_keys) == n_threshold

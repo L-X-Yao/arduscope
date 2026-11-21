@@ -15,7 +15,7 @@ import pytest
 
 pytestmark = pytest.mark.fast
 
-from analyzers import (
+from arduscope.analyzers import (
     AnalysisResult,
     derive_default_action_level,
     worst_action_level,
@@ -148,7 +148,7 @@ class TestSafetyCriticalAnalyzersExplicit:
 
     def test_battery_critical_escalates_to_safety_stop(self):
         import numpy as np  # noqa: F401 — fixture module needs it loaded
-        from analyzers.battery import BatteryAnalyzer
+        from arduscope.analyzers.battery import BatteryAnalyzer
         from tests.test_synthetic_coverage import (
             TestBatterySynthetic, _thresholds, _vehicle)
         reader = TestBatterySynthetic()._build_reader(
@@ -160,7 +160,7 @@ class TestSafetyCriticalAnalyzersExplicit:
         assert result.action_text                # concrete instructions
 
     def test_battery_warning_routes_to_physical_check(self):
-        from analyzers.battery import BatteryAnalyzer
+        from arduscope.analyzers.battery import BatteryAnalyzer
         from tests.test_synthetic_coverage import (
             TestBatterySynthetic, _thresholds, _vehicle)
         reader = TestBatterySynthetic()._build_reader(
@@ -172,7 +172,7 @@ class TestSafetyCriticalAnalyzersExplicit:
 
     def test_ekf_critical_escalates_to_safety_stop(self):
         import numpy as np
-        from analyzers.ekf import EKFAnalyzer
+        from arduscope.analyzers.ekf import EKFAnalyzer
         from tests.test_synthetic_coverage import (
             SyntheticReader, _thresholds, _vehicle)
         n = 100
@@ -197,7 +197,7 @@ class TestSafetyCriticalAnalyzersExplicit:
         assert result.action_text
 
     def test_vibration_critical_routes_to_physical_check(self):
-        from analyzers.vibration import VibrationAnalyzer
+        from arduscope.analyzers.vibration import VibrationAnalyzer
         from tests.test_synthetic_coverage import (
             TestVibrationSynthetic, _thresholds, _vehicle)
         reader = TestVibrationSynthetic()._build_reader(max_vibe=35.0)
@@ -209,7 +209,7 @@ class TestSafetyCriticalAnalyzersExplicit:
 
     def test_motor_critical_without_gains_physical_check(self):
         import numpy as np
-        from analyzers.motor import MotorAnalyzer
+        from arduscope.analyzers.motor import MotorAnalyzer
         from tests.test_synthetic_coverage import (
             SyntheticReader, _thresholds, _vehicle)
         n = 600
@@ -234,9 +234,9 @@ class TestSafetyCriticalAnalyzersExplicit:
     def test_failsafe_trigger_routes_to_physical_check(self):
         # A fired failsafe means "go find out why", never apply_param —
         # the unsourced BATT_LOW_VOLT auto-suggestion was removed.
-        from analyzers.failsafe import FailsafeAnalyzer
-        from lib.log_reader import ErrorEvent
-        from lib.thresholds import Thresholds
+        from arduscope.analyzers.failsafe import FailsafeAnalyzer
+        from arduscope.lib.log_reader import ErrorEvent
+        from arduscope.lib.thresholds import Thresholds
         from tests.test_synthetic_coverage import (
             SyntheticReader, _vehicle)
         reader = SyntheticReader(messages={})
@@ -249,8 +249,8 @@ class TestSafetyCriticalAnalyzersExplicit:
 
     def test_pid_tuning_without_gains_recommends_autotune(self):
         import numpy as np
-        from analyzers.pid_tuning import PIDTuningAnalyzer
-        from lib.thresholds import Thresholds
+        from arduscope.analyzers.pid_tuning import PIDTuningAnalyzer
+        from arduscope.lib.thresholds import Thresholds
         from tests.test_synthetic_coverage import (
             SyntheticReader, _vehicle)
         n = 400
@@ -279,7 +279,7 @@ class TestSafetyCriticalAnalyzersExplicit:
 # ====================================================================
 class TestBaseAnalyzerMakeResult:
     def test_make_result_passes_through_new_fields(self):
-        from analyzers import BaseAnalyzer
+        from arduscope.analyzers import BaseAnalyzer
 
         class _Dummy(BaseAnalyzer):
             registry_key = "_dummy"
@@ -313,7 +313,7 @@ class TestThresholdsHaveAuthoritativeSources:
     docs/convergence_criteria.md."""
 
     def test_thresholds_module_documented(self):
-        from lib import thresholds as th
+        from arduscope.lib import thresholds as th
         src = inspect.getsource(th)
         # Required source identifiers from convergence_criteria.md
         assert "METHODIC" in src, \
@@ -323,7 +323,7 @@ class TestThresholdsHaveAuthoritativeSources:
 
     def test_pid_rate_out_threshold_present(self):
         """The METHODIC RATE.*out criterion is the canonical PID metric."""
-        from lib.thresholds import Thresholds
+        from arduscope.lib.thresholds import Thresholds
         t = Thresholds()
         assert hasattr(t, 'pid_rate_out_warn')
         assert hasattr(t, 'pid_rate_out_crit')
@@ -332,7 +332,7 @@ class TestThresholdsHaveAuthoritativeSources:
 
     def test_convergence_criteria_present(self):
         """Convergence (drone fully tuned) thresholds present."""
-        from lib.thresholds import Thresholds
+        from arduscope.lib.thresholds import Thresholds
         t = Thresholds()
         assert hasattr(t, 'converge_vibe_max')
         assert hasattr(t, 'converge_clip_max')
@@ -389,7 +389,7 @@ class TestParamSuggestionShape:
 class TestExecutiveSummaryHeadline:
     def test_all_ok_headline(self):
         """All analyzers OK → diagnostic headline, no 'perfect' claim."""
-        from lib.executive_summary import build_executive_summary
+        from arduscope.lib.executive_summary import build_executive_summary
         results = [
             AnalysisResult(title="a", status="good", action_level=ACTION_OK),
             AnalysisResult(title="b", status="good", action_level=ACTION_OK),
@@ -399,7 +399,7 @@ class TestExecutiveSummaryHeadline:
 
     def test_has_issues_headline(self):
         """Issues present → headline describes diagnostic result."""
-        from lib.executive_summary import build_executive_summary
+        from arduscope.lib.executive_summary import build_executive_summary
         results = [
             AnalysisResult(title="a", status="good", action_level=ACTION_OK),
             AnalysisResult(
@@ -416,7 +416,7 @@ class TestExecutiveSummaryHeadline:
         assert "METHODIC" not in es.headline
 
     def test_empty_results(self):
-        from lib.executive_summary import build_executive_summary
+        from arduscope.lib.executive_summary import build_executive_summary
         es = build_executive_summary([])
         assert es.headline != ""
 
@@ -426,24 +426,24 @@ class TestExecutiveSummaryHeadline:
 # ====================================================================
 class TestFormatActionText:
     def test_numbered_steps_get_breaks(self):
-        from lib.html_report import _format_action_text
+        from arduscope.lib.html_report import _format_action_text
         result = _format_action_text("检查：1. 电池2. GPS3. EKF")
         assert "<br>1. " in result
         assert "<br>2. " in result
         assert "<br>3. " in result
 
     def test_circled_numbers_get_breaks(self):
-        from lib.html_report import _format_action_text
+        from arduscope.lib.html_report import _format_action_text
         result = _format_action_text("步骤：① 减少② 检查③ SD")
         assert "<br>①" in result
         assert "<br>②" in result
 
     def test_decimals_not_broken(self):
-        from lib.html_report import _format_action_text
+        from arduscope.lib.html_report import _format_action_text
         result = _format_action_text("FS_EKF_THRESH=0.8 和 42.0V")
         assert "<br>0." not in result
         assert "<br>42." not in result
 
     def test_empty_string(self):
-        from lib.html_report import _format_action_text
+        from arduscope.lib.html_report import _format_action_text
         assert _format_action_text("") == ""

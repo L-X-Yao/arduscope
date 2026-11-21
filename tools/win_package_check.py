@@ -120,10 +120,10 @@ def source_modules(root: str = REPO_ROOT) -> set[str]:
     imports.
     """
     found = set()
-    for folder in ("lib", "analyzers"):
+    for folder in ("src/arduscope/lib", "src/arduscope/analyzers"):
         for path in glob.glob(os.path.join(root, folder, "**", "*.py"),
                               recursive=True):
-            rel = os.path.relpath(path, root)
+            rel = os.path.relpath(path, os.path.join(root, "src"))
             if "__pycache__" in rel.split(os.sep):
                 continue
             found.add(rel[:-3].replace(os.sep, "/"))
@@ -216,7 +216,7 @@ def check_zip(path: str, version: str) -> list[dict]:
         names = z.namelist()
         # 0.10.1 and earlier had the version in the top-level __init__;
         # 0.11.0 moved it into the lib package.
-        init_name = "arduscope/log_analysis/lib/__init__.pyc"
+        init_name = "arduscope/log_analysis/arduscope/__init__.pyc"
         if init_name not in names:
             init_name = "arduscope/log_analysis/__init__.pyc"
         init = z.read(init_name)

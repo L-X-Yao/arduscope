@@ -10,9 +10,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lib.log_reader import Event, LogReader
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo, _count_imus
+from arduscope.lib.log_reader import Event, LogReader
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo, _count_imus
 from tests.test_synthetic_coverage import SyntheticReader
 
 pytestmark = pytest.mark.fast
@@ -88,7 +88,7 @@ class TestBatch1VibrationInstance:
         )
 
     def test_primary_instance_drives_status(self):
-        from analyzers.vibration import VibrationAnalyzer
+        from arduscope.analyzers.vibration import VibrationAnalyzer
         reader = self._reader(primary_max=5.0, backup_max=99.0)
         # Precondition: a non-primary IMU shows critical-level vibration.
         vibe = reader.get_messages_as_arrays("VIBE", ["IMU", "VibeX"])
@@ -100,7 +100,7 @@ class TestBatch1VibrationInstance:
         assert res.status == "good"
 
     def test_clip_read_per_instance(self):
-        from analyzers.vibration import VibrationAnalyzer
+        from arduscope.analyzers.vibration import VibrationAnalyzer
         n = 600
         ts = np.linspace(0, 120, n)
         imu = np.tile([0.0, 1.0], n // 2)
@@ -129,7 +129,7 @@ class TestBatch1VibrationInstance:
 class TestBatch2CoreInstance:
 
     def test_ekf_primary_core_only(self):
-        from analyzers.ekf import EKFAnalyzer
+        from arduscope.analyzers.ekf import EKFAnalyzer
         th = Thresholds()
         crit = th.ekf_variance_crit
         n = 400
@@ -152,7 +152,7 @@ class TestBatch2CoreInstance:
         assert res.status != "critical"
 
     def test_gyro_saturation_denominator_primary_imu(self):
-        from analyzers.gyro_saturation import GyroSaturationAnalyzer
+        from arduscope.analyzers.gyro_saturation import GyroSaturationAnalyzer
         n = 400
         ts = np.linspace(0, 100, n)
         imu = np.tile([0.0, 1.0], n // 2)
@@ -174,7 +174,7 @@ class TestBatch2CoreInstance:
         assert res.status == "critical"
 
     def test_flight_profile_climb_primary_core(self):
-        from analyzers.flight_profile import FlightProfileAnalyzer
+        from arduscope.analyzers.flight_profile import FlightProfileAnalyzer
         n = 400
         ts = np.linspace(0, 100, n)
         core = np.tile([0.0, 1.0], n // 2)
@@ -200,7 +200,7 @@ class TestBatch2CoreInstance:
 class TestBatch34FalsePositives:
 
     def test_gps_glitch_ignores_nofix_zero_samples(self):
-        from analyzers.gps_glitch import GPSGlitchAnalyzer
+        from arduscope.analyzers.gps_glitch import GPSGlitchAnalyzer
         n = 200
         ts = np.linspace(0, 100, n)
         lat = np.full(n, 39.9)
@@ -225,7 +225,7 @@ class TestBatch34FalsePositives:
         assert res.status != "critical"
 
     def test_gps_glitch_only_instance_1(self):
-        from analyzers.gps_glitch import GPSGlitchAnalyzer
+        from arduscope.analyzers.gps_glitch import GPSGlitchAnalyzer
         n = 100
         ts = np.linspace(0, 100, n)
         reader = SyntheticReader(
@@ -243,7 +243,7 @@ class TestBatch34FalsePositives:
         assert res.status in ("good", "warning", "critical")
 
     def test_failsafe_battery_margin_no_armed_not_critical(self):
-        from analyzers.failsafe import FailsafeAnalyzer
+        from arduscope.analyzers.failsafe import FailsafeAnalyzer
         n = 200
         ts = np.linspace(0, 100, n)
         volt = np.full(n, 24.0)
@@ -270,7 +270,7 @@ class TestBatch34FalsePositives:
 class TestBatch4PidLogic:
 
     def test_constant_izero_not_windup_no_noop(self):
-        from analyzers.pid_tuning import PIDTuningAnalyzer
+        from arduscope.analyzers.pid_tuning import PIDTuningAnalyzer
         n = 400
         ts = np.linspace(0, 120, n)
         tar = 0.2 * np.sin(np.linspace(0, 40, n))  # small rate target, rad/s
@@ -299,7 +299,7 @@ class TestBatch4PidLogic:
                    for s in res.param_suggestions)
 
     def test_tracking_gate_live_in_degs(self):
-        from analyzers.pid_tuning import PIDTuningAnalyzer
+        from arduscope.analyzers.pid_tuning import PIDTuningAnalyzer
         n = 400
         ts = np.linspace(0, 120, n)
         tar = np.full(n, 0.5)   # 0.5 rad/s ~ 28.6 deg/s target
@@ -330,7 +330,7 @@ class TestBatch4PidLogic:
 class TestBatch56:
 
     def test_compass_nan_offsets_no_leak(self):
-        from analyzers.compass import CompassAnalyzer
+        from arduscope.analyzers.compass import CompassAnalyzer
         n = 200
         ts = np.linspace(0, 100, n)
         reader = SyntheticReader(
@@ -352,7 +352,7 @@ class TestBatch56:
         assert not any("nan" in d.lower() for d in res.details)
 
     def test_log_health_clean_disarm_not_abrupt(self):
-        from analyzers.log_health import LogHealthAnalyzer
+        from arduscope.analyzers.log_health import LogHealthAnalyzer
         reader = SyntheticReader(messages={}, armed_intervals=[(5.0, 95.0)])
         reader.time_range = (0.0, 95.3)  # gap 0.3s < the abrupt-end gap
         reader.events = [Event(5.0, 10), Event(95.0, 11)]  # arm + disarm
@@ -365,7 +365,7 @@ class TestBatch56:
         assert status is None
 
     def test_log_health_unclosed_arm_still_abrupt(self):
-        from analyzers.log_health import LogHealthAnalyzer
+        from arduscope.analyzers.log_health import LogHealthAnalyzer
         reader = SyntheticReader(messages={}, armed_intervals=[(5.0, 95.0)])
         reader.time_range = (0.0, 95.3)
         reader.events = [Event(5.0, 10)]  # armed, never disarmed
@@ -380,7 +380,7 @@ class TestBatch56:
     def test_web_ui_locale_applied_per_request(self):
         import bottle
         import web_app
-        from lib.i18n import get_locale, set_locale
+        from arduscope.lib.i18n import get_locale, set_locale
         saved = web_app._UI_LOCALE
         try:
             # Simulate a fresh server thread that defaulted to zh while the
@@ -403,7 +403,7 @@ class TestVtolTrnDetection:
     2=DONE)."""
 
     def _analyzer(self):
-        from analyzers.vtol_transition import VTOLTransitionAnalyzer
+        from arduscope.analyzers.vtol_transition import VTOLTransitionAnalyzer
         reader = SyntheticReader(messages={}, vehicle_type="ArduPlane",
                                  params={"Q_ENABLE": 1})
         return VTOLTransitionAnalyzer(reader, Thresholds(),

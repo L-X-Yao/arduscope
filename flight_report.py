@@ -25,21 +25,24 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PARENT_DIR = os.path.dirname(_SCRIPT_DIR)
 if _PARENT_DIR not in sys.path:
     sys.path.insert(0, _PARENT_DIR)
+_SRC_DIR = os.path.join(_SCRIPT_DIR, "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
 if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
 
-from lib.csv_safe import SafeWriter
-from lib.i18n import localized_value, set_locale, t
-from lib.log_reader import LogReader
-from lib.html_report import ChartRenderError, HtmlReportGenerator
-from lib.ai_diagnosis import generate_diagnosis
-from lib.agent import analyze_with_agent
-from lib.agent.config import config_from_args
-from lib.param_conflict import distinct_values, merge_suggestions
-from lib.pipeline import run_analysis
-from lib.templates import get_template, list_templates
-from lib.thresholds import Thresholds
-from analyzers import AnalysisResult, discover_analyzers
+from arduscope.lib.csv_safe import SafeWriter
+from arduscope.lib.i18n import localized_value, set_locale, t
+from arduscope.lib.log_reader import LogReader
+from arduscope.lib.html_report import ChartRenderError, HtmlReportGenerator
+from arduscope.lib.ai_diagnosis import generate_diagnosis
+from arduscope.lib.agent import analyze_with_agent
+from arduscope.lib.agent.config import config_from_args
+from arduscope.lib.param_conflict import distinct_values, merge_suggestions
+from arduscope.lib.pipeline import run_analysis
+from arduscope.lib.templates import get_template, list_templates
+from arduscope.lib.thresholds import Thresholds
+from arduscope.analyzers import AnalysisResult, discover_analyzers
 
 
 def _export_param_file(results_by_key: dict, report_path: str):
@@ -427,7 +430,7 @@ def main():
     # failures must never block the report.
     if not args.no_fleet_record:
         try:
-            from lib import fleet_history
+            from arduscope.lib import fleet_history
             db_path = os.path.join(
                 os.path.dirname(os.path.abspath(output_path)), "fleet.db")
             serial, n = fleet_history.record(db_path, pipeline, args.logfile)
@@ -447,7 +450,7 @@ def main():
                    param_conflicts)
     elif args.format == "pdf":
         try:
-            from lib.pdf_export import html_to_pdf
+            from arduscope.lib.pdf_export import html_to_pdf
         except ImportError:
             print(t('report.pdf_requires_weasyprint'), file=sys.stderr)
             sys.exit(1)

@@ -1,6 +1,6 @@
 # Convergence Criteria
 
-Threshold traceability table for all fields in `lib/thresholds.py`.
+Threshold traceability table for all fields in `src/arduscope/lib/thresholds.py`.
 
 METHODIC is the [ArduPilot Methodic Configurator's tuning guide](https://ardupilot.github.io/MethodicConfigurator/TUNING_GUIDE_ArduCopter.html).
 

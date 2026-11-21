@@ -40,11 +40,11 @@ for _path in (_ROOT, os.path.join(_ROOT, "tests", "sitl")):
         sys.path.insert(0, _path)
 
 import generate_logs  # noqa: E402
-from lib.log_reader import LogReader  # noqa: E402
-from lib.outputs import motor_channels, read_outputs  # noqa: E402
-from lib.param_conflict import merge_suggestions  # noqa: E402
-from lib.pipeline import run_analysis  # noqa: E402
-from lib.plane_phase import FLIGHT_STAGE_NORMAL, stat_at  # noqa: E402
+from arduscope.lib.log_reader import LogReader  # noqa: E402
+from arduscope.lib.outputs import motor_channels, read_outputs  # noqa: E402
+from arduscope.lib.param_conflict import merge_suggestions  # noqa: E402
+from arduscope.lib.pipeline import run_analysis  # noqa: E402
+from arduscope.lib.plane_phase import FLIGHT_STAGE_NORMAL, stat_at  # noqa: E402
 
 # Height above home that counts as off the ground, in metres.
 _AIRBORNE_M = 2.0

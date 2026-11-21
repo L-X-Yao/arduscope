@@ -6,15 +6,15 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from analyzers.airspeed import AirspeedAnalyzer
-from analyzers.gps import GPSAnalyzer
-from analyzers.motor import MotorAnalyzer
-from analyzers.rangefinder import RangefinderAnalyzer
-from analyzers.summary import SummaryAnalyzer
-from analyzers.wind import WindAnalyzer
-from lib.log_reader import ErrorEvent
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers.airspeed import AirspeedAnalyzer
+from arduscope.analyzers.gps import GPSAnalyzer
+from arduscope.analyzers.motor import MotorAnalyzer
+from arduscope.analyzers.rangefinder import RangefinderAnalyzer
+from arduscope.analyzers.summary import SummaryAnalyzer
+from arduscope.analyzers.wind import WindAnalyzer
+from arduscope.lib.log_reader import ErrorEvent
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
 
 pytestmark = pytest.mark.fast

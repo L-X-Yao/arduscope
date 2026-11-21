@@ -165,14 +165,14 @@ def main() -> int:
         data = json.load(f)
     table = {k: set(v) for k, v in data["messages"].items()}
 
-    sys.path.insert(0, REPO_ROOT)
-    from lib.log_reader import LogReader
+    sys.path.insert(0, os.path.join(REPO_ROOT, "src"))
+    from arduscope.lib.log_reader import LogReader
     aliases = set(LogReader._FIELD_ALIASES.keys())
 
     errors: list[str] = []
     dynamic = 0
     n_files = 0
-    for d in ("analyzers", "lib"):
+    for d in ("src/arduscope/analyzers", "src/arduscope/lib"):
         full = os.path.join(REPO_ROOT, d)
         for fname in sorted(os.listdir(full)):
             if fname.endswith(".py"):

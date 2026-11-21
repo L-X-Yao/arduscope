@@ -13,9 +13,9 @@ import pytest
 import binlog
 import batch_report
 import multi_report
-from lib.ai_diagnosis import generate_diagnosis
-from lib.html_report import HtmlReportGenerator, _safe_detail
-from lib.pipeline import run_analysis
+from arduscope.lib.ai_diagnosis import generate_diagnosis
+from arduscope.lib.html_report import HtmlReportGenerator, _safe_detail
+from arduscope.lib.pipeline import run_analysis
 
 ATTACK = '<svg/onload=alert(1337)>'
 ESCAPED = '&lt;svg/onload=alert(1337)&gt;'

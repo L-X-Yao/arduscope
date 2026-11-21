@@ -13,11 +13,11 @@ import numpy as np
 import pytest
 
 import binlog
-from analyzers.flight_profile import FlightProfileAnalyzer
-from lib.i18n import t as _t
-from lib.log_reader import LogReader
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers.flight_profile import FlightProfileAnalyzer
+from arduscope.lib.i18n import t as _t
+from arduscope.lib.log_reader import LogReader
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
 
 pytestmark = pytest.mark.fast

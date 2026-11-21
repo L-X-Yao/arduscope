@@ -63,12 +63,15 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _LA_DIR = os.path.dirname(_SCRIPT_DIR)
 if _LA_DIR not in sys.path:
     sys.path.insert(0, _LA_DIR)
+_SRC_DIR = os.path.join(_LA_DIR, "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
 
-from lib.log_reader import LogReader  # noqa: E402
-from lib.thresholds import Thresholds  # noqa: E402
-from lib.vehicle_detect import detect_vehicle  # noqa: E402
-from lib.pipeline import _get_preload_types  # noqa: E402
-from analyzers import AnalysisResult, discover_analyzers  # noqa: E402
+from arduscope.lib.log_reader import LogReader  # noqa: E402
+from arduscope.lib.thresholds import Thresholds  # noqa: E402
+from arduscope.lib.vehicle_detect import detect_vehicle  # noqa: E402
+from arduscope.lib.pipeline import _get_preload_types  # noqa: E402
+from arduscope.analyzers import AnalysisResult, discover_analyzers  # noqa: E402
 
 
 def _git_sha() -> str:

@@ -6,10 +6,10 @@ mixing data from all instances together.
 """
 
 from conftest import (LOG_QUADPLANE_FLIGHT, LOG_OCTA_AUTOTUNE, run_analyzer)
-from analyzers.temperature import TemperatureAnalyzer
-from analyzers.airspeed import AirspeedAnalyzer
-from analyzers.wind import WindAnalyzer
-from analyzers.power import PowerAnalyzer
+from arduscope.analyzers.temperature import TemperatureAnalyzer
+from arduscope.analyzers.airspeed import AirspeedAnalyzer
+from arduscope.analyzers.wind import WindAnalyzer
+from arduscope.analyzers.power import PowerAnalyzer
 
 
 class TestTemperatureMultiIMU:
@@ -95,8 +95,8 @@ class TestPowerGPSInstance:
         distance (and thus halve Wh/km). The old test looped over a
         hover log that never produces a Wh/km line — zero assertions
         ever ran."""
-        from analyzers.power import PowerAnalyzer
-        from lib.thresholds import Thresholds
+        from arduscope.analyzers.power import PowerAnalyzer
+        from arduscope.lib.thresholds import Thresholds
         from tests.test_synthetic_coverage import _vehicle
         single = PowerAnalyzer(self._power_reader([0]),
                                Thresholds(), _vehicle()).analyze()

@@ -5,12 +5,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from analyzers.compass import CompassAnalyzer
-from analyzers.motor import MotorAnalyzer
-from analyzers.servo_dither import ServoDitherAnalyzer
-from lib.outputs import motor_channels, read_outputs
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers.compass import CompassAnalyzer
+from arduscope.analyzers.motor import MotorAnalyzer
+from arduscope.analyzers.servo_dither import ServoDitherAnalyzer
+from arduscope.lib.outputs import motor_channels, read_outputs
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from test_synthetic_coverage import SyntheticReader
 
 N = 2000

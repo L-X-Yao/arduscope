@@ -16,9 +16,9 @@ import bottle
 import pytest
 
 import web_app as wa
-from lib import fleet_history
-from lib.i18n import t
-from lib.log_reader import TextMessage
+from arduscope.lib import fleet_history
+from arduscope.lib.i18n import t
+from arduscope.lib.log_reader import TextMessage
 from tests.lib.test_fleet_history import SERIAL, _logfile, _pipeline, _reader
 
 pytestmark = pytest.mark.fast

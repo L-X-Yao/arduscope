@@ -11,9 +11,9 @@ import numpy as np
 
 from conftest import (LOG_QUADPLANE_FLIGHT, LOG_QUADPLANE_GROUND, LOG_OCTA_NOTCH_OFF,
                       LOG_OCTA_AUTOTUNE, run_analyzer)
-from analyzers.notch_tuning import NotchTuningAnalyzer
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers.notch_tuning import NotchTuningAnalyzer
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
 
 

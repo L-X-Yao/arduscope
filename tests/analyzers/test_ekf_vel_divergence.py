@@ -8,9 +8,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from analyzers.ekf_vel_divergence import EKFVelDivergenceAnalyzer
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers.ekf_vel_divergence import EKFVelDivergenceAnalyzer
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
 
 pytestmark = pytest.mark.fast

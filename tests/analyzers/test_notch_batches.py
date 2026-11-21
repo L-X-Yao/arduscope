@@ -8,12 +8,12 @@ import numpy as np
 import pytest
 
 import binlog
-from analyzers.notch_tuning import NotchTuningAnalyzer
-from lib.fft_helpers import do_fft
-from lib.i18n import t
-from lib.log_reader import LogReader
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo, detect_vehicle
+from arduscope.analyzers.notch_tuning import NotchTuningAnalyzer
+from arduscope.lib.fft_helpers import do_fft
+from arduscope.lib.i18n import t
+from arduscope.lib.log_reader import LogReader
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo, detect_vehicle
 from tests.test_synthetic_coverage import SyntheticReader
 
 

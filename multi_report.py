@@ -19,19 +19,22 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PARENT_DIR = os.path.dirname(_SCRIPT_DIR)
 if _PARENT_DIR not in sys.path:
     sys.path.insert(0, _PARENT_DIR)
+_SRC_DIR = os.path.join(_SCRIPT_DIR, "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
 if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
 
-from lib.comparison_report import (  # noqa: F401 - re-exported for tests
+from arduscope.lib.comparison_report import (  # noqa: F401 - re-exported for tests
     METRIC_CONFIG,
     _render_param_diff_html,
     compute_param_diff,
     generate_html,
 )
-from lib.i18n import t
-from lib.multi_metrics import extract_metrics  # noqa: F401 - re-exported for tests
-from lib.pipeline import read_flight_log
-from lib.thresholds import Thresholds
+from arduscope.lib.i18n import t
+from arduscope.lib.multi_metrics import extract_metrics  # noqa: F401 - re-exported for tests
+from arduscope.lib.pipeline import read_flight_log
+from arduscope.lib.thresholds import Thresholds
 
 
 def main():
@@ -63,7 +66,7 @@ def main():
     )
     args = parser.parse_args()
 
-    from lib.i18n import set_locale
+    from arduscope.lib.i18n import set_locale
     set_locale(args.lang)
 
     # Validate files

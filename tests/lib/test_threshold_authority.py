@@ -25,7 +25,7 @@ pytestmark = pytest.mark.fast
 
 
 THRESHOLDS_FILE = (
-    REPO_ROOT / "lib" / "thresholds.py"
+    REPO_ROOT / "src" / "arduscope" / "lib" / "thresholds.py"
 )
 
 
@@ -224,7 +224,7 @@ class TestTraceabilityTable:
     def test_listed_values_match_the_code(self):
         from dataclasses import fields
 
-        from lib.thresholds import Thresholds
+        from arduscope.lib.thresholds import Thresholds
         defaults = {f.name: f.default for f in fields(Thresholds)}
         rows = self._rows()
         wrong = [name for name, text in rows.items()

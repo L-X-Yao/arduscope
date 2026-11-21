@@ -7,14 +7,14 @@ from __future__ import annotations
 
 import numpy as np
 
-from analyzers.gyro_saturation import GyroSaturationAnalyzer
-from analyzers.gps_glitch import GPSGlitchAnalyzer
-from analyzers.clock_health import ClockHealthAnalyzer
-from analyzers.compass_consistency import CompassConsistencyAnalyzer
-from analyzers.servo_dither import ServoDitherAnalyzer
-from lib.i18n import t
-from lib.thresholds import Thresholds
-from lib.vehicle_detect import VehicleInfo
+from arduscope.analyzers.gyro_saturation import GyroSaturationAnalyzer
+from arduscope.analyzers.gps_glitch import GPSGlitchAnalyzer
+from arduscope.analyzers.clock_health import ClockHealthAnalyzer
+from arduscope.analyzers.compass_consistency import CompassConsistencyAnalyzer
+from arduscope.analyzers.servo_dither import ServoDitherAnalyzer
+from arduscope.lib.i18n import t
+from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
 
 

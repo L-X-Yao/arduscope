@@ -20,11 +20,11 @@ import pytest
 import batch_report
 import binlog
 import web_app
-from analyzers import discover_analyzers
-from lib import fleet_history
-from lib.i18n import t
-from lib.pipeline import run_analysis
-from lib.templates import get_template
+from arduscope.analyzers import discover_analyzers
+from arduscope.lib import fleet_history
+from arduscope.lib.i18n import t
+from arduscope.lib.pipeline import run_analysis
+from arduscope.lib.templates import get_template
 
 _ROOT = str(REPO_ROOT)
 

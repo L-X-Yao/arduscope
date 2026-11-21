@@ -48,7 +48,7 @@ def section(title: str) -> None:
 
 
 def load_locale(lang: str) -> dict[str, str]:
-    path = os.path.join(PROJECT_ROOT, "locales", f"{lang}.json")
+    path = os.path.join(PROJECT_ROOT, "src", "arduscope", "locales", f"{lang}.json")
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
@@ -59,7 +59,7 @@ def extract_placeholders(template: str) -> set[str]:
 
 def _source_files() -> list[str]:
     files: list[str] = []
-    for d in ("analyzers", "lib"):
+    for d in ("src/arduscope/analyzers", "src/arduscope/lib"):
         full = os.path.join(PROJECT_ROOT, d)
         if not os.path.isdir(full):
             continue
@@ -280,7 +280,7 @@ def check_hardcoded_strings() -> list[str]:
     section("Hardcoded strings in analyzers")
     errors = []
 
-    analyzer_dir = os.path.join(PROJECT_ROOT, "analyzers")
+    analyzer_dir = os.path.join(PROJECT_ROOT, "src", "arduscope", "analyzers")
     for fname in sorted(os.listdir(analyzer_dir)):
         if not fname.endswith(".py") or fname == "__init__.py":
             continue
@@ -339,7 +339,7 @@ def check_trace_names() -> list[str]:
     section("Plotly trace name i18n")
     warnings = []
 
-    analyzer_dir = os.path.join(PROJECT_ROOT, "analyzers")
+    analyzer_dir = os.path.join(PROJECT_ROOT, "src", "arduscope", "analyzers")
     for fname in sorted(os.listdir(analyzer_dir)):
         if not fname.endswith(".py") or fname == "__init__.py":
             continue

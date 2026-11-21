@@ -22,7 +22,7 @@ if _PROJECT_DIR not in sys.path:
 from webtest import TestApp
 
 from tests.conftest import LOG_QUADPLANE_FLIGHT
-from lib.i18n import set_locale, t
+from arduscope.lib.i18n import set_locale, t
 
 
 @pytest.fixture

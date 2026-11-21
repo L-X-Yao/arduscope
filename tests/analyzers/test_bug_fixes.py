@@ -29,7 +29,7 @@ def _pkg_path(*parts: str) -> str:
 class TestPidOscThreshold:
     def test_threshold_is_configurable(self):
         """The oscillation threshold should come from thresholds, not hardcoded."""
-        from lib.thresholds import Thresholds
+        from arduscope.lib.thresholds import Thresholds
         t = Thresholds()
         assert hasattr(t, "pid_osc_crossings_warn")
         assert t.pid_osc_crossings_warn == 5.0
@@ -37,7 +37,7 @@ class TestPidOscThreshold:
     def test_analyzer_uses_threshold(self):
         """pid_tuning must reference self.thresholds, not a magic number."""
         import inspect
-        from analyzers.pid_tuning import PIDTuningAnalyzer
+        from arduscope.analyzers.pid_tuning import PIDTuningAnalyzer
         src = inspect.getsource(PIDTuningAnalyzer)
         # Should NOT have a bare "5.0" comparison for oscillation
         # Should reference thresholds.pid_osc_crossings_warn
@@ -51,7 +51,7 @@ class TestWindForwardFlight:
     def test_wind_filters_hover(self):
         """Wind stats should exclude hover (ws≈0) samples."""
         result = run_analyzer(
-            __import__("analyzers.wind", fromlist=["WindAnalyzer"]).WindAnalyzer,
+            __import__("arduscope.analyzers.wind", fromlist=["WindAnalyzer"]).WindAnalyzer,
             LOG_QUADPLANE_FLIGHT)
         # A QuadPlane that mostly hovers should report low/zero wind
         # but NOT have the hover data inflating sample count
@@ -65,7 +65,7 @@ class TestBatteryArmedFiltering:
     def test_battery_not_critical_on_ground(self):
         """Ground test battery should not trigger false critical."""
         result = run_analyzer(
-            __import__("analyzers.battery", fromlist=["BatteryAnalyzer"]).BatteryAnalyzer,
+            __import__("arduscope.analyzers.battery", fromlist=["BatteryAnalyzer"]).BatteryAnalyzer,
             LOG_QUADPLANE_GROUND)
         assert result.status != "critical", \
             f"Battery should not be critical on ground test: {result.summary}"
@@ -77,7 +77,7 @@ class TestBatteryArmedFiltering:
 class TestPowerArmedFiltering:
     def test_power_no_crash_ground(self):
         result = run_analyzer(
-            __import__("analyzers.power", fromlist=["PowerAnalyzer"]).PowerAnalyzer,
+            __import__("arduscope.analyzers.power", fromlist=["PowerAnalyzer"]).PowerAnalyzer,
             LOG_QUADPLANE_GROUND)
         assert result.status in ("good", "warning", "critical", "info")
 
@@ -89,7 +89,7 @@ class TestPidParamFalsy:
     def test_get_param_uses_is_none(self):
         """The param check should use 'is None', not truthiness."""
         import inspect
-        from analyzers.pid_tuning import PIDTuningAnalyzer
+        from arduscope.analyzers.pid_tuning import PIDTuningAnalyzer
         src = inspect.getsource(PIDTuningAnalyzer)
         # Should use "is None" pattern, not "not self._get_param"
         assert "is None" in src
@@ -102,7 +102,7 @@ class TestMotorPWMParamOrder:
     def test_quadplane_uses_q_prefix(self):
         """On a QuadPlane log, motor analyzer should use Q_M_PWM_MIN."""
         result = run_analyzer(
-            __import__("analyzers.motor", fromlist=["MotorAnalyzer"]).MotorAnalyzer,
+            __import__("arduscope.analyzers.motor", fromlist=["MotorAnalyzer"]).MotorAnalyzer,
             LOG_QUADPLANE_FLIGHT)
         # Should show Q_M_SPIN_MIN label for QuadPlane
         found_q_label = any("Q_M_SPIN_MIN" in d for d in result.details)
@@ -118,13 +118,13 @@ class TestLogHealthLoopTime:
     def test_uses_sched_rate(self):
         """Loop time thresholds should scale with SCHED_LOOP_RATE."""
         import inspect
-        from analyzers.log_health import LogHealthAnalyzer
+        from arduscope.analyzers.log_health import LogHealthAnalyzer
         src = inspect.getsource(LogHealthAnalyzer)
         assert "SCHED_LOOP_RATE" in src
 
     def test_no_crash(self):
         result = run_analyzer(
-            __import__("analyzers.log_health", fromlist=["LogHealthAnalyzer"]).LogHealthAnalyzer,
+            __import__("arduscope.analyzers.log_health", fromlist=["LogHealthAnalyzer"]).LogHealthAnalyzer,
             LOG_QUADPLANE_FLIGHT)
         assert result.status in ("good", "warning", "critical", "info")
 
@@ -138,10 +138,10 @@ class TestLogHealthCPULoad:
         'unavailable' note, never a fabricated 'CPU 0.0%'. (The old
         test looped with `pass` and ended in `assert True`.)"""
         import numpy as np
-        from analyzers.log_health import LogHealthAnalyzer
-        from lib.i18n import t as _t
-        from lib.thresholds import Thresholds
-        from lib.vehicle_detect import VehicleInfo
+        from arduscope.analyzers.log_health import LogHealthAnalyzer
+        from arduscope.lib.i18n import t as _t
+        from arduscope.lib.thresholds import Thresholds
+        from arduscope.lib.vehicle_detect import VehicleInfo
         from tests.test_synthetic_coverage import SyntheticReader
         n = 20
         reader = SyntheticReader(messages={"PM": {
@@ -168,7 +168,7 @@ class TestLogHealthCPULoad:
 class TestRangefinderNaN:
     def test_no_crash_without_rangefinder(self):
         """Logs without RFND should gracefully skip."""
-        from analyzers.rangefinder import RangefinderAnalyzer
+        from arduscope.analyzers.rangefinder import RangefinderAnalyzer
         fix = _load(LOG_QUADPLANE_FLIGHT)
         analyzer = RangefinderAnalyzer(fix.reader, fix.thresholds, fix.vehicle)
         if not analyzer.can_run():
@@ -184,7 +184,7 @@ class TestMissionAutoMode:
     def test_auto_mode_includes_copter(self):
         """AUTO mode detection should include mode number '3' for Copter."""
         import inspect
-        from analyzers.mission import MissionAnalyzer
+        from arduscope.analyzers.mission import MissionAnalyzer
         src = inspect.getsource(MissionAnalyzer)
         assert "'3'" in src, "Should check for Copter AUTO mode number 3"
 
@@ -196,7 +196,7 @@ class TestMissionNaNCId:
     def test_cid_nan_handling(self):
         """Mission analyzer should handle NaN CId without crashing."""
         result = run_analyzer(
-            __import__("analyzers.mission", fromlist=["MissionAnalyzer"]).MissionAnalyzer,
+            __import__("arduscope.analyzers.mission", fromlist=["MissionAnalyzer"]).MissionAnalyzer,
             LOG_QUADPLANE_FLIGHT)
         assert result.status in ("good", "warning", "critical", "info")
 
@@ -208,7 +208,7 @@ class TestMissionWPRadius:
     def test_uses_wp_radius_param(self):
         """Should read WP_RADIUS from log, not hardcode 30."""
         import inspect
-        from analyzers.mission import MissionAnalyzer
+        from arduscope.analyzers.mission import MissionAnalyzer
         src = inspect.getsource(MissionAnalyzer)
         assert "WP_RADIUS" in src
 
@@ -219,7 +219,7 @@ class TestMissionWPRadius:
 class TestLogReaderNonNumeric:
     def test_fallback_read_handles_non_numeric(self):
         """LogReader._read_msg_type should not crash on string fields."""
-        from lib.log_reader import LogReader
+        from arduscope.lib.log_reader import LogReader
         import inspect
         src = inspect.getsource(LogReader)
         # The _read_msg_type method should have try/except around float()
@@ -233,7 +233,7 @@ class TestLogReaderNonNumeric:
 class TestFlightReportErrorResults:
     def test_error_results_added_to_dict(self):
         """Crashed analyzer results should be in results_by_key."""
-        with open(_pkg_path("lib/pipeline.py"), encoding="utf-8") as f:
+        with open(_pkg_path("src/arduscope/lib/pipeline.py"), encoding="utf-8") as f:
             src = f.read()
         assert "results_by_key[key]" in src
 
@@ -259,7 +259,7 @@ class TestNotchFLTDParamName:
     def test_copter_uses_atc_prefix(self):
         """Copter FLTD check should use ATC_RAT_RLL_FLTD, not A_RAT_RLL_FLTD."""
         import inspect
-        from analyzers.notch_tuning import NotchTuningAnalyzer
+        from arduscope.analyzers.notch_tuning import NotchTuningAnalyzer
         src = inspect.getsource(NotchTuningAnalyzer)
         assert "ATC_RAT_" in src, \
             "Should use ATC_RAT_ prefix for Copter FLTD params"
@@ -273,7 +273,7 @@ class TestNotchFLTDParamName:
     def test_quadplane_uses_q_a_prefix(self):
         """QuadPlane FLTD check should use Q_A_RAT_RLL_FLTD."""
         import inspect
-        from analyzers.notch_tuning import NotchTuningAnalyzer
+        from arduscope.analyzers.notch_tuning import NotchTuningAnalyzer
         src = inspect.getsource(NotchTuningAnalyzer)
         assert "Q_A_RAT_" in src or "q_prefix" in src
 
@@ -285,7 +285,7 @@ class TestVibrationNaNSafety:
     def test_safe_nanmax_in_source(self):
         """vibration.py should guard against all-NaN vibe arrays."""
         import inspect
-        from analyzers.vibration import VibrationAnalyzer
+        from arduscope.analyzers.vibration import VibrationAnalyzer
         src = inspect.getsource(VibrationAnalyzer)
         assert "np.all(np.isnan" in src or "_safe_nanmax" in src
 
@@ -297,7 +297,7 @@ class TestTemperatureDtGuard:
     def test_dt_minimum_clamp(self):
         """temperature.py should clamp dt to a reasonable minimum, not just == 0."""
         import inspect
-        from analyzers.temperature import TemperatureAnalyzer
+        from arduscope.analyzers.temperature import TemperatureAnalyzer
         src = inspect.getsource(TemperatureAnalyzer)
         # Should use < comparison, not just == 0
         assert "dt < " in src or "dt[dt <" in src, \
@@ -311,7 +311,7 @@ class TestAirspeedRollingStdVectorized:
     def test_no_python_loop_for_rolling_std(self):
         """airspeed.py should use vectorized rolling std, not Python loop."""
         import inspect
-        from analyzers.airspeed import AirspeedAnalyzer
+        from arduscope.analyzers.airspeed import AirspeedAnalyzer
         src = inspect.getsource(AirspeedAnalyzer)
         assert "for i in range" not in src, \
             "Should not use Python loop for rolling std"
@@ -328,14 +328,14 @@ class TestEkfNaNCoreHandling:
     def test_handles_nan_core_ids(self):
         """EKF should use all data when C field is all NaN."""
         import inspect
-        from analyzers.ekf import EKFAnalyzer
+        from arduscope.analyzers.ekf import EKFAnalyzer
         src = inspect.getsource(EKFAnalyzer)
         assert "all_nan_cores" in src, \
             "Should detect and handle all-NaN core IDs"
 
     def test_no_crash(self):
         result = run_analyzer(
-            __import__("analyzers.ekf", fromlist=["EKFAnalyzer"]).EKFAnalyzer,
+            __import__("arduscope.analyzers.ekf", fromlist=["EKFAnalyzer"]).EKFAnalyzer,
             LOG_QUADPLANE_FLIGHT)
         assert result.status in ("good", "warning", "critical", "info")
 
@@ -349,9 +349,9 @@ class TestPidGroundTestEarlyReturn:
         back to the whole log and grade it. (The old test's
         `A not in src or B in src` had an always-true second branch.)"""
         import numpy as np
-        from analyzers.pid_tuning import PIDTuningAnalyzer
-        from lib.thresholds import Thresholds
-        from lib.vehicle_detect import VehicleInfo
+        from arduscope.analyzers.pid_tuning import PIDTuningAnalyzer
+        from arduscope.lib.thresholds import Thresholds
+        from arduscope.lib.vehicle_detect import VehicleInfo
         from tests.test_synthetic_coverage import SyntheticReader
         n = 400
         ts = np.linspace(0.0, 100.0, n)
@@ -375,9 +375,9 @@ class TestPidGroundTestEarlyReturn:
         treated as 'parameter missing' (the old truthiness bug fell
         back to the copter ATC_RAT_* namespace on zero gains)."""
         import numpy as np
-        from analyzers.pid_tuning import PIDTuningAnalyzer
-        from lib.thresholds import Thresholds
-        from lib.vehicle_detect import VehicleInfo
+        from arduscope.analyzers.pid_tuning import PIDTuningAnalyzer
+        from arduscope.lib.thresholds import Thresholds
+        from arduscope.lib.vehicle_detect import VehicleInfo
         from tests.test_synthetic_coverage import SyntheticReader
         n = 400
         ts = np.linspace(0.0, 100.0, n)
@@ -415,7 +415,7 @@ class TestPidGroundTestEarlyReturn:
         reachable, and assigning 'ok' there violates the apply_param ↔
         param_suggestions invariant from CLAUDE.md."""
         import inspect
-        from analyzers.pid_tuning import PIDTuningAnalyzer
+        from arduscope.analyzers.pid_tuning import PIDTuningAnalyzer
         src = inspect.getsource(PIDTuningAnalyzer)
         # Find both branches of the sub_action_level decision
         sugg_idx = src.find("if param_suggestions:\n            sub_action_level = \"apply_param\"")
@@ -437,14 +437,14 @@ class TestFailsafeEkfNaNMargin:
     def test_nan_margin_guarded(self):
         """failsafe._ekf_margin must guard np.nanmin against all-NaN."""
         import inspect
-        from analyzers.failsafe import FailsafeAnalyzer
+        from arduscope.analyzers.failsafe import FailsafeAnalyzer
         src = inspect.getsource(FailsafeAnalyzer._ekf_margin)
         assert "np.all(np.isnan" in src, \
             "Should detect all-NaN margin before nanmin"
 
     def test_no_crash_on_normal_log(self):
         result = run_analyzer(
-            __import__("analyzers.failsafe",
+            __import__("arduscope.analyzers.failsafe",
                        fromlist=["FailsafeAnalyzer"]).FailsafeAnalyzer,
             LOG_QUADPLANE_FLIGHT)
         assert result.status in ("good", "warning", "critical", "info")
@@ -457,7 +457,7 @@ class TestWindDirTraceLength:
     def test_uses_consistent_mask(self):
         """wind.py must use a single mask for t and wd in the direction plot."""
         import inspect
-        from analyzers.wind import WindAnalyzer
+        from arduscope.analyzers.wind import WindAnalyzer
         src = inspect.getsource(WindAnalyzer)
         # The fix introduced a single stat_mask variable
         assert "stat_mask" in src and "t_valid" in src, \
@@ -473,7 +473,7 @@ class TestAttitudeGroundTestGuard:
     def test_early_return_on_no_armed(self):
         """attitude.py should return info when armed samples are too few."""
         import inspect
-        from analyzers.attitude import AttitudeAnalyzer
+        from arduscope.analyzers.attitude import AttitudeAnalyzer
         src = inspect.getsource(AttitudeAnalyzer)
         assert "np.sum(armed_mask) < 10" in src
         # Should NOT fall back to full data
@@ -482,7 +482,7 @@ class TestAttitudeGroundTestGuard:
     def test_nan_rms_guarded(self):
         """attitude.py should detect NaN RMS rather than fall through to good."""
         import inspect
-        from analyzers.attitude import AttitudeAnalyzer
+        from arduscope.analyzers.attitude import AttitudeAnalyzer
         src = inspect.getsource(AttitudeAnalyzer)
         assert "np.isnan(roll_rms)" in src or "np.isnan(pitch_rms)" in src
 
@@ -493,7 +493,7 @@ class TestAttitudeGroundTestGuard:
 class TestImuConsistencyFixes:
     def test_safe_interp_helper_exists(self):
         """imu_consistency.py should define _safe_interp_diff."""
-        from analyzers.imu_consistency import _safe_interp_diff
+        from arduscope.analyzers.imu_consistency import _safe_interp_diff
         t0 = np.array([1.0, 2.0, 3.0])
         d0 = np.array([10.0, 20.0, 30.0])
         t1 = np.array([1.0, 2.0, 3.0])
@@ -509,7 +509,7 @@ class TestImuConsistencyFixes:
     def test_compares_all_instances_not_just_two(self):
         """Should compare IMU0 vs each other instance, not just IMU0/IMU1."""
         import inspect
-        from analyzers.imu_consistency import IMUConsistencyAnalyzer
+        from arduscope.analyzers.imu_consistency import IMUConsistencyAnalyzer
         src = inspect.getsource(IMUConsistencyAnalyzer.analyze)
         assert "unique_instances[1:]" in src, \
             "Should iterate pair-wise against IMU0"
@@ -517,7 +517,7 @@ class TestImuConsistencyFixes:
     def test_nan_max_diff_does_not_silent_good(self):
         """Empty accel_diff_rms_values must not leave overall_status='good'."""
         import inspect
-        from analyzers.imu_consistency import IMUConsistencyAnalyzer
+        from arduscope.analyzers.imu_consistency import IMUConsistencyAnalyzer
         src = inspect.getsource(IMUConsistencyAnalyzer)
         # Fix: explicit else branch bumps status to info when no data
         assert 'overall_status, "info"' in src
@@ -530,7 +530,7 @@ class TestGpsNanCrash:
     def test_all_nan_nsats_guarded(self):
         """gps.py should guard int(np.nanmin) against all-NaN nsats arrays."""
         import inspect
-        from analyzers.gps import GPSAnalyzer
+        from arduscope.analyzers.gps import GPSAnalyzer
         src = inspect.getsource(GPSAnalyzer)
         assert "np.all(np.isnan(nsats_inst))" in src
 
@@ -542,7 +542,7 @@ class TestRcInputArmedFilter:
     def test_stick_saturation_uses_armed_mask(self):
         """rc_input.py should only count stick saturation during armed flight."""
         import inspect
-        from analyzers.rc_input import RCInputAnalyzer
+        from arduscope.analyzers.rc_input import RCInputAnalyzer
         src = inspect.getsource(RCInputAnalyzer.analyze)
         assert "armed_mask" in src
         assert "arr[armed_mask]" in src
@@ -550,7 +550,7 @@ class TestRcInputArmedFilter:
     def test_failsafe_threshold_scales_with_channels(self):
         """rc_input failsafe detection should scale with channel count."""
         import inspect
-        from analyzers.rc_input import RCInputAnalyzer
+        from arduscope.analyzers.rc_input import RCInputAnalyzer
         src = inspect.getsource(RCInputAnalyzer._detect_failsafe)
         # Hardcoded `>= 3` replaced by a channel-count-aware threshold
         assert "n_ch" in src
@@ -559,7 +559,7 @@ class TestRcInputArmedFilter:
     def test_failsafe_grouping_uses_time_not_sample_count(self):
         """Failsafe event grouping should use time gap, not sample index gap."""
         import inspect
-        from analyzers.rc_input import RCInputAnalyzer
+        from arduscope.analyzers.rc_input import RCInputAnalyzer
         src = inspect.getsource(RCInputAnalyzer._detect_failsafe)
         # Old pattern `fs_indices[i] - fs_indices[i-1] > 5` replaced
         assert "fs_indices[i] - fs_indices[i-1] > 5" not in src
@@ -573,7 +573,7 @@ class TestLogReaderFallbackFloat:
     def test_read_msg_type_has_try_except(self):
         """_read_msg_type must handle non-numeric fields without crashing."""
         import inspect
-        from lib.log_reader import LogReader
+        from arduscope.lib.log_reader import LogReader
         src = inspect.getsource(LogReader._read_msg_type)
         assert "ValueError" in src or "except" in src, \
             "_read_msg_type must guard float() against string fields"
@@ -586,7 +586,7 @@ class TestLogReaderTimestampGuard:
     def test_prescan_skips_none_timestamp(self):
         """_prescan must skip messages with no _timestamp (first_ts=None)."""
         import inspect
-        from lib.log_reader import LogReader
+        from arduscope.lib.log_reader import LogReader
         src = inspect.getsource(LogReader._scan)
         # Old pattern `(ts or 0.0) - (first_timestamp or 0.0)` replaced
         assert "(ts or 0.0) - (first_timestamp or 0.0)" not in src
@@ -594,7 +594,7 @@ class TestLogReaderTimestampGuard:
 
     def test_preload_all_skips_none_timestamp(self):
         import inspect
-        from lib.log_reader import LogReader
+        from arduscope.lib.log_reader import LogReader
         src = inspect.getsource(LogReader.preload_all)
         # Old pattern `ts = getattr(m, '_timestamp', 0.0)` replaced
         assert "getattr(m, '_timestamp', 0.0)" not in src
@@ -607,7 +607,7 @@ class TestLogReaderTimestampGuard:
 class TestAiDiagnosisEmptyRelatedKeys:
     def test_defensive_first_key(self):
         """Accessing related_keys[0] must be guarded."""
-        with open(_pkg_path("lib", "ai_diagnosis.py"), encoding="utf-8") as f:
+        with open(_pkg_path("src", "arduscope", "lib", "ai_diagnosis.py"), encoding="utf-8") as f:
             src = f.read()
         # Old direct access pattern replaced
         assert "issue.related_keys[0]" not in src or "first_key" in src
@@ -619,11 +619,11 @@ class TestAiDiagnosisEmptyRelatedKeys:
 class TestVehicleDetectY6:
     def test_y6_is_six_motors_directly(self):
         """_FRAME_CLASS_MOTORS[5] should be 6 in the dict literal."""
-        from lib.vehicle_detect import _FRAME_CLASS_MOTORS
+        from arduscope.lib.vehicle_detect import _FRAME_CLASS_MOTORS
         assert _FRAME_CLASS_MOTORS[5] == 6
         # Also verify the override line (which is no longer needed) is gone
         import inspect
-        import lib.vehicle_detect as vd
+        import arduscope.lib.vehicle_detect as vd
         src = inspect.getsource(vd)
         assert "_FRAME_CLASS_MOTORS[5] = 6" not in src, \
             "Y6 fix should be in the dict literal, not a post-hoc override"
@@ -641,7 +641,7 @@ class TestResultCorrectness:
 
     def test_ground_test_pid_returns_info(self):
         """The ground-run log should report info for PID (not good)."""
-        from analyzers.pid_tuning import PIDTuningAnalyzer
+        from arduscope.analyzers.pid_tuning import PIDTuningAnalyzer
         result = run_analyzer(PIDTuningAnalyzer, LOG_QUADPLANE_GROUND)
         # Ground test: pilot had the log running but never armed long
         # enough for meaningful PID analysis. Must not silently say "good".
@@ -650,7 +650,7 @@ class TestResultCorrectness:
 
     def test_attitude_runs_on_flight_log(self):
         """Normal flight log should produce an attitude result with RMS data."""
-        from analyzers.attitude import AttitudeAnalyzer
+        from arduscope.analyzers.attitude import AttitudeAnalyzer
         result = run_analyzer(AttitudeAnalyzer, LOG_QUADPLANE_FLIGHT)
         assert result.status in ("good", "warning", "critical", "info")
         # Must report RMS figures in details (regression-proof that the
@@ -660,7 +660,7 @@ class TestResultCorrectness:
 
     def test_ground_test_battery_not_critical(self):
         """Ground test battery should not trigger false critical."""
-        from analyzers.battery import BatteryAnalyzer
+        from arduscope.analyzers.battery import BatteryAnalyzer
         result = run_analyzer(BatteryAnalyzer, LOG_QUADPLANE_GROUND)
         # Static ground test has no motor load; battery should not be critical.
         assert result.status != "critical", \
@@ -668,7 +668,7 @@ class TestResultCorrectness:
 
     def test_flight_log_summary_has_duration(self):
         """Regular flight log should report a non-zero flight duration."""
-        from analyzers.summary import SummaryAnalyzer
+        from arduscope.analyzers.summary import SummaryAnalyzer
         result = run_analyzer(SummaryAnalyzer, LOG_QUADPLANE_FLIGHT)
         duration_detail = next(
             (d for d in result.details if "m" in d and "s" in d and ":" in d), None
@@ -680,7 +680,7 @@ class TestResultCorrectness:
 
     def test_notch_tuning_flags_heavy_vibration(self):
         """The log from before the notch should trigger notch tuning warn."""
-        from analyzers.notch_tuning import NotchTuningAnalyzer
+        from arduscope.analyzers.notch_tuning import NotchTuningAnalyzer
         result = run_analyzer(NotchTuningAnalyzer, LOG_OCTA_NOTCH_OFF)
         # This log is the "未开滤波器" case — notch_tuning must detect
         # high vibration and produce actionable guidance (warning/critical).
@@ -695,7 +695,7 @@ class TestResultCorrectness:
 
     def test_vibration_analyzer_flags_no_filter_log(self):
         """Vibration analyzer on the no-filter log should NOT be 'good'."""
-        from analyzers.vibration import VibrationAnalyzer
+        from arduscope.analyzers.vibration import VibrationAnalyzer
         result = run_analyzer(VibrationAnalyzer, LOG_OCTA_NOTCH_OFF)
         # Heavy pre-notch vibration — must be at least warning.
         assert result.status in ("warning", "critical", "info"), \
@@ -703,14 +703,14 @@ class TestResultCorrectness:
 
     def test_flight_log_gps_has_fix(self):
         """Normal flight should show good/warning GPS, never info (no data)."""
-        from analyzers.gps import GPSAnalyzer
+        from arduscope.analyzers.gps import GPSAnalyzer
         result = run_analyzer(GPSAnalyzer, LOG_QUADPLANE_FLIGHT)
         assert result.status != "info", \
             f"Flight log should have GPS data: {result.summary}"
 
     def test_worst_status_priority_monotonic(self):
         """BaseAnalyzer.worst_status must respect priority ordering."""
-        from analyzers import BaseAnalyzer
+        from arduscope.analyzers import BaseAnalyzer
 
         class _Dummy(BaseAnalyzer):
             registry_key = "_dummy_test"

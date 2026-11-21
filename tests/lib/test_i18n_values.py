@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lib.i18n import localized_value, set_locale
+from arduscope.lib.i18n import localized_value, set_locale
 
 
 @pytest.mark.fast

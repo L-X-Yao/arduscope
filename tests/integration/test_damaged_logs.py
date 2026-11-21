@@ -12,10 +12,10 @@ import struct
 import pytest
 
 import binlog
-from lib import log_reader as log_reader_module
-from lib.i18n import t
-from lib.log_reader import LogReader, UnreadableLog, not_log_bytes
-from lib.pipeline import NotAFlightLog, run_analysis
+from arduscope.lib import log_reader as log_reader_module
+from arduscope.lib.i18n import t
+from arduscope.lib.log_reader import LogReader, UnreadableLog, not_log_bytes
+from arduscope.lib.pipeline import NotAFlightLog, run_analysis
 
 LONGEST_MESSAGE = 255
 

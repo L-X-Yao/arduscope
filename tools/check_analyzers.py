@@ -46,7 +46,7 @@ def section(title: str) -> None:
 def check_contracts() -> list[str]:
     section("Analyzer contracts")
     errors = []
-    analyzer_dir = os.path.join(PROJECT_ROOT, "analyzers")
+    analyzer_dir = os.path.join(PROJECT_ROOT, "src", "arduscope", "analyzers")
     seen_keys: dict[str, str] = {}
 
     for fname in sorted(os.listdir(analyzer_dir)):
@@ -151,7 +151,7 @@ def check_contracts() -> list[str]:
 def check_evidence_source() -> list[str]:
     section("Evidence source coverage")
     errors: list[str] = []
-    analyzer_dir = os.path.join(PROJECT_ROOT, "analyzers")
+    analyzer_dir = os.path.join(PROJECT_ROOT, "src", "arduscope", "analyzers")
 
     for fname in sorted(os.listdir(analyzer_dir)):
         if not fname.endswith(".py") or fname == "__init__.py":
