@@ -1,0 +1,14 @@
+version: 2
+
+updates:
+  # The actions are pinned by commit SHA. Dependabot keeps the pins moving
+  # without turning every update into its own pull request.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore"

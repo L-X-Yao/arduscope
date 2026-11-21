@@ -9,6 +9,14 @@ releases are not published.
 
 ## [Unreleased]
 
+### Added
+- `docs/sitl.md` records the eight SITL scenarios, the analyzers they cover and
+  the gaps; the READMEs carry a synthetic SITL demo screenshot and `README_zh`
+  now has the analyzer-authoring section.
+- CI runs weekly and on demand, Dependabot security updates are enabled,
+  GitHub Actions get a grouped monthly update, and `v*` release tags are
+  append-only.
+
 ### Changed
 - Development moved to maintenance mode: the maintainer fixes defects and does
   not schedule new features. The positioning, contributing guide, READMEs and

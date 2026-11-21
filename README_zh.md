@@ -24,6 +24,12 @@ ArduScope 读取 ArduPilot `.BIN` 日志，运行 32 个分析器，生成可执
 - **可选的在线分析** — 配好模型和密钥后，模型用只读工具逐条核查 warning，并写出带引用的解释；不配模型时离线分析完全不变
 - **中英双语** — 默认中文，`--lang en` 输出英文
 
+## 演示
+
+![ArduScope 在合成 SITL 日志 copter_high_vibration 上的报告](docs/images/demo-report-zh.png)
+
+图为合成 SITL 飞行，不是真实飞行数据。截图只取 `flight_report.py` 生成的 HTML 报告顶部。
+
 ## 快速开始
 
 Windows 且没有 Python：从 [Releases](https://github.com/L-X-Yao/arduscope/releases)
@@ -175,6 +181,28 @@ ANTHROPIC_API_KEY=... python3 flight_report.py --ai-agent --ai-provider anthropi
 }
 ```
 
+## 添加分析器
+
+自动发现：在 `analyzers/` 下新建 `.py` 文件即可：
+
+```python
+from . import AnalysisResult, BaseAnalyzer
+
+class MyAnalyzer(BaseAnalyzer):
+    registry_key = "my_analyzer"
+    sort_order = 200
+    required_messages = ["MSG_TYPE"]
+
+    def analyze(self) -> AnalysisResult:
+        return self.make_result(
+            title="My Analysis",
+            status="good",
+            summary="All clear",
+        )
+```
+
+不需要改入口。CLI、Web 和多日志对比会自动注册。实际提交时，用户可见字符串走 `lib/i18n.py`，并在 `locales/zh.json` 和 `locales/en.json` 同时加键。
+
 ## 项目定位
 
 本工具面向 **ArduPilot 调参工程师**。诊断严格性是特性，不是缺陷——"觉得阈值严"不构成调松依据。社区日志数据欢迎用于阈值校准，带日志的误报报告同样欢迎，降低标准的诉求不接受。ArduScope 自 2026-11-20 起处于维护模式：维护者只修缺陷，不排期新功能。收到带真值的新日志、新标注或新方向后再恢复开发。在线分析 agent 仍是工具的一部分。详见 [POSITIONING_zh.md](POSITIONING_zh.md)。
@@ -208,7 +236,7 @@ arduscope/
 ├── locales/              zh.json + en.json
 ├── tools/                CI、lint、release、baseline 工具
 ├── tests/                pytest 测试套件（fast、合成、真实日志、SITL 四层）
-└── docs/                 阈值溯源、建议依据、已知限制
+└── docs/                 阈值溯源、建议依据、SITL 覆盖、已知限制
 ```
 
 ## 安全

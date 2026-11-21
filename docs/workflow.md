@@ -108,6 +108,21 @@ A run whose cgroup `memory.max` is `max` does not satisfy the rule. The
 preflight checks that the machine has at least 8 GB available; it does not yet
 read the cgroup limit. Until it does, the cap is a manual precondition.
 
+## Local data
+
+The gate and the demo reports write outside git. Sizes on 2026-11-21:
+
+| Path | Size | Rebuildable | Keep |
+|---|---|---|---|
+| `.log_cache/` | 60 GB | Yes, by the next gate | Delete only when disk is tight; the next gate rebuilds it |
+| `reports/` | 591 MB | No for historical reports | `reports/release-gate/accepted/` (4.4 MB), the latest gate record and `reports/fleet.db` |
+| `tests/sitl/logs/` | 842 MB | Yes, by `generate_logs.py` | The eight scenario logs; the `cl_*` files are closed-loop evidence |
+| `local_paths.json` | Small | No | Back it up privately; it names the real logs |
+
+A partial gate result (`*.partial.json`) is not authoritative and may be
+deleted. Before deleting anything else, back up the accepted baselines,
+`local_paths.json` and `fleet.db`.
+
 ## Before the gate
 
 `tools/gate_preflight.py` checks, in seconds: a clean working tree; the SITL

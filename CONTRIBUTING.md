@@ -155,7 +155,8 @@ python3 -m pytest tests/ -q
 
 Real-log tests skip without the logs, which are not in the repository, and SITL
 tests skip without `tests/sitl/logs`. A skip is not a pass: CI runs under half
-of the suite for this reason.
+of the suite for this reason. The scenario matrix, what each SITL flight
+covers, and the gaps are in [docs/sitl.md](docs/sitl.md).
 
 The logs are the maintainer's. The tests ask for them by label, and a machine
 that has them names the files in `local_paths.json`, which git ignores:
