@@ -1,11 +1,11 @@
 # Contributing to ArduScope
 
-The project is under long-term, continuous development. Feature work resumed on
-2026-11-13. The online analysis agent was reopened on 2026-11-12 and released in
-v0.10.0 the same day (see [POSITIONING.md](POSITIONING.md)). The maintainer
-continues development and fixes defects. A pull request goes through the gates
-under "Which gates a change has to pass". What follows describes how the code is
-put together, for a change and for anyone who extends a copy of their own.
+ArduScope is in maintenance mode as of 2026-11-20: the maintainer fixes defects
+and does not schedule new features. Work reopens on new flight logs with ground
+truth, new labels, or a new direction (see [POSITIONING.md](POSITIONING.md)). A
+pull request goes through the gates under "Which gates a change has to pass".
+What follows describes how the code is put together, for a change and for
+anyone who extends a copy of their own.
 
 ## How changes are made
 
@@ -13,6 +13,18 @@ Development runs through writers, a blind reviewer and an integrator, with one
 release-gate pass per batch. The roles, the review format and the worktree
 rules are in [docs/workflow.md](docs/workflow.md); the gates each kind of
 change has to pass are below.
+
+In maintenance mode, docs and CI changes use an integrator self-check and
+`tools/ci_local.py`. Code changes still get one blind review; safety code gets
+the snapshot and corpus steps. The three-session protocol applies when feature
+work reopens.
+
+## External pull requests
+
+An external contributor runs `tools/ci_local.py` and the tests for the changed
+code. The maintainer acts as integrator, arranges the blind review, and runs the
+snapshot, corpus and Windows checks on the private logs. The PR template records
+who reviewed the diff. The logs and gate corpora are not shared.
 
 ## Adding a new analyzer
 
@@ -164,7 +176,9 @@ reading what changed.
 
 CI checks names, formats and contracts. It has no flight logs and no SITL, so it
 cannot say whether a diagnosis is right, and the defects that shipped in 0.9.x
-passed all of it. Each row includes the rows above it.
+passed all of it. Each row includes the rows above it. In maintenance mode,
+docs and CI changes stop at `ci_local`; code changes keep the blind review, and
+safety code keeps the snapshot and corpus steps.
 
 | Change | Gate |
 |---|---|

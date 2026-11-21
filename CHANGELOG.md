@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Changed
+- Development moved to maintenance mode: the maintainer fixes defects and does
+  not schedule new features. The positioning, contributing guide, READMEs and
+  issue template now say so. The workflow records the two-session maintenance
+  tier, the external pull-request path and the cgroup memory-cap command. CI
+  now runs the synthetic suite on Windows.
+
 ## [0.12.10] - 2026-11-20
 
 ### Changed
