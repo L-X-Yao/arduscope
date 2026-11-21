@@ -24,6 +24,11 @@ releases are not published.
   tier, the external pull-request path and the cgroup memory-cap command. CI
   now runs the synthetic suite on Windows.
 
+### Fixed
+- A log without a vehicle identity shows the locale's word for Unknown in the
+  Chinese report, CLI vehicle line and web cards, instead of the English
+  sentinel. API and export payloads keep the raw value.
+
 ## [0.12.10] - 2026-11-20
 
 ### Changed
