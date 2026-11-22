@@ -33,7 +33,7 @@ if _SCRIPT_DIR not in sys.path:
 
 from arduscope.lib.csv_safe import SafeWriter
 from arduscope.lib.i18n import localized_value, set_locale, t
-from arduscope.lib.log_reader import LogReader
+from arduscope.lib.log_reader import LogReader, format_byte_size
 from arduscope.lib.html_report import ChartRenderError, HtmlReportGenerator
 from arduscope.lib.ai_diagnosis import generate_diagnosis
 from arduscope.lib.agent import analyze_with_agent
@@ -425,6 +425,10 @@ def main():
     health_score = pipeline.health_score
     param_conflicts = pipeline.conflicts
     gps_track = pipeline.gps_track
+    if pipeline.damage:
+        print(t("report.log_damage",
+                size=format_byte_size(pipeline.damage["not_log_bytes"]),
+                offset=pipeline.damage["first_offset"]), file=sys.stderr)
     for issue in outcome.issues:
         print(t("pipeline.issue_line", stage=issue.stage,
                 message=issue.message), file=sys.stderr)
@@ -467,6 +471,7 @@ def main():
             gps_track=gps_track,
             max_trace_points=args.trace_points,
             static_images=True,
+            damage=pipeline.damage,
         )
         try:
             html_string = generator.generate()
@@ -488,6 +493,7 @@ def main():
             health_score=health_score,
             gps_track=gps_track,
             max_trace_points=args.trace_points,
+            damage=pipeline.damage,
         )
         generator.write(output_path)
 

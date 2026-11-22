@@ -125,6 +125,7 @@ def analyze_one(
         "error": None,
         "archive_warning": None,
         "issues": [],
+        "damage": None,
         "elapsed": 0.0,
     }
 
@@ -172,6 +173,7 @@ def analyze_one(
         result["duration"] = reader.get_flight_duration()
         result["params"] = dict(reader.params)
         result["health_score"] = pipeline.health_score
+        result["damage"] = pipeline.damage
         result["n_warnings"] = sum(
             1 for r in pipeline.results if r.status == "warning"
         )
@@ -203,6 +205,7 @@ def analyze_one(
             flight_duration=reader.get_flight_duration(),
             health_score=pipeline.health_score,
             gps_track=gps_track,
+            damage=pipeline.damage,
         )
         generator.write(report_path)
         result["report_path"] = report_path

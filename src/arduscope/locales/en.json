@@ -1507,6 +1507,7 @@
   "report.footer": "ArduScope | Generated: {timestamp}",
   "report.health_overview": "Health Overview",
   "report.intro": "This report is for tuning engineers. Judgments follow METHODIC official docs. Every recommendation cites its authoritative source. Click technical details to expand.",
+  "report.log_damage": "Warning: {size} of this log is not log data, starting at byte {offset}. The analysis may include a damaged message.",
   "report.map_end": "End",
   "report.map_start": "Start",
   "report.map_subtitle": "GPS track — hover over chart to see position",

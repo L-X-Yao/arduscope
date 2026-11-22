@@ -30,7 +30,7 @@ _CACHE_DIR = os.environ.get(
 
 # Bump whenever parsing changes what ends up in the cache. Part of the
 # cache key, so a stale entry can never mask a parser regression.
-_CACHE_VERSION = 4
+_CACHE_VERSION = 5
 
 # Official family name followed by a semantic-ish version token. Punctuation
 # and brackets are allowed between them; a vendor prefix/version is ignored.
@@ -133,10 +133,19 @@ def not_log_bytes(path: str) -> tuple[int, int]:
     return total, max(first, 0)
 
 
-def _refuse_what_is_not_a_log(path: str) -> None:
-    """Raise UnreadableLog before pymavlink spends minutes on the file."""
+def format_byte_size(count: int) -> str:
+    """A byte count at a readable scale, including small damage holes."""
+    if count < 1024:
+        return f"{count} bytes"
+    if count < 1024 * 1024:
+        return f"{count / 1024:.1f} KB"
+    return f"{count / (1024 * 1024):.1f} MB"
+
+
+def _refuse_what_is_not_a_log(path: str) -> tuple[int, int]:
+    """Refuse an unreadable .BIN; return its readable damage, if any."""
     if not path.lower().endswith(_BINARY_SUFFIXES):
-        return
+        return 0, 0
     size = os.path.getsize(path)
     not_log, first = not_log_bytes(path)
     if not_log * 2 > size:
@@ -149,6 +158,7 @@ def _refuse_what_is_not_a_log(path: str) -> None:
             f"Damaged log, {not_log / 1e6:.1f} MB of it is not log data, "
             f"from byte {first}: {path}",
             size=size, not_log_bytes=not_log, first_offset=first)
+    return not_log, first
 
 
 def _close_quietly(resource) -> None:
@@ -318,6 +328,8 @@ class LogReader:
         self.firmware_version: str = "Unknown"
         self.board_name: str = "Unknown"
         self.time_range: tuple[float, float] = (0.0, 0.0)
+        self.not_log_bytes = 0
+        self.first_not_log_offset = 0
 
         # Message cache: msg_type -> {field_name: np.ndarray}
         self._msg_cache: dict[str, dict[str, np.ndarray]] = {}
@@ -350,7 +362,8 @@ class LogReader:
         4. (Optional) Full field data for preload_types, or for every
            non-metadata type when want_all is set
         """
-        _refuse_what_is_not_a_log(self.filepath)
+        self.not_log_bytes, self.first_not_log_offset = \
+            _refuse_what_is_not_a_log(self.filepath)
         with _open_log(self.filepath) as mlog:
             self._scan(mlog, preload_types, want_all)
 
@@ -968,6 +981,8 @@ class LogReader:
             self.firmware_version = data["firmware_version"]
             self.board_name = data["board_name"]
             self.time_range = data["time_range"]
+            self.not_log_bytes = data["not_log_bytes"]
+            self.first_not_log_offset = data["first_not_log_offset"]
             self.isb_batches = data["isb_batches"]
             if "msg_cache" in data:
                 self._msg_cache = data["msg_cache"]
@@ -992,6 +1007,8 @@ class LogReader:
                 "firmware_version": self.firmware_version,
                 "board_name": self.board_name,
                 "time_range": self.time_range,
+                "not_log_bytes": self.not_log_bytes,
+                "first_not_log_offset": self.first_not_log_offset,
                 "isb_batches": self.isb_batches,
             }
             if self._disk_cache and self._msg_cache:

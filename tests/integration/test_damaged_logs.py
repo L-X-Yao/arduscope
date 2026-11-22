@@ -13,7 +13,8 @@ import pytest
 
 import binlog
 from arduscope.lib import log_reader as log_reader_module
-from arduscope.lib.i18n import t
+from arduscope.lib.html_report import HtmlReportGenerator
+from arduscope.lib.i18n import set_locale, t
 from arduscope.lib.log_reader import LogReader, UnreadableLog, not_log_bytes
 from arduscope.lib.pipeline import NotAFlightLog, run_analysis
 
@@ -122,6 +123,11 @@ class TestNotALogAtAll:
 
 
 class TestHoles:
+    def test_whole_log_pipeline_has_no_damage(self, flight):
+        pipeline = run_analysis(flight, include_gps=False)
+
+        assert pipeline.damage is None
+
     def test_short_hole_is_read_through_in_silence(self, flight, tmp_path,
                                                    capfd):
         """pymavlink printed a line for every byte of it: 262,000 lines for
@@ -136,6 +142,51 @@ class TestHoles:
         assert holed.params == whole.params
         assert holed.has_message("ATT")
         assert capfd.readouterr().err == ""
+
+    def test_pipeline_reports_a_readable_hole(self, flight, tmp_path):
+        path, cut = _with_run(flight, tmp_path / "hole.bin", bytes(8192))
+
+        pipeline = run_analysis(path, include_gps=False)
+
+        assert pipeline.damage is not None
+        assert set(pipeline.damage) == {"not_log_bytes", "first_offset"}
+        assert abs(pipeline.damage["not_log_bytes"] - 8192) <= LONGEST_MESSAGE
+        assert cut < pipeline.damage["first_offset"] <= cut + LONGEST_MESSAGE
+        assert pipeline.issues == []
+
+    def test_disk_cache_keeps_the_damage(self, flight, tmp_path, monkeypatch):
+        monkeypatch.setattr(log_reader_module, "_CACHE_DIR",
+                            str(tmp_path / "cache"))
+        path, _cut = _with_run(flight, tmp_path / "hole.bin", bytes(8192))
+        cold = LogReader(path, disk_cache=True)
+        assert cold.not_log_bytes > 7000  # precondition: the hole is recorded
+
+        def no_cache_miss(*_args, **_kwargs):
+            raise AssertionError("the warm reader did not use the disk cache")
+
+        monkeypatch.setattr(log_reader_module.mavutil, "mavlink_connection",
+                            no_cache_miss)
+        warm = LogReader(path, disk_cache=True)
+
+        assert (warm.not_log_bytes, warm.first_not_log_offset) == (
+            cold.not_log_bytes, cold.first_not_log_offset)
+
+    def test_html_report_warns_about_a_readable_hole(self, flight, tmp_path):
+        path, _cut = _with_run(flight, tmp_path / "hole.bin", bytes(8192))
+        pipeline = run_analysis(path, include_gps=False)
+        set_locale("en")
+        try:
+            page = HtmlReportGenerator(
+                pipeline.vehicle_info, pipeline.results,
+                damage=pipeline.damage).generate()
+            expected = t(
+                "report.log_damage",
+                size=f"{pipeline.damage['not_log_bytes'] / 1024:.1f} KB",
+                offset=pipeline.damage["first_offset"])
+            assert expected in page
+            assert 'class="damage-warning"' in page
+        finally:
+            set_locale("zh")
 
     def test_long_hole_is_refused_with_its_size_and_place(
             self, flight, tmp_path, monkeypatch):

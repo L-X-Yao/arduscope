@@ -1507,6 +1507,7 @@
   "report.footer": "ArduScope | 生成时间: {timestamp}",
   "report.health_overview": "健康总览",
   "report.intro": "本报告面向调参工程师。判定依据 METHODIC 官方文档，每条建议附权威来源。点击技术详情展开完整数据。",
+  "report.log_damage": "警告：此日志中有 {size} 不是日志数据，首个异常字节偏移为 {offset}。分析可能包含已损坏的消息。",
   "report.map_end": "终点",
   "report.map_start": "起点",
   "report.map_subtitle": "GPS 航迹 — 悬停图表查看对应位置",

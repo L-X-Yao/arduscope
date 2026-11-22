@@ -1116,6 +1116,7 @@ def _run_analysis(job_id: str, filepath: str, original_name: str,
             flight_duration=reader.get_flight_duration(),
             health_score=health_score,
             gps_track=gps_track,
+            damage=outcome.pipeline.damage,
         )
         generator.write(output_path)
         _prune_reports()

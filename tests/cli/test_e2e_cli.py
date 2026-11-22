@@ -22,6 +22,7 @@ import sys
 
 import pytest
 
+import binlog
 from conftest import LOG_QUADPLANE_FLIGHT
 
 
@@ -171,6 +172,29 @@ class TestFlightReportEdgeCases:
         # unhandled exception (traceback in stderr).
         if result.returncode != 0:
             assert "Traceback" not in result.stderr
+
+    def test_readable_damage_warns_on_stderr(self, tmp_path):
+        source = binlog.flight_log(duration_s=12.0).save(
+            tmp_path / "source.bin")
+        data = open(source, "rb").read()
+        cut = len(data) // 2
+        damaged = tmp_path / "damaged.bin"
+        damaged.write_bytes(data[:cut] + bytes(8192) + data[cut:])
+        output = tmp_path / "report.html"
+
+        result = _run_cli([
+            "flight_report.py", str(damaged), "-o", str(output),
+            "--no-open", "--no-ai", "--no-map", "--no-fleet-record",
+            "--only", "summary", "--lang", "en",
+        ])
+
+        assert result.returncode == 0, result.stderr
+        warnings = [line for line in result.stderr.splitlines()
+                    if "not log data" in line]
+        assert len(warnings) == 1
+        assert "KB" in warnings[0]
+        assert "starting at byte" in warnings[0]
+        assert "0.0 MB" not in warnings[0]
 
     def test_param_export_includes_all_suggestions(self, tmp_path):
         """The .param file must include param_suggestions from ALL analyzers."""

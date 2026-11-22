@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Fixed
+- A readable `.BIN` containing non-log bytes now warns with their byte count
+  and first offset in the HTML report and on the command line.
+
 ## [0.13.1] - 2026-11-21
 
 ### Changed

@@ -205,13 +205,13 @@ them readable, on the current gate baseline.
 
 - **DataFlash only.** `.BIN`, and `.log` in the text format. A telemetry
   `.tlog` is refused.
-- **A damaged log is read as far as it goes, and the report does not say it is
-  damaged.** Up to 1 MB of a `.BIN` may be bytes that are not log data, such as
-  zeros from a failed copy or an incomplete download. Over that it is refused.
-  A message cut by such a hole can hold wrong values, and a long hole shows in
-  `clock_health` as a gap. Nothing can see a wrong value inside a whole
-  message: the format has no checksum. A log cut short is not damage, and
-  `log_health` says when one ends armed.
+- **A damaged log is read as far as it goes, and readable damage is reported.**
+  The report gives the byte count and first offset of bytes that are not log
+  data, such as zeros from a failed copy or an incomplete download. Over 1 MiB
+  of such bytes, the log is refused. A message cut by such a hole can hold wrong
+  values, and a long hole shows in `clock_health` as a gap. Nothing can see a
+  wrong value inside a whole message: the format has no checksum. A log cut
+  short is not damage, and `log_health` says when one ends armed.
 - **The web upload stops at 1 GB.** Every corpus log is under it: the largest
   is 813 MB and takes 3.0 to 4.1 GB of memory in the web server. Larger logs
   go through `flight_report.py`.
@@ -290,9 +290,9 @@ them readable, on the current gate baseline.
 
 ## Install
 
-- **Top-level module names are generic.** `lib`, `analyzers`, `locales` and
-  the five entry scripts install at the root of site-packages. Give ArduScope
-  a virtual environment of its own, or use the Windows package.
+- **Only the five entry scripts install as top-level modules.** The library
+  installs as the `arduscope` package. Give ArduScope a virtual environment of
+  its own, or use the Windows package.
 - **The Windows package carries its own Python**, 3.14.10 since 0.9.10, and
   pinned libraries. A fix in either reaches it only with a new ArduScope
   release. Once a Python version takes security fixes only, its releases are

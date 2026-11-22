@@ -26,6 +26,7 @@ from .executive_summary import (
     get_level_display,
 )
 from .i18n import localized_value, t
+from .log_reader import format_byte_size
 from .param_conflict import distinct_values, merge_suggestions
 from .series import lttb_downsample
 from .vehicle_detect import VehicleInfo
@@ -204,7 +205,8 @@ class HtmlReportGenerator:
                  health_score: int = -1,
                  gps_track: Optional[dict] = None,
                  max_trace_points: int = 2000,
-                 static_images: bool = False):
+                 static_images: bool = False,
+                 damage: Optional[dict] = None):
         self.vehicle = vehicle_info
         self.results = results
         self.log_filename = log_filename
@@ -214,6 +216,7 @@ class HtmlReportGenerator:
         self.gps_track = gps_track
         self.max_trace_points = max_trace_points
         self.static_images = static_images
+        self.damage = damage
 
     def generate(self) -> str:
         """Generate the full HTML report as a string."""
@@ -251,6 +254,7 @@ class HtmlReportGenerator:
 {self._render_header()}
 
 <div class="container">
+{self._render_damage_warning()}
 {executive_html}
 {dashboard_html}
 {toc_html}
@@ -310,6 +314,18 @@ class HtmlReportGenerator:
         </div>
     </div>
 </header>"""
+
+    def _render_damage_warning(self) -> str:
+        """A readable hole is a property of the log, not an analyzer card."""
+        if not self.damage:
+            return ""
+        warning = t(
+            "report.log_damage",
+            size=format_byte_size(self.damage["not_log_bytes"]),
+            offset=self.damage["first_offset"],
+        )
+        return (f'<div class="damage-warning" role="alert">'
+                f'{html.escape(warning)}</div>')
 
     def _render_executive_summary(self) -> str:
         """Render the executive summary card at the top of the report."""
@@ -887,6 +903,15 @@ body {
     max-width: 1200px;
     margin: 0 auto;
     padding: 24px;
+}
+.damage-warning {
+    background: #fff3cd;
+    border: 1px solid #f0ad4e;
+    border-left: 5px solid #f0ad4e;
+    border-radius: 6px;
+    color: #6b4e00;
+    margin-bottom: 20px;
+    padding: 12px 16px;
 }
 
 /* Executive summary card */

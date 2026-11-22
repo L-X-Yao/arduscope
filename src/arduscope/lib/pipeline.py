@@ -174,6 +174,7 @@ class PipelineResult:
     conflicts: list[dict]
     gps_track: Optional[dict]
     issues: list[AnalysisIssue] = field(default_factory=list)
+    damage: Optional[dict[str, int]] = None
 
 
 def run_analysis(
@@ -319,6 +320,13 @@ def run_analysis(
 
     _progress(95, t("cli.stage_done"))
 
+    damage = None
+    if reader.not_log_bytes:
+        damage = {
+            "not_log_bytes": reader.not_log_bytes,
+            "first_offset": reader.first_not_log_offset,
+        }
+
     return PipelineResult(
         reader=reader,
         vehicle_info=vehicle_info,
@@ -329,4 +337,5 @@ def run_analysis(
         conflicts=conflicts,
         gps_track=gps_track,
         issues=issues,
+        damage=damage,
     )
