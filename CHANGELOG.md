@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.13.2] - 2026-11-22
 
 ### Fixed
 - A readable `.BIN` containing non-log bytes now warns with their byte count
