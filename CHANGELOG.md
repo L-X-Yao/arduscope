@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.13.3] - 2026-11-22
 
 ### Changed
 - JSON and CSV exports now carry readable log damage, and the live web job
