@@ -65,6 +65,7 @@ _VEHICLE = SimpleNamespace(vehicle_type="ArduCopter", board_name="CubeOrange",
                            imu_count=2)
 _READER = SimpleNamespace(params={}, errors=[],
                           get_flight_duration=lambda: 120.0)
+_DAMAGE = {"not_log_bytes": 8192, "first_offset": 1234}
 
 
 def _pid_results() -> list[AnalysisResult]:
@@ -121,6 +122,17 @@ class TestJson:
         values = {e["value"] for e in data["conflicts"][0]["suggestions"]}
         assert values == {28.0, 20.0}
 
+    @pytest.mark.fast
+    def test_damage_is_top_level_or_null(self, data, tmp_path):
+        assert data["damage"] is None
+        path = tmp_path / "damaged.json"
+
+        flight_report.export_json(
+            _pid_results(), _VEHICLE, _READER, 49, str(path), [],
+            damage=_DAMAGE)
+
+        assert json.loads(path.read_text(encoding="utf-8"))["damage"] == _DAMAGE
+
 
 class TestCsv:
     @pytest.fixture
@@ -156,6 +168,21 @@ class TestCsv:
         assert len(conflict) == 1
         assert conflict[0][1] == "ATC_RAT_RLL_FLTD"
         assert "28.0" in conflict[0][2] and "20.0" in conflict[0][2]
+
+    @pytest.mark.fast
+    def test_damage_metadata_only_when_present(self, rows, tmp_path):
+        assert all(not row or row[0] != t("csv.meta_damage") for row in rows)
+        path = tmp_path / "damaged.csv"
+
+        flight_report.export_csv(
+            [], _VEHICLE, _READER, 49, str(path), [], damage=_DAMAGE)
+
+        with open(path, encoding="utf-8-sig", newline="") as f:
+            damaged_rows = list(csv.reader(f))
+        damage_row = [t("csv.meta_damage"), "8.0 KB at byte 1234"]
+        assert damage_row in damaged_rows
+        duration = damaged_rows.index([t("csv.meta_duration"), "120.0"])
+        assert damaged_rows[duration + 1] == damage_row
 
 
 class TestCsvFormulas:

@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Changed
+- JSON and CSV exports now carry readable log damage, and the live web job
+  card shows a damage badge.
+
 ## [0.13.2] - 2026-11-22
 
 ### Fixed

@@ -110,7 +110,7 @@ def _json_entry(r: AnalysisResult) -> dict:
 
 def export_json(results: list[AnalysisResult], vehicle_info,
                 reader: LogReader, health_score: int,
-                output_path: str, conflicts: list[dict]):
+                output_path: str, conflicts: list[dict], damage=None):
     """Export analysis results as JSON."""
     data = {
         "vehicle": {
@@ -126,6 +126,7 @@ def export_json(results: list[AnalysisResult], vehicle_info,
             "error_count": len(reader.errors),
         },
         "health_score": health_score,
+        "damage": damage,
         "analyzers": [_json_entry(r) for r in results],
         "conflicts": conflicts,
     }
@@ -156,7 +157,7 @@ def _csv_row(r: AnalysisResult, title: str) -> list[str]:
 
 def export_csv(results: list[AnalysisResult], vehicle_info,
                reader: LogReader, health_score: int,
-               output_path: str, conflicts: list[dict]):
+               output_path: str, conflicts: list[dict], damage=None):
     """Export analysis results as CSV."""
     with open(output_path, 'w', newline='', encoding='utf-8-sig') as f:
         writer = SafeWriter(f)
@@ -174,6 +175,12 @@ def export_csv(results: list[AnalysisResult], vehicle_info,
         writer.writerow([t("csv.meta_board"), vehicle_info.board_name])
         writer.writerow([t("csv.meta_firmware"), vehicle_info.firmware_version])
         writer.writerow([t("csv.meta_duration"), f"{reader.get_flight_duration():.1f}"])
+        if damage:
+            writer.writerow([
+                t("csv.meta_damage"),
+                f"{format_byte_size(damage['not_log_bytes'])} "
+                f"at byte {damage['first_offset']}",
+            ])
         for c in conflicts:
             writer.writerow([
                 t("csv.meta_conflict"), c["param"],
@@ -452,10 +459,10 @@ def main():
 
     if args.format == "json":
         export_json(results, vehicle_info, reader, health_score, output_path,
-                    param_conflicts)
+                    param_conflicts, damage=pipeline.damage)
     elif args.format == "csv":
         export_csv(results, vehicle_info, reader, health_score, output_path,
-                   param_conflicts)
+                   param_conflicts, damage=pipeline.damage)
     elif args.format == "pdf":
         try:
             from arduscope.lib.pdf_export import html_to_pdf

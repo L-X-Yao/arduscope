@@ -40,6 +40,11 @@ class TestCounting:
     def test_whole_log_has_none(self, flight):
         assert not_log_bytes(flight) == (0, 0)
 
+    def test_text_log_suffix_skips_binary_damage_scan(self, tmp_path):
+        path = str(tmp_path / "flight.log")
+
+        assert log_reader_module._refuse_what_is_not_a_log(path) == (0, 0)
+
     def test_zeros_after_the_last_message(self, flight, tmp_path):
         size = os.path.getsize(flight)
         path, _cut = _with_run(flight, tmp_path / "tail.bin", bytes(10_000),

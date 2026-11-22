@@ -608,6 +608,7 @@ const I18N = """
         "js.agent_tag": t("web.agent_tag"),
         "js.unknown": t("report.unknown"),
         "js.issues": t("web.js_issues"),
+        "js.damage": t("web.js_damage"),
     }, ensure_ascii=False)
     + f";\nconst MAX_UPLOAD_BYTES = {max_upload_bytes};"
     + r"""
@@ -788,6 +789,13 @@ function renderJobCard(job) {
         sizeTag = `<span class="vehicle-tag">${mb} MB</span>`;
     }
 
+    /* readable damage: live job only, not a history field */
+    let damageTag = '';
+    if (job.damage) {
+        const detail = `${job.damage.not_log_bytes} bytes at byte ${job.damage.first_offset}`;
+        damageTag = `<span class="vehicle-tag" style="color:#e6a23c" title="${esc(detail)}">${I18N['js.damage']}</span>`;
+    }
+
     /* progress */
     let prog = '';
     if (job.status === 'running' || job.status === 'queued') {
@@ -869,7 +877,7 @@ function renderJobCard(job) {
 
     return `<div class="job-card ${cls}">
         <div class="job-header">
-            <span class="job-filename">${esc(job.filename)}</span>${sizeTag}${veh}${score}${agentTag}${issueTag}${elapsedTag}
+            <span class="job-filename">${esc(job.filename)}</span>${sizeTag}${damageTag}${veh}${score}${agentTag}${issueTag}${elapsedTag}
         </div>
         ${prog}${dots}${err}${act}
     </div>`;

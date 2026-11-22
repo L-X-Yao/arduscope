@@ -457,6 +457,7 @@ def _start_job(job_id: str, save_path: str, filename: str, written: int,
             'agent_calls': 0,
             'agent_fallback': '',
             'issues': [],
+            'damage': None,
         }
     worker = threading.Thread(
         target=_analyze_then_free_slot,
@@ -1073,6 +1074,7 @@ def _run_analysis(job_id: str, filepath: str, original_name: str,
         health_score = outcome.pipeline.health_score
         gps_track = outcome.pipeline.gps_track
         issues = list(outcome.issues)
+        _update_job(job_id, damage=outcome.pipeline.damage)
         _update_job(job_id, issues=[issue.as_dict() for issue in issues])
         if outcome.archive_error:
             warning = t("fleet.record_failed", error=outcome.archive_error)
