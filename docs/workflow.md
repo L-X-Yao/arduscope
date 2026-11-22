@@ -6,6 +6,10 @@ and the process that applies when work reopens. The code-facing rules stay in
 [CONTRIBUTING.md](../CONTRIBUTING.md), `CLAUDE.md` and
 [POSITIONING.md](../POSITIONING.md).
 
+GitHub Actions runs the CI suite weekly, `security.yml` audits the dependency
+pins weekly, and `release-verify.yml` checks a published release's record and
+assets.
+
 ## Modes
 
 ### Maintenance (current)

@@ -174,6 +174,7 @@ python3 tools/release.py patch   # 0.3.1 -> 0.3.2
 python3 tools/release.py minor   # 0.3.1 -> 0.4.0
 python3 tools/win_package_check.py --release vX.Y.Z
 gh release edit vX.Y.Z --draft=false
+python3 tools/verify_release.py vX.Y.Z  # published, immutable, three assets
 ```
 
 `release.py` refuses a commit without a pass from the gate, then bumps the

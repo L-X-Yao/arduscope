@@ -1,0 +1,49 @@
+name: Security
+
+on:
+  schedule:
+    # Weekly, after the Monday CI run. The advisory database moves without
+    # a repository change, so this cannot ride on push alone.
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pip-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install pip-audit
+        run: pip install pip-audit==2.10.1
+
+      - name: Audit the project dependencies
+        run: pip-audit . --strict
+
+      # The Windows pins are win_amd64 cp314 wheels; auditing the hashed
+      # file from Linux would resolve a different artefact and fail on the
+      # hash, not on a vulnerability. Audit the versions, and let the build
+      # keep checking the hashes.
+      - name: Audit the Windows package pins
+        # Run even if the project audit failed, so the weekly report says
+        # something about both targets.
+        if: always()
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path("win64-requirements.txt").read_text(encoding="utf-8")
+          pins = re.findall(r"^([A-Za-z0-9_.-]+==[^\\\s]+)", text, re.M)
+          Path("/tmp/win64-versions.txt").write_text(
+              "\n".join(pins) + "\n", encoding="utf-8")
+          print(f"{len(pins)} pins")
+          PY
+          pip-audit -r /tmp/win64-versions.txt --no-deps --strict
