@@ -10,9 +10,10 @@ and the process that applies when work reopens. The code-facing rules stay in
 
 ### Maintenance (current)
 
-- Two sessions: the integrator and one peer. The peer is the blind reviewer by
-  default and writes when assigned; the integrator writes otherwise. A session
-  never reviews its own code change. The third session is optional.
+- Three sessions by default: the integrator and two peers. One peer writes when
+  assigned, the other is the blind reviewer or does an independent audit; the
+  integrator writes otherwise. A session never reviews its own code change. The
+  third session is omitted only when the batch has no independent work for it.
 - No scheduled capability probes while idle. Re-probe after a model switch or
   when feature work resumes.
 - The change tiers below set the review and gate level.
