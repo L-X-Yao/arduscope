@@ -14,10 +14,12 @@ release-gate pass per batch. The roles, the review format and the worktree
 rules are in [docs/workflow.md](docs/workflow.md); the gates each kind of
 change has to pass are below.
 
-In maintenance mode, docs and CI changes use an integrator self-check and
-`tools/ci_local.py`. Code changes still get one blind review; safety code gets
-the snapshot and corpus steps. The three-session protocol applies when feature
-work reopens.
+In maintenance mode, the three-session protocol is the default: one peer
+writes, the other blind-reviews or audits, and the integrator lands the change.
+Docs and CI changes use an integrator self-check and `tools/ci_local.py`. Code
+changes still get one blind review; safety code gets the snapshot and corpus
+steps. The third session is omitted only when a batch has no independent work
+for it.
 
 ## External pull requests
 
