@@ -444,6 +444,261 @@
           "return": 240
         }
       ]
+    },
+    {
+      "name": "copter_autotune_axes",
+      "vehicle": "ArduCopter",
+      "description": "Vibration-degraded attitude with a partial autotune axes mask, so AUTOTUNE_AXES 7 is suggested",
+      "sitl_params": {
+        "SIM_ACC1_RND": 30,
+        "SIM_ACC2_RND": 30,
+        "SIM_ACC3_RND": 30,
+        "SIM_VIB_FREQ_X": 80,
+        "SIM_VIB_FREQ_Y": 80,
+        "SIM_VIB_FREQ_Z": 80,
+        "SIM_ENGINE_FAIL": 1,
+        "SIM_ENGINE_MUL": 0.7,
+        "AUTOTUNE_AXES": 1
+      },
+      "expected": {
+        "analyzers_warning_or_critical": [
+          "attitude"
+        ],
+        "suggestions_include": [
+          "AUTOTUNE_AXES"
+        ],
+        "suggestions_equal": {
+          "AUTOTUNE_AXES": 7
+        }
+      },
+      "steps": [
+        {
+          "takeoff": 10
+        },
+        {
+          "hold": 30
+        },
+        {
+          "return": 240
+        }
+      ]
+    },
+    {
+      "name": "copter_gps_glitch_dual",
+      "vehicle": "ArduCopter",
+      "description": "GPS1 glitch of the dual-GPS scenario with auto-switch off, so GPS_AUTO_SWITCH 1 is suggested",
+      "sitl_params": {
+        "GPS2_TYPE": 100,
+        "GPS_AUTO_SWITCH": 0
+      },
+      "expected": {
+        "analyzers_warning_or_critical": [
+          "gps",
+          "gps_glitch"
+        ],
+        "cross_rules_should_fire": [
+          "gps_glitch_ekf"
+        ],
+        "suggestions_include": [
+          "GPS_AUTO_SWITCH"
+        ],
+        "suggestions_equal": {
+          "GPS_AUTO_SWITCH": 1
+        }
+      },
+      "steps": [
+        {
+          "takeoff": 15
+        },
+        {
+          "hold": 10
+        },
+        {
+          "set": {
+            "SIM_GPS1_NUMSATS": 5
+          }
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0.0002,
+            "SIM_GPS1_GLTCH_Y": 0.0002
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0,
+            "SIM_GPS1_GLTCH_Y": 0
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0.0002,
+            "SIM_GPS1_GLTCH_Y": 0.0002
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0,
+            "SIM_GPS1_GLTCH_Y": 0
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0.0002,
+            "SIM_GPS1_GLTCH_Y": 0.0002
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0,
+            "SIM_GPS1_GLTCH_Y": 0
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0.0002,
+            "SIM_GPS1_GLTCH_Y": 0.0002
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0,
+            "SIM_GPS1_GLTCH_Y": 0
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0.0002,
+            "SIM_GPS1_GLTCH_Y": 0.0002
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "set": {
+            "SIM_GPS1_GLTCH_X": 0,
+            "SIM_GPS1_GLTCH_Y": 0
+          }
+        },
+        {
+          "hold": 2
+        },
+        {
+          "hold": 20
+        },
+        {
+          "return": 240
+        }
+      ]
+    },
+    {
+      "name": "plane_airspeed_offset",
+      "vehicle": "ArduPlane",
+      "description": "A pitot reporting 36% of the true airspeed, disagreeing with windless GPS groundspeed, so ARSPD_USE 0 is suggested",
+      "sitl_params": {
+        "SIM_ARSPD_RATIO": 15
+      },
+      "expected": {
+        "analyzers_warning_or_critical": [
+          "airspeed"
+        ],
+        "suggestions_include": [
+          "ARSPD_USE"
+        ],
+        "suggestions_equal": {
+          "ARSPD_USE": 0
+        }
+      },
+      "steps": [
+        {
+          "mission": [
+            [
+              300,
+              0,
+              80
+            ],
+            [
+              300,
+              600,
+              80
+            ],
+            [
+              -300,
+              600,
+              80
+            ],
+            [
+              -300,
+              0,
+              80
+            ]
+          ]
+        },
+        {
+          "wait_disarm": 300
+        }
+      ]
+    },
+    {
+      "name": "copter_compass_outlier",
+      "vehicle": "ArduCopter",
+      "description": "A 600 mGauss X offset injected on compass 2 in flight while the other two agree, so COMPASS_USE2 0 is suggested",
+      "sitl_params": {},
+      "expected": {
+        "analyzers_warning_or_critical": [
+          "compass_consistency"
+        ],
+        "suggestions_include": [
+          "COMPASS_USE2"
+        ],
+        "suggestions_equal": {
+          "COMPASS_USE2": 0
+        }
+      },
+      "steps": [
+        {
+          "takeoff": 15
+        },
+        {
+          "mode": "CIRCLE"
+        },
+        {
+          "set": {
+            "SIM_MAG2_OFS_X": 600
+          }
+        },
+        {
+          "hold": 60
+        },
+        {
+          "return": 240
+        }
+      ]
     }
   ]
 }
