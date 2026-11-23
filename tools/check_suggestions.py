@@ -81,12 +81,9 @@ DYNAMIC_SITES: dict[str, tuple[str, ...]] = {
 # suggestion gets here only by someone deciding, in review, that it should
 # ship unflown.
 NOT_FLOWN_WAIVERS: dict[str, str] = {
-    "airspeed:ARSPD_USE": "needs a scenario with a failing pitot",
-    "attitude:AUTOTUNE_AXES": "selects what AutoTune runs, not a tuned value",
-    "compass_consistency:COMPASS_USE": "needs a scenario with a bad compass",
-    "gps:GPS_AUTO_SWITCH": "needs a scenario with a failing second GPS",
-    "notch_tuning:INS_HNTC2_*": "no scenario has two noise bands yet",
-    "pid_tuning:RLL_RATE_D": "flights so far were on Copter",
+    "pid_tuning:RLL_RATE_D": "the oscillation gate reads the RATE message, "
+                             "which the plane controller does not log; "
+                             "unreachable without an analyzer change",
 }
 
 

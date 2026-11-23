@@ -699,6 +699,179 @@
           "return": 240
         }
       ]
+    },
+    {
+      "name": "copter_second_notch_band",
+      "vehicle": "ArduCopter",
+      "description": "Motor noise peak near 105 Hz with a static first notch at 40 Hz, so the INS_HNTC2 set is suggested",
+      "sitl_params": {
+        "SIM_VIB_MOT_MAX": 250,
+        "SIM_GYR1_RND": 20,
+        "SIM_GYR2_RND": 20,
+        "SIM_GYR3_RND": 20,
+        "INS_LOG_BAT_MASK": 1,
+        "INS_LOG_BAT_OPT": 2,
+        "INS_GYRO_FILTER": 100,
+        "WP_SPD_UP": 8,
+        "WP_SPD_DN": 5,
+        "WP_ACC_Z": 3,
+        "INS_HNTCH_ENABLE": 1,
+        "INS_HNTCH_MODE": 0,
+        "INS_HNTCH_FREQ": 40,
+        "INS_HNTCH_BW": 20
+      },
+      "expected": {
+        "suggestions_include": [
+          "INS_HNTC2_ENABLE",
+          "INS_HNTC2_MODE",
+          "INS_HNTC2_FREQ",
+          "INS_HNTC2_BW",
+          "INS_HNTC2_REF"
+        ],
+        "suggestions_equal": {
+          "INS_HNTC2_ENABLE": 1,
+          "INS_HNTC2_MODE": 3,
+          "INS_HNTC2_REF": 1
+        },
+        "suggestions_between": {
+          "INS_HNTC2_FREQ": [
+            95,
+            115
+          ]
+        }
+      },
+      "steps": [
+        {
+          "takeoff": 20
+        },
+        {
+          "hold": 15
+        },
+        {
+          "mission": [
+            [
+              0,
+              0,
+              110
+            ],
+            [
+              0,
+              0,
+              20
+            ],
+            [
+              0,
+              0,
+              110
+            ],
+            [
+              0,
+              0,
+              20
+            ],
+            [
+              0,
+              0,
+              110
+            ],
+            [
+              0,
+              0,
+              20
+            ]
+          ]
+        },
+        {
+          "hold": 5
+        },
+        {
+          "return": 240
+        }
+      ]
+    },
+    {
+      "name": "copter_static_dual_notch",
+      "vehicle": "ArduCopter",
+      "description": "Both notches enabled and static off the peak, so the second-notch path runs but emits no INS_HNTC2 suggestion",
+      "sitl_params": {
+        "SIM_VIB_MOT_MAX": 250,
+        "SIM_GYR1_RND": 20,
+        "SIM_GYR2_RND": 20,
+        "SIM_GYR3_RND": 20,
+        "INS_LOG_BAT_MASK": 1,
+        "INS_LOG_BAT_OPT": 2,
+        "INS_GYRO_FILTER": 100,
+        "WP_SPD_UP": 8,
+        "WP_SPD_DN": 5,
+        "WP_ACC_Z": 3,
+        "INS_HNTCH_ENABLE": 1,
+        "INS_HNTCH_MODE": 0,
+        "INS_HNTCH_FREQ": 40,
+        "INS_HNTCH_BW": 20,
+        "INS_HNTC2_ENABLE": 1,
+        "INS_HNTC2_MODE": 0,
+        "INS_HNTC2_FREQ": 40,
+        "INS_HNTC2_BW": 20
+      },
+      "expected": {
+        "suggestions_exclude": [
+          "INS_HNTC2_ENABLE",
+          "INS_HNTC2_MODE",
+          "INS_HNTC2_FREQ",
+          "INS_HNTC2_BW",
+          "INS_HNTC2_REF",
+          "INS_HNTC2_HMNCS",
+          "INS_HNTC2_OPTS"
+        ]
+      },
+      "steps": [
+        {
+          "takeoff": 20
+        },
+        {
+          "hold": 15
+        },
+        {
+          "mission": [
+            [
+              0,
+              0,
+              110
+            ],
+            [
+              0,
+              0,
+              20
+            ],
+            [
+              0,
+              0,
+              110
+            ],
+            [
+              0,
+              0,
+              20
+            ],
+            [
+              0,
+              0,
+              110
+            ],
+            [
+              0,
+              0,
+              20
+            ]
+          ]
+        },
+        {
+          "hold": 5
+        },
+        {
+          "return": 240
+        }
+      ]
     }
   ]
 }

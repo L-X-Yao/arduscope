@@ -200,6 +200,25 @@ class TestSitlPipeline:
             assert low <= suggested[name] <= high, \
                 f"{name}={suggested[name]} outside {low} to {high}"
 
+    def test_expected_suggestion_exclusions(self, scenario):
+        """Params a scenario asserts are NOT suggested, even though the
+        code path that would suggest them runs.
+
+        copter_static_dual_notch reaches the second-notch branch with
+        HNTC2 already enabled: without this expectation, a regression
+        that starts emitting INS_HNTC2 rows on an enabled notch would
+        pass silently.
+        """
+        excluded = scenario.get("expected", {}).get("suggestions_exclude", [])
+        if not excluded:
+            pytest.skip("No suggestion exclusion expectations")
+        result = _run_pipeline(scenario["_log_path"])
+        suggested = {s["param"] for r in result.results_by_key.values()
+                     for s in r.param_suggestions}
+        present = set(excluded) & suggested
+        assert not present, \
+            f"Suggested despite exclusion expectation: {sorted(present)}"
+
     def test_param_file_generation(self, scenario, tmp_path):
         """Every scenario runs the export, with or without suggestions.
 

@@ -32,17 +32,17 @@ Columns:
 | `INS_HNTCH_REF` | notch_tuning | 1 for ESC or RPM tracking. For throttle tracking, the median throttle in level hover | A: wiki common-esc-telem-based-notch, common-throttle-based-notch | E2, E3, Z5, N7, Z2, T2 | flown |
 | `INS_HNTCH_HMNCS` | notch_tuning | 3 | A: HarmonicNotchFilter.cpp default | N8, N9, N12 | flown |
 | `INS_HNTCH_OPTS` | notch_tuning | 16 for a wide peak, else 0 | A: wiki common-imu-notch-filtering | N13 | flown |
-| `INS_HNTC2_*` | notch_tuning | Same rules, for a second band | A: wiki common-imu-notch-filtering | - | not_flown |
+| `INS_HNTC2_*` | notch_tuning | Same rules, for a second band | A: wiki common-imu-notch-filtering | SITL copter_second_notch_band | flown |
 | `ATC_RAT_RLL_FLTD` `ATC_RAT_PIT_FLTD` `Q_A_RAT_RLL_FLTD` `Q_A_RAT_PIT_FLTD` | notch_tuning | INS_GYRO_FILTER/2, when above it | A: wiki setting-up-for-tuning | F2, Z4 | flown |
 | `MOT_THST_HOVER` `Q_M_THST_HOVER` | notch_tuning | Median throttle in level hover, where the parameter is over 0.12 from it | D: AP_MotorsMulticopter.cpp THST_HOVER, measured inside the gate of update_throttle_hover | H1 | flown |
 | `ATC_RAT_*_D` `Q_A_RAT_*_D` | pid_tuning | x0.9, x0.8 when noise is critical, on an oscillating axis | A: wiki ac_rollpitchtuning | D1 | flown |
 | `RLL_RATE_D` `PTCH_RATE_D` `YAW_RATE_D` | pid_tuning | Same rule, on the Plane rate loop | D: Copter rule applied to Plane | - | not_flown |
 | `MOT_SPIN_MIN` `Q_M_SPIN_MIN` | motor | MOT_SPIN_ARM + 0.03 | A: wiki set-motor-range | S1 | flown |
 | `TECS_SPDWEIGHT` | tecs_tuning | + 0.5, up to 2.0, with airspeed in use | D: AP_TECS.cpp SPDWEIGHT | P1 | flown |
-| `ARSPD_USE` | airspeed | 0 on critical disagreement with GPS | D: AP_Airspeed_Params.cpp USE | - | not_flown |
-| `AUTOTUNE_AXES` `Q_AUTOTUNE_AXES` | attitude | 7 | A: AC_AutoTune_Multi.cpp default | - | not_flown |
-| `GPS_AUTO_SWITCH` | gps | 1 with two GPS and a GPS finding | A: AP_GPS.cpp default | - | not_flown |
-| `COMPASS_USE` `COMPASS_USE2` `COMPASS_USE3` | compass_consistency | 0 for the outlier | D: AP_Compass.cpp USE | - | not_flown |
+| `ARSPD_USE` | airspeed | 0 on critical disagreement with GPS | D: AP_Airspeed_Params.cpp USE | SITL plane_airspeed_offset | flown |
+| `AUTOTUNE_AXES` `Q_AUTOTUNE_AXES` | attitude | 7 | A: AC_AutoTune_Multi.cpp default | SITL copter_autotune_axes | flown |
+| `GPS_AUTO_SWITCH` | gps | 1 with two GPS and a GPS finding | A: AP_GPS.cpp default | SITL copter_gps_glitch_dual | flown |
+| `COMPASS_USE` `COMPASS_USE2` `COMPASS_USE3` | compass_consistency | 0 for the outlier | D: AP_Compass.cpp USE | SITL copter_compass_outlier | flown |
 | `LOG_REPLAY` | log_health | 0 | D: AP_Logger.cpp REPLAY | - | log_setting |
 | `LOG_BITMASK` | log_health | Vehicle default | D: vehicle default bitmask | - | log_setting |
 
@@ -51,6 +51,14 @@ the `INS_HNTCH_FREQ` floor in FFT mode, `INS_HNTCH_BW` widened to cover a peak
 that lands near the edge of the band, and `INS_HNTCH_REF` 1 on an RPM sensor
 notch, which takes the same path through the firmware as the ESC notch that
 was flown.
+
+The Plane rate-loop D row stays unflown for a structural reason, not a
+missing flight: the rule's oscillation gate reads the `RATE` message, which
+the fixed-wing controller does not log, so no plane log can satisfy it as
+the analyzer stands (the SITL suite records the same in `docs/sitl.md`).
+The `AUTOTUNE_AXES`, `GPS_AUTO_SWITCH`, `COMPASS_USE` and `INS_HNTC2_*`
+rows above were exercised in SITL, named in the Flight column; SITL shows
+the rule firing, it does not replace a flight on an aircraft.
 
 Throttle tracking was flown through climbs and descents with REF at the hover
 throttle and with a REF the throttle never reaches (T2, T1). The two came out
