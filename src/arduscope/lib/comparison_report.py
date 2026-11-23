@@ -17,6 +17,7 @@ import plotly.offline
 from arduscope.lib.log_metadata import format_flight_time
 from arduscope.lib.i18n import t
 from arduscope.lib.thresholds import Thresholds
+from arduscope.lib.theme import FONT_STACK_CSS, FONT_STACK_PLOTLY
 from arduscope.lib.trend_analyzer import (
     analyze_trends,
     TrendReport,
@@ -309,7 +310,7 @@ def _render_param_charts(
             margin=dict(l=60, r=30, t=50, b=80),
             template="plotly_white",
             font=dict(
-                family="PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif",
+                family=FONT_STACK_PLOTLY + ", sans-serif",
                 size=12,
             ),
             xaxis=dict(tickangle=-45),
@@ -397,10 +398,7 @@ def _render_overlay_charts(
             margin=dict(l=60, r=30, t=50, b=60),
             template="plotly_white",
             font=dict(
-                family=(
-                    "PingFang SC, Microsoft YaHei, "
-                    "Noto Sans SC, sans-serif"
-                ),
+                family=FONT_STACK_PLOTLY + ", sans-serif",
                 size=12,
             ),
             legend=dict(font=dict(size=10)),
@@ -542,6 +540,7 @@ def _flight_date_row(all_metrics: list[dict]) -> str:
     return f"<tr><td><strong>{t('multi.row_flight_date')}</strong></td>{cells}</tr>"
 
 
+
 def generate_html(
     log_names: list[str],
     all_metrics: list[dict[str, float | None]],
@@ -618,10 +617,7 @@ def generate_html(
             margin=dict(l=60, r=30, t=50, b=80),
             template="plotly_white",
             font=dict(
-                family=(
-                    "PingFang SC, Microsoft YaHei, "
-                    "Noto Sans SC, sans-serif"
-                ),
+                family=FONT_STACK_PLOTLY + ", sans-serif",
                 size=12,
             ),
             xaxis=dict(tickangle=-45),
@@ -702,7 +698,7 @@ def generate_html(
 <style>
 * {{ margin: 0; padding: 0; box-sizing: border-box; }}
 body {{
-    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC",
+    font-family: {FONT_STACK_CSS}
                  -apple-system, BlinkMacSystemFont, sans-serif;
     background: #f5f6fa;
     color: #333;

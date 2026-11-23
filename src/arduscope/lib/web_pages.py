@@ -12,6 +12,7 @@ import json
 from arduscope.lib import fleet_history
 from arduscope.agent import config as agent_config
 from arduscope.lib.i18n import get_locale, t
+from arduscope.lib.theme import COLORS, FONT_STACK_CSS_COMPACT
 
 # The services the project tested end to end. Picking one fills in the
 # address and model so a first-time user does not have to find them in the
@@ -207,6 +208,9 @@ async function testSettings() {{
 </html>"""
 
 
+_ACCENT = COLORS["accent"]
+
+
 def build_index_html(max_upload_bytes: int, allow_settings: bool) -> str:
     """Build the index page HTML with i18n strings."""
     from arduscope.lib.i18n import get_locale
@@ -264,7 +268,7 @@ def build_index_html(max_upload_bytes: int, allow_settings: bool) -> str:
 /* ---- Reset & Base ---- */
 *{margin:0;padding:0;box-sizing:border-box}
 body{
-    font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",
+    font-family:""" + FONT_STACK_CSS_COMPACT + r"""
                 -apple-system,BlinkMacSystemFont,sans-serif;
     background:var(--bg);color:var(--text);min-height:100vh;
 }
@@ -312,7 +316,7 @@ body{
     border-radius:4px;font-size:13px;color:var(--text);background:var(--input-bg);
     cursor:pointer;
 }
-.template-bar select:focus{outline:none;border-color:#409eff}
+.template-bar select:focus{outline:none;border-color:""" + _ACCENT + r"""}
 .template-bar .agent-check{
     display:flex;align-items:center;gap:6px;white-space:nowrap;
     cursor:pointer;color:var(--text-secondary);font-size:13px;
@@ -326,7 +330,7 @@ body{
     background:var(--card-bg);cursor:pointer;transition:all .2s;
     margin-bottom:24px;
 }
-.upload-zone:hover,.upload-zone.dragover{border-color:#409eff;background:var(--hover-bg)}
+.upload-zone:hover,.upload-zone.dragover{border-color:""" + _ACCENT + r""";background:var(--hover-bg)}
 .upload-zone .icon{font-size:48px;margin-bottom:12px}
 .upload-zone .hint{color:var(--text-muted);font-size:14px}
 .upload-zone .hint2{color:var(--dashed-border);font-size:12px;margin-top:8px}
@@ -338,7 +342,7 @@ body{
     margin-bottom:12px;box-shadow:0 1px 3px var(--shadow);
     border-left:4px solid var(--dashed-border);transition:border-color .3s;
 }
-.job-card.status-running{border-left-color:#409eff}
+.job-card.status-running{border-left-color:""" + _ACCENT + r"""}
 .job-card.status-done{border-left-color:#67c23a}
 .job-card.status-error{border-left-color:#f56c6c}
 .job-header{display:flex;align-items:center;gap:10px;margin-bottom:6px}
@@ -354,11 +358,11 @@ body{
     overflow:hidden;margin:8px 0 4px;
 }
 .progress-fill{
-    height:100%;background:#409eff;border-radius:3px;
+    height:100%;background:""" + _ACCENT + r""";border-radius:3px;
     transition:width .4s ease;
 }
 .progress-fill.active{
-    background:linear-gradient(90deg,#409eff,#66b1ff,#409eff);
+    background:linear-gradient(90deg,""" + _ACCENT + r""",#66b1ff,""" + _ACCENT + r""");
     background-size:200% 100%;animation:shimmer 1.5s infinite;
 }
 @keyframes shimmer{
@@ -383,7 +387,7 @@ body{
     font-size:13px;text-decoration:none;cursor:pointer;
     border:none;transition:background .2s;
 }
-.btn-primary{background:#409eff;color:#fff}
+.btn-primary{background:""" + _ACCENT + r""";color:#fff}
 .btn-primary:hover{background:#337ecc}
 .btn-secondary{background:var(--btn-secondary-bg);color:var(--text-secondary)}
 .btn-secondary:hover{background:var(--btn-secondary-hover)}
@@ -430,7 +434,7 @@ body{
     border-radius:4px;font-size:13px;color:var(--text);background:var(--input-bg);
     margin-bottom:10px;
 }
-.history-search:focus{outline:none;border-color:#409eff}
+.history-search:focus{outline:none;border-color:""" + _ACCENT + r"""}
 
 /* ---- History date group ---- */
 .history-date-header{
@@ -461,7 +465,7 @@ body{
 .toast{padding:12px 20px;border-radius:8px;color:#fff;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,.15);animation:slideIn .3s ease;max-width:360px}
 .toast-error{background:#f56c6c}
 .toast-success{background:#67c23a}
-.toast-info{background:#409eff}
+.toast-info{background:""" + _ACCENT + r"""}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 
 /* ---- Responsive ---- */
@@ -1084,7 +1088,7 @@ def _build_fleet_shell(title_text: str, body: str,
 --text-muted:#707080;--border:#3a3a50;--shadow:rgba(0,0,0,.3);
 --header-bg:linear-gradient(135deg,#0d0d1a 0%,#0f1525 100%)}}
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",
+body{{font-family:{FONT_STACK_CSS_COMPACT}
 -apple-system,BlinkMacSystemFont,sans-serif;
 background:var(--bg);color:var(--text);min-height:100vh}}
 .header{{background:var(--header-bg);color:#fff;padding:16px 0;
@@ -1101,7 +1105,7 @@ th,td{{padding:8px 10px;text-align:left;
 border-bottom:1px solid var(--border)}}
 th{{color:var(--text-muted);font-weight:600;white-space:nowrap}}
 td code{{font-size:12px}}
-a.serial{{color:#409eff;text-decoration:none}}
+a.serial{{color:{_ACCENT};text-decoration:none}}
 a.serial:hover{{text-decoration:underline}}
 .score{{font-weight:600}}
 .empty{{text-align:center;color:var(--text-muted);padding:24px 0}}
@@ -1111,7 +1115,7 @@ a.serial:hover{{text-decoration:underline}}
 border:1px solid var(--border);border-radius:4px;
 background:var(--card-bg);color:var(--text)}}
 .alias-form button{{padding:6px 14px;font-size:13px;border:none;
-border-radius:4px;background:#409eff;color:#fff;cursor:pointer}}
+border-radius:4px;background:{_ACCENT};color:#fff;cursor:pointer}}
 .alias-form button:hover{{background:#66b1ff}}
 </style>
 </head>

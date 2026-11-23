@@ -37,6 +37,7 @@ if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
 
 from arduscope.lib.csv_safe import SafeWriter
+from arduscope.lib.theme import COLORS, FONT_STACK_CSS_COMPACT
 from arduscope.lib.i18n import t
 from arduscope.lib.html_report import HtmlReportGenerator
 from arduscope.lib.ai_diagnosis import generate_diagnosis
@@ -273,6 +274,9 @@ def write_summary_csv(results: list[dict], output_path: str):
             writer.writerow(row)
 
 
+_ACCENT = COLORS["accent"]
+
+
 def write_summary_html(results: list[dict], output_path: str,
                        compare_path: str | None = None):
     """Write a standalone HTML overview table."""
@@ -363,7 +367,7 @@ def write_summary_html(results: list[dict], output_path: str,
 <title>{t("batch.page_title")}</title>
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+body{{font-family:{FONT_STACK_CSS_COMPACT}sans-serif;
       background:#f5f6fa;color:#333;line-height:1.6}}
 .header{{background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;
          padding:24px;text-align:center}}
@@ -380,9 +384,9 @@ td{{padding:8px;text-align:center;border-bottom:1px solid #f0f0f0}}
 .fname{{text-align:left;font-family:monospace;font-size:12px;max-width:300px;
         overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 .row-err td{{background:#fff5f5}}
-a{{color:#409eff;text-decoration:none}}
+a{{color:{_ACCENT};text-decoration:none}}
 a:hover{{text-decoration:underline}}
-.btn{{display:inline-block;background:#409eff;color:#fff;padding:8px 20px;
+.btn{{display:inline-block;background:{_ACCENT};color:#fff;padding:8px 20px;
       border-radius:6px;font-size:14px}}
 .btn:hover{{background:#337ecc;color:#fff;text-decoration:none}}
 .footer{{text-align:center;padding:20px;color:#999;font-size:12px}}

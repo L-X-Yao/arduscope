@@ -29,6 +29,7 @@ from .i18n import localized_value, t
 from .log_reader import format_byte_size
 from .param_conflict import distinct_values, merge_suggestions
 from .series import lttb_downsample
+from .theme import COLORS, FONT_STACK_CSS
 from .vehicle_detect import VehicleInfo
 
 
@@ -187,6 +188,9 @@ def _action_status_tag(status: str) -> str:
         return ""
     return (f' <span class="status-badge" style="background-color: '
             f'{STATUS_COLORS[status]};">{_status_label(status)}</span>')
+
+
+_ACCENT = COLORS["accent"]
 
 
 class HtmlReportGenerator:
@@ -777,7 +781,7 @@ class HtmlReportGenerator:
         }}
         map = L.map('flight-map', {{zoomControl: true}});
         polyline = L.polyline(coords, {{
-            color: '#409eff', weight: 2.5, opacity: 0.8
+            color: '{_ACCENT}', weight: 2.5, opacity: 0.8
         }}).addTo(map);
         map.fitBounds(polyline.getBounds().pad(0.1));
         marker = L.circleMarker(coords[0], {{
@@ -864,7 +868,7 @@ class HtmlReportGenerator:
 /* Base */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC",
+    font-family: """ + FONT_STACK_CSS + """
                  -apple-system, BlinkMacSystemFont, sans-serif;
     background: #f5f6fa;
     color: #333;
@@ -1331,7 +1335,7 @@ body {
     bottom: 20px;
     right: 20px;
     z-index: 1001;
-    background: #409eff;
+    background: """ + _ACCENT + """;
     color: #fff;
     border: none;
     border-radius: 8px;
