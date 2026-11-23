@@ -16,6 +16,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 from arduscope.lib.i18n import t
+from arduscope.lib.suggestions import ParamSuggestion
 from . import AnalysisResult, BaseAnalyzer
 
 
@@ -39,7 +40,7 @@ class GPSAnalyzer(BaseAnalyzer):
     def analyze(self) -> AnalysisResult:
         details = []
         figures = []
-        param_suggestions: list[dict] = []
+        param_suggestions: list[ParamSuggestion] = []
 
         # -----------------------------------------------------------
         # 1. Read GPS data
@@ -266,12 +267,12 @@ class GPSAnalyzer(BaseAnalyzer):
                 and overall_status in ("warning", "critical")):
             gps_auto_switch = self.reader.get_param("GPS_AUTO_SWITCH", 0)
             if gps_auto_switch == 0:
-                param_suggestions.append({
-                    "param": "GPS_AUTO_SWITCH",
-                    "current": 0,
-                    "suggested": 1,
-                    "reason": t("gps.auto_switch_reason"),
-                })
+                param_suggestions.append(ParamSuggestion(
+                    param="GPS_AUTO_SWITCH",
+                    current=0,
+                    suggested=1,
+                    reason=t("gps.auto_switch_reason"),
+                ))
 
         # -----------------------------------------------------------
         # 4. Ground track (Lat vs Lng colored by altitude)

@@ -252,7 +252,7 @@ class TestSignificantPeak:
         result = _analyzer(log.save(tmp_path / "noise.bin")).analyze()
         assert t("notch_tuning.no_peak") in result.details
         assert not [s for s in result.param_suggestions
-                    if s["param"].startswith("INS_HNTCH")]
+                    if s.param.startswith("INS_HNTCH")]
 
 
 class TestAttenuationMeaning:
@@ -378,8 +378,8 @@ class TestFltdAdvice:
 
     @staticmethod
     def _suggested(result, param):
-        return [s["suggested"] for s in result.param_suggestions
-                if s["param"] == param]
+        return [s.suggested for s in result.param_suggestions
+                if s.param == param]
 
     def test_above_half_the_gyro_filter_is_lowered(self, tmp_path):
         result = self._flown(tmp_path, 20, 20)

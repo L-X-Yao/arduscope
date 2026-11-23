@@ -17,11 +17,11 @@ What it checks:
     a flight or a waiver  a row is flown, a log setting, or waived below
     a source or a waiver  a row with source `none` must be waived too
 
-Names are read from the suggestion dicts. A dict with a literal name needs
-nothing else. A dict that takes its name from a variable cannot be read, so
-it must be declared in DYNAMIC_SITES: a new one fails until it says what it
-can produce. `--baseline` runs the same comparison on what a corpus scan
-really suggested, which is how a wrong DYNAMIC_SITES entry gets caught.
+Names are read from suggestion rows. A literal name needs nothing else. A row
+that takes its name from a variable cannot be read, so it must be declared in
+DYNAMIC_SITES: a new one fails until it says what it can produce. `--baseline`
+runs the same comparison on what a corpus scan really suggested, which is how
+a wrong DYNAMIC_SITES entry gets caught.
 
 Usage:
     python3 tools/check_suggestions.py
@@ -52,7 +52,7 @@ RESET = "\033[0m"
 
 STATUSES = ("flown", "not_flown", "log_setting")
 
-# Suggestion dicts that take their name from a variable, as
+# Suggestion rows that take their name from a variable, as
 # "<module>.<function>:<expression>", and what each one can produce.
 DYNAMIC_SITES: dict[str, tuple[str, ...]] = {
     "attitude.analyze:autotune_param": (
@@ -118,7 +118,7 @@ def parse_registry(text: str) -> tuple[list[Row], list[str]]:
 
 
 class _Sites(ast.NodeVisitor):
-    """Suggestion dicts in one module: literal names and variable ones."""
+    """Suggestion rows in one module: literal names and variable ones."""
 
     def __init__(self, module: str):
         self.module = module
@@ -141,6 +141,15 @@ class _Sites(ast.NodeVisitor):
             index = [isinstance(k, ast.Constant) and k.value == "param"
                      for k in node.keys].index(True)
             self._record(node.values[index])
+        self.generic_visit(node)
+
+    def visit_Call(self, node):
+        name = (node.func.id if isinstance(node.func, ast.Name) else
+                node.func.attr if isinstance(node.func, ast.Attribute) else "")
+        if name == "ParamSuggestion":
+            keyword = next((k for k in node.keywords if k.arg == "param"), None)
+            if keyword is not None:
+                self._record(keyword.value)
         self.generic_visit(node)
 
     def _record(self, value: ast.expr) -> None:

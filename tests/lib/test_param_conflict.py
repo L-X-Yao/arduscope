@@ -9,10 +9,11 @@ pytestmark = pytest.mark.fast
 from arduscope.analyzers import AnalysisResult
 from arduscope.lib.param_conflict import detect_param_conflicts
 from arduscope.lib.html_report import HtmlReportGenerator
+from arduscope.lib.suggestions import ParamSuggestion
 from arduscope.lib.vehicle_detect import VehicleInfo
 
 
-def _result(title: str, suggestions: list[dict],
+def _result(title: str, suggestions: list[ParamSuggestion],
             sub_results: list | None = None) -> AnalysisResult:
     return AnalysisResult(
         title=title,
@@ -41,10 +42,10 @@ class TestDetectParamConflicts:
     def test_no_conflicts_different_params(self):
         results = [
             _result("vibration", [
-                {"param": "INS_ACCEL_FILTER", "suggested": 10, "current": 0, "reason": "t"},
+                ParamSuggestion(param="INS_ACCEL_FILTER", suggested=10, current=0, reason="t"),
             ]),
             _result("notch_tuning", [
-                {"param": "INS_HNTCH_FREQ", "suggested": 150, "current": 0, "reason": "t"},
+                ParamSuggestion(param="INS_HNTCH_FREQ", suggested=150, current=0, reason="t"),
             ]),
         ]
         assert detect_param_conflicts(results) == []
@@ -52,10 +53,10 @@ class TestDetectParamConflicts:
     def test_same_param_same_value_no_conflict(self):
         results = [
             _result("vibration", [
-                {"param": "INS_ACCEL_FILTER", "suggested": 10, "current": 0, "reason": "t"},
+                ParamSuggestion(param="INS_ACCEL_FILTER", suggested=10, current=0, reason="t"),
             ]),
             _result("notch_tuning", [
-                {"param": "INS_ACCEL_FILTER", "suggested": 10, "current": 0, "reason": "t"},
+                ParamSuggestion(param="INS_ACCEL_FILTER", suggested=10, current=0, reason="t"),
             ]),
         ]
         assert detect_param_conflicts(results) == []
@@ -63,10 +64,10 @@ class TestDetectParamConflicts:
     def test_same_param_different_values_conflict(self):
         results = [
             _result("vibration", [
-                {"param": "INS_ACCEL_FILTER", "suggested": 10, "current": 0, "reason": "t"},
+                ParamSuggestion(param="INS_ACCEL_FILTER", suggested=10, current=0, reason="t"),
             ]),
             _result("notch_tuning", [
-                {"param": "INS_ACCEL_FILTER", "suggested": 15, "current": 0, "reason": "t"},
+                ParamSuggestion(param="INS_ACCEL_FILTER", suggested=15, current=0, reason="t"),
             ]),
         ]
         conflicts = detect_param_conflicts(results)
@@ -79,12 +80,12 @@ class TestDetectParamConflicts:
     def test_sub_results_included(self):
         """Conflicts in sub_results are detected too."""
         sub = _result("imu0", [
-            {"param": "INS_GYR_CAL", "suggested": 1, "current": 0, "reason": "t"},
+            ParamSuggestion(param="INS_GYR_CAL", suggested=1, current=0, reason="t"),
         ])
         results = [
             _result("imu_consistency", [], sub_results=[sub]),
             _result("vibration", [
-                {"param": "INS_GYR_CAL", "suggested": 0, "current": 0, "reason": "t"},
+                ParamSuggestion(param="INS_GYR_CAL", suggested=0, current=0, reason="t"),
             ]),
         ]
         conflicts = detect_param_conflicts(results)
@@ -112,12 +113,12 @@ class TestConflictRenderedInHtml:
         try:
             results = [
                 _result("vibration", [
-                    {"param": "INS_ACCEL_FILTER", "suggested": 10,
-                     "current": 20, "reason": "lower filter"},
+                    ParamSuggestion(param="INS_ACCEL_FILTER", suggested=10,
+                                current=20, reason="lower filter"),
                 ]),
                 _result("notch_tuning", [
-                    {"param": "INS_ACCEL_FILTER", "suggested": 15,
-                     "current": 20, "reason": "match notch"},
+                    ParamSuggestion(param="INS_ACCEL_FILTER", suggested=15,
+                                current=20, reason="match notch"),
                 ]),
             ]
             conflicts = detect_param_conflicts(results)
@@ -140,8 +141,8 @@ class TestConflictRenderedInHtml:
         try:
             results = [
                 _result("vibration", [
-                    {"param": "INS_ACCEL_FILTER", "suggested": 10,
-                     "current": 20, "reason": "lower filter"},
+                    ParamSuggestion(param="INS_ACCEL_FILTER", suggested=10,
+                                current=20, reason="lower filter"),
                 ]),
             ]
             gen = HtmlReportGenerator(

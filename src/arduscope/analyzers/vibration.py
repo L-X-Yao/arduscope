@@ -19,6 +19,8 @@ from arduscope.lib.fft_helpers import do_fft, find_flight_window, find_peaks
 from arduscope.lib.i18n import t
 from arduscope.lib.series import VIBE_ARMED_FLOOR, armed_rows
 
+from arduscope.lib.suggestions import ParamSuggestion
+
 from . import AnalysisResult, BaseAnalyzer
 
 
@@ -40,7 +42,7 @@ class VibrationAnalyzer(BaseAnalyzer):
     def analyze(self) -> AnalysisResult:
         details = []
         figures = []
-        param_suggestions: list[dict] = []
+        param_suggestions: list[ParamSuggestion] = []
 
         # -----------------------------------------------------------
         # 1. Read VIBE data

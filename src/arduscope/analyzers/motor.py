@@ -19,6 +19,8 @@ import plotly.graph_objects as go
 from arduscope.lib.i18n import t
 from arduscope.lib.outputs import channels_with_function, read_outputs
 
+from arduscope.lib.suggestions import ParamSuggestion
+
 from . import AnalysisResult, BaseAnalyzer
 
 
@@ -41,7 +43,7 @@ class MotorAnalyzer(BaseAnalyzer):
     def analyze(self) -> AnalysisResult:
         details = []
         figures = []
-        param_suggestions: list[dict] = []
+        param_suggestions: list[ParamSuggestion] = []
 
         # -----------------------------------------------------------
         # 1. Determine which outputs are motors
@@ -140,12 +142,12 @@ class MotorAnalyzer(BaseAnalyzer):
                   smin=spin_min_name,
                   val=f"{spin_arm + gap_min:.2f}")
             )
-            param_suggestions.append({
-                "param": spin_min_name,
-                "current": spin_min,
-                "suggested": round(spin_arm + gap_min, 2),
-                "reason": t("motor.spin_gap_reason"),
-            })
+            param_suggestions.append(ParamSuggestion(
+                param=spin_min_name,
+                current=spin_min,
+                suggested=round(spin_arm + gap_min, 2),
+                reason=t("motor.spin_gap_reason"),
+            ))
         else:
             status = "good"
 

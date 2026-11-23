@@ -12,6 +12,8 @@ releases are not published.
 ### Changed
 - Threshold citations now come from a generated source registry checked
   against the convergence-criteria table.
+- Parameter suggestions now use a typed internal representation with
+  unchanged export formats.
 
 ## [0.13.4] - 2026-11-23
 

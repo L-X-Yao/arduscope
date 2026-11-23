@@ -17,6 +17,8 @@ import plotly.graph_objects as go
 
 from arduscope.lib.i18n import t
 
+from arduscope.lib.suggestions import ParamSuggestion
+
 from . import AnalysisResult, BaseAnalyzer
 
 # Device types the driver runs at +/-4000 deg/s: ICM45686 and IIM42653
@@ -50,7 +52,7 @@ class GyroSaturationAnalyzer(BaseAnalyzer):
     def analyze(self) -> AnalysisResult:
         details = []
         figures = []
-        param_suggestions: list[dict] = []
+        param_suggestions: list[ParamSuggestion] = []
 
         # -----------------------------------------------------------
         # 1. Read IMU gyro data

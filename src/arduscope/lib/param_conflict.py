@@ -8,6 +8,7 @@ users need a heads-up so they can make an informed decision.
 from __future__ import annotations
 
 from .results import AnalysisResult
+from .suggestions import ParamSuggestion
 
 
 def detect_param_conflicts(results: list[AnalysisResult]) -> list[dict]:
@@ -58,8 +59,8 @@ def merge_suggestions(
             rows += [(f"{r.title}/{sub.title}", s)
                      for s in sub.param_suggestions]
         for source, s in rows:
-            if s["param"] not in conflicted:
-                merged.setdefault(s["param"], {**s, "source": source})
+            if s.param not in conflicted:
+                merged.setdefault(s.param, {**s.to_dict(), "source": source})
     return list(merged.values()), conflicts
 
 
@@ -72,13 +73,11 @@ def distinct_values(conflict: dict) -> list[dict]:
 
 
 def _collect(by_param: dict[str, list[dict]], source: str,
-             suggestions: list[dict]) -> None:
+             suggestions: list[ParamSuggestion]) -> None:
     for s in suggestions:
-        param = s.get("param", "")
-        if not param:
+        if not s.param:
             continue
-        value = s.get("suggested", s.get("value", ""))
-        by_param.setdefault(param, []).append({
+        by_param.setdefault(s.param, []).append({
             "source": source,
-            "value": value,
+            "value": s.suggested,
         })

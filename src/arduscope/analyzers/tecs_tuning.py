@@ -28,6 +28,7 @@ from arduscope.lib.i18n import t as _t
 from arduscope.lib.plane_phase import (
     FLIGHT_STAGE_NORMAL, MIN_FIXED_WING_S, covered_seconds, stat_at,
     vtol_windows_mask)
+from arduscope.lib.suggestions import ParamSuggestion
 from . import AnalysisResult, BaseAnalyzer
 
 
@@ -178,12 +179,12 @@ class TECSTuningAnalyzer(BaseAnalyzer):
                 details.append(_t("tecs_tuning.no_airspeed"))
             elif tecs_spdweight >= 0:
                 suggested_wt = round(min(max(tecs_spdweight + 0.5, 0.0), 2.0), 1)
-                suggestions.append({
-                    "param": "TECS_SPDWEIGHT",
-                    "current": float(tecs_spdweight),
-                    "suggested": suggested_wt,
-                    "reason": _t("tecs_tuning.reason_spdweight"),
-                })
+                suggestions.append(ParamSuggestion(
+                    param="TECS_SPDWEIGHT",
+                    current=float(tecs_spdweight),
+                    suggested=suggested_wt,
+                    reason=_t("tecs_tuning.reason_spdweight"),
+                ))
 
         # Figure 1: Desired vs actual height
         fig_height = self.make_figure(

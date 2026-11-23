@@ -15,6 +15,7 @@ import pytest
 
 pytestmark = pytest.mark.fast
 
+from arduscope.lib.suggestions import ParamSuggestion
 from arduscope.analyzers import (
     AnalysisResult,
     derive_default_action_level,
@@ -353,11 +354,8 @@ class TestThresholdsHaveAuthoritativeSources:
 # param_suggestions: analyzers that set apply_param must produce them
 # ====================================================================
 class TestParamSuggestionShape:
-    """The {param, current, suggested, reason} structure is enforced
-    mechanically by AnalysisResult.__post_init__ — every analyzer that
-    constructs a result passes through it. (The old tests grepped each
-    module's SOURCE for the word "param_suggestions", which asserted
-    nothing about the data.)"""
+    """ParamSuggestion and AnalysisResult enforce the typed row on every
+    analyzer result."""
 
     def _mk(self, sugg):
         return AnalysisResult(
@@ -366,20 +364,20 @@ class TestParamSuggestionShape:
             param_suggestions=[sugg])
 
     def test_well_formed_accepted(self):
-        r = self._mk({"param": "MOT_SPIN_MIN", "current": 0.0,
-                      "suggested": 0.12, "reason": "r"})
+        r = self._mk(ParamSuggestion(
+            param="MOT_SPIN_MIN", current=0.0, suggested=0.12, reason="r"))
         assert r.param_suggestions
 
     @pytest.mark.parametrize("bad", [
-        {"current": 1, "suggested": 2, "reason": "r"},           # no param
+        {"current": 1, "suggested": 2, "reason": "r"},
         {"param": "", "current": 1, "suggested": 2, "reason": "r"},
-        {"param": "P", "suggested": 2, "reason": "r"},           # no current
-        {"param": "P", "current": 1, "reason": "r"},             # no suggested
-        {"param": "P", "current": 1, "suggested": 2},            # no reason
-        "MOT_SPIN_MIN=0.12",                                     # not a dict
+        {"param": "P", "suggested": 2, "reason": "r"},
+        {"param": "P", "current": 1, "reason": "r"},
+        {"param": "P", "current": 1, "suggested": 2},
+        "MOT_SPIN_MIN=0.12",
     ])
-    def test_malformed_rejected(self, bad):
-        with pytest.raises(AssertionError):
+    def test_untyped_rows_rejected(self, bad):
+        with pytest.raises(TypeError, match="ParamSuggestion"):
             self._mk(bad)
 
 

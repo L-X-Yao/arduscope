@@ -570,7 +570,7 @@ class TestServoDither:
             reader, _thresholds(reader), _vehicle()).analyze()
         assert result.status in ("warning", "critical")
         motor_suggestions = [s for s in result.param_suggestions
-                             if s["param"] == "MOT_SPIN_MIN"]
+                             if s.param == "MOT_SPIN_MIN"]
         assert len(motor_suggestions) == 0
 
     def test_empty_rcou(self):

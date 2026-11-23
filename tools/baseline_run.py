@@ -71,6 +71,7 @@ from arduscope.lib.log_reader import LogReader  # noqa: E402
 from arduscope.lib.thresholds import Thresholds  # noqa: E402
 from arduscope.lib.vehicle_detect import detect_vehicle  # noqa: E402
 from arduscope.lib.pipeline import _get_preload_types  # noqa: E402
+from arduscope.lib.suggestions import ParamSuggestion  # noqa: E402
 from arduscope.analyzers import AnalysisResult, discover_analyzers  # noqa: E402
 
 
@@ -132,7 +133,7 @@ def _analyze_one(logfile: str, registry, disk_cache: bool = False) -> dict:
                 "summary": (result.summary or "")[:200],
                 "n_param_suggestions": len(result.param_suggestions or []),
                 "suggestions": sorted(
-                    f"{p['param']}={p['suggested']}"
+                    f"{p.param}={p.suggested}"
                     for p in _all_suggestions(result)),
                 # POSITIONING contract: the pipeline keeps such a result
                 # and flags it, so this is where the bug surfaces.
@@ -152,7 +153,7 @@ def _analyze_one(logfile: str, registry, disk_cache: bool = False) -> dict:
     return out
 
 
-def _all_suggestions(result: AnalysisResult) -> list[dict]:
+def _all_suggestions(result: AnalysisResult) -> list[ParamSuggestion]:
     """Suggestions that reach the .param file: parent and sub-results."""
     found = list(result.param_suggestions or [])
     for sub in result.sub_results or []:

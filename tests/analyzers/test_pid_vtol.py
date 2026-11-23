@@ -182,7 +182,7 @@ class TestPlaneVtolExclusion:
         plane = _sub(r, "固定翼相")
         assert plane is not None
         assert plane.status == "info"
-        assert not any(s["param"].startswith("RLL_")
+        assert not any(s.param.startswith("RLL_")
                        for s in r.param_suggestions)
 
     def test_plane_axis_mode_fallback_excludes_q_modes(self):

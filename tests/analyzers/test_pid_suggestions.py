@@ -55,7 +55,7 @@ def test_no_gain_change_from_the_ratio(name, act):
     axis = result.sub_results[0]
     assert any("ATC_RAT_RLL_P" in d for d in axis.details), name
     assert not [s for s in result.param_suggestions
-                if s["param"].endswith(("_P", "_FF"))]
+                if s.param.endswith(("_P", "_FF"))]
 
 
 def test_poor_tracking_points_to_autotune():
@@ -134,7 +134,7 @@ class TestDTermGate:
 
     def _suggested(self, *messages) -> list:
         merged = {k: v for m in messages for k, v in m.items()}
-        return [s["param"] for s in _run(merged, GAINS).param_suggestions]
+        return [s.param for s in _run(merged, GAINS).param_suggestions]
 
     def test_share_alone_changes_nothing(self):
         assert "ATC_RAT_RLL_D" not in self._suggested(
@@ -150,7 +150,7 @@ class TestDTermGate:
     def test_fltd_gets_a_pointer_with_no_value(self):
         merged = {**self._noisy_d(), **self._rate(0.12)}
         result = _run(merged, {**GAINS, "ATC_RAT_RLL_FLTD": 30.0})
-        names = [s["param"] for s in result.param_suggestions]
+        names = [s.param for s in result.param_suggestions]
         assert "ATC_RAT_RLL_D" in names  # the gate was open
         assert "ATC_RAT_RLL_FLTD" not in names
         pointer = t("pid_tuning.suggest_fltd_reduce",
@@ -233,23 +233,23 @@ class TestPlaneDTermGate:
         result = self._run_plane(message)
 
         suggestion = next(s for s in result.param_suggestions
-                          if s["param"] == param)
-        assert suggestion["current"] == 0.01
-        assert suggestion["suggested"] == 0.008
+                          if s.param == param)
+        assert suggestion.current == 0.01
+        assert suggestion.suggested == 0.008
 
     def test_warning_d_noise_gets_the_smaller_step(self):
         result = self._run_plane("PIDR", warning_noise=True)
 
         suggestion = next(s for s in result.param_suggestions
-                          if s["param"] == "RLL_RATE_D")
-        assert suggestion["suggested"] == 0.009
+                          if s.param == "RLL_RATE_D")
+        assert suggestion.suggested == 0.009
 
     @pytest.mark.parametrize("message,param", CASES)
     def test_high_d_noise_without_oscillation_changes_nothing(
             self, message, param):
         result = self._run_plane(message, oscillating=False)
 
-        assert param not in [s["param"] for s in result.param_suggestions]
+        assert param not in [s.param for s in result.param_suggestions]
 
     def test_bias_with_subthreshold_crossings_changes_nothing(self):
         pid = self._pid(oscillating=False)
@@ -266,19 +266,19 @@ class TestPlaneDTermGate:
 
         assert len(result.sub_results) == 3  # all three axes ran
         assert not {"RLL_RATE_D", "PTCH_RATE_D", "YAW_RATE_D"} & {
-            s["param"] for s in result.param_suggestions}
+            s.param for s in result.param_suggestions}
 
     @pytest.mark.parametrize("message,param", CASES)
     def test_quiet_d_with_oscillation_changes_nothing(self, message, param):
         result = self._run_plane(message, quiet=True)
 
-        assert param not in [s["param"] for s in result.param_suggestions]
+        assert param not in [s.param for s in result.param_suggestions]
 
     def test_copter_crossings_do_not_replace_the_rate_gate(self):
         result = _run({"PIDR": self._pid()}, GAINS)
 
         assert "ATC_RAT_RLL_D" not in [
-            s["param"] for s in result.param_suggestions]
+            s.param for s in result.param_suggestions]
 
     def test_vtol_crossings_do_not_replace_the_rate_gate(self):
         gains = {"Q_A_RAT_RLL_P": 0.2, "Q_A_RAT_RLL_I": 0.2,
@@ -287,7 +287,7 @@ class TestPlaneDTermGate:
                       vehicle_type="ArduPlane", quadplane=True)
 
         assert "Q_A_RAT_RLL_D" not in [
-            s["param"] for s in result.param_suggestions]
+            s.param for s in result.param_suggestions]
 
 
 def test_small_absolute_error_gets_no_advice():

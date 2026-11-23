@@ -17,6 +17,8 @@ import plotly.graph_objects as go
 
 from arduscope.lib.i18n import t
 
+from arduscope.lib.suggestions import ParamSuggestion
+
 from . import AnalysisResult, BaseAnalyzer
 
 # AC_ATTITUDE_THRUST_ERROR_ANGLE in ArduPilot's AC_AttitudeControl.h: the
@@ -346,23 +348,23 @@ class AttitudeAnalyzer(BaseAnalyzer):
             plain_summary = t("attitude.critical_plain")
             action_text = t("attitude.critical_action", pid_info=pid_info)
             if autotune_axes not in (7, 0):
-                suggestions.append({
-                    "param": autotune_param,
-                    "current": int(autotune_axes),
-                    "suggested": 7,
-                    "reason": t("attitude.autotune_axes_reason"),
-                })
+                suggestions.append(ParamSuggestion(
+                    param=autotune_param,
+                    current=int(autotune_axes),
+                    suggested=7,
+                    reason=t("attitude.autotune_axes_reason"),
+                ))
             action_level = "apply_param" if suggestions else "run_autotune"
         elif status == "warning":
             plain_summary = t("attitude.warn_plain")
             action_text = t("attitude.warn_action", pid_info=pid_info)
             if autotune_axes not in (7, 0):
-                suggestions.append({
-                    "param": autotune_param,
-                    "current": int(autotune_axes),
-                    "suggested": 7,
-                    "reason": t("attitude.autotune_axes_reason"),
-                })
+                suggestions.append(ParamSuggestion(
+                    param=autotune_param,
+                    current=int(autotune_axes),
+                    suggested=7,
+                    reason=t("attitude.autotune_axes_reason"),
+                ))
             action_level = "apply_param" if suggestions else "run_autotune"
         else:
             action_level = "ok"

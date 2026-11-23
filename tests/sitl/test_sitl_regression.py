@@ -195,7 +195,7 @@ class TestSitlPipeline:
         if not wanted:
             pytest.skip("No suggestion expectations")
         result = _run_pipeline(scenario["_log_path"])
-        suggested = {s["param"] for r in result.results_by_key.values()
+        suggested = {s.param for r in result.results_by_key.values()
                      for s in r.param_suggestions}
         missing = set(wanted) - suggested
         assert not missing, f"Missing {missing}, got {sorted(suggested)}"
@@ -212,7 +212,7 @@ class TestSitlPipeline:
         if not equal and not between:
             pytest.skip("No suggestion value expectations")
         result = _run_pipeline(scenario["_log_path"])
-        suggested = {s["param"]: s["suggested"]
+        suggested = {s.param: s.suggested
                      for r in result.results_by_key.values()
                      for s in r.param_suggestions}
         assert {name: suggested.get(name) for name in equal} == equal
@@ -234,7 +234,7 @@ class TestSitlPipeline:
         if not excluded:
             pytest.skip("No suggestion exclusion expectations")
         result = _run_pipeline(scenario["_log_path"])
-        suggested = {s["param"] for r in result.results_by_key.values()
+        suggested = {s.param for r in result.results_by_key.values()
                      for s in r.param_suggestions}
         present = set(excluded) & suggested
         assert not present, \

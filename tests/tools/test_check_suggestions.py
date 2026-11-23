@@ -15,6 +15,7 @@ import pytest
 
 sys.path.insert(0, str(TOOLS_DIR))
 
+import check_params as cp  # noqa: E402
 import check_suggestions as cs  # noqa: E402
 
 pytestmark = pytest.mark.fast
@@ -109,6 +110,39 @@ def f(recs):
         recs.append({"param": param, "old": old, "new": new})
 """)
         assert names == {"A_B", "C_D", "E_F"} and not dynamic
+
+    def test_typed_literal_name(self):
+        names, dynamic = cs.scan_source("mod", """
+def f():
+    return ParamSuggestion(
+        param="A_B", current=0, suggested=1, reason="test")
+""")
+        assert names == {"A_B"} and not dynamic
+
+    def test_typed_variable_name_is_a_dynamic_site(self):
+        names, dynamic = cs.scan_source("mod", """
+class X:
+    def f(self):
+        return ParamSuggestion(param=name, current=0, suggested=1, reason="")
+""")
+        assert not names and dynamic == {"mod.f:name"}
+
+    def test_typed_copying_another_recommendation_is_not_a_site(self):
+        names, dynamic = cs.scan_source("mod", """
+def f(r):
+    return ParamSuggestion(param=r["param"], current="", suggested=1, reason="")
+""")
+        assert not names and not dynamic
+
+
+class TestParamNamePattern:
+    def test_typed_suggestion_matches_across_lines(self):
+        assert cp._SUGGESTION.findall(
+            'ParamSuggestion(\n    param="A_B",\n    suggested=1)') == ["A_B"]
+
+    def test_dict_suggestion_still_matches(self):
+        assert cp._SUGGESTION.findall('{"param": "A_B", "suggested": 1}') == [
+            "A_B"]
 
 
 class TestRows:

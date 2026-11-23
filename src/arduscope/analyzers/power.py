@@ -17,6 +17,7 @@ import plotly.graph_objects as go
 
 from arduscope.lib.battery_packs import Pack, read_packs, sum_over_packs
 from arduscope.lib.i18n import t
+from arduscope.lib.suggestions import ParamSuggestion
 from . import AnalysisResult, BaseAnalyzer
 
 
@@ -277,7 +278,7 @@ class PowerAnalyzer(BaseAnalyzer):
         # -----------------------------------------------------------
         summary = t("power.summary", total_wh=f"{total_wh:.1f}", mean_power=f"{mean_power:.0f}")
 
-        suggestions = []
+        suggestions: list[ParamSuggestion] = []
         if status == "critical":
             action_level = "safety_stop"
             plain_summary = t("power.plain_critical")

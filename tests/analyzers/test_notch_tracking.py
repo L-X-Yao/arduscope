@@ -494,7 +494,7 @@ class TestHoverIsMeasuredInTheAir:
         """Hover tests are flown as low as 1.7 m."""
         result = self._analyze(_hover_reader(throttle=0.34, height=1.7))
 
-        suggested = {s["param"]: s["suggested"]
+        suggested = {s.param: s.suggested
                      for s in result.param_suggestions}
         assert suggested["INS_HNTCH_REF"] == 0.34
         assert suggested["INS_HNTCH_FREQ"] == pytest.approx(138.0, abs=2.0)
@@ -504,7 +504,7 @@ class TestHoverIsMeasuredInTheAir:
         result = self._analyze(_hover_reader(throttle=0.60, height=10.0))
 
         assert result.status == "critical"
-        assert {s["param"]: s["suggested"] for s in result.param_suggestions
+        assert {s.param: s.suggested for s in result.param_suggestions
                 }["MOT_THST_HOVER"] == 0.6
 
     @pytest.mark.parametrize("climb, roll", [(2.0, 0.0), (0.0, 20.0)])
@@ -586,7 +586,7 @@ class TestWholeFlight:
         result = _analyze(_flight_log(
             tmp_path, esc_hz=lambda secs: 120.0 + secs))
 
-        suggested = {s["param"]: s["suggested"]
+        suggested = {s.param: s.suggested
                      for s in result.param_suggestions}
         assert suggested["INS_HNTCH_ENABLE"] == 1.0
         assert suggested["INS_HNTCH_MODE"] == 3.0
@@ -599,7 +599,7 @@ class TestWholeFlight:
     def test_flight_without_esc_gets_throttle_tracking(self, tmp_path):
         result = _analyze(_flight_log(tmp_path))
 
-        suggested = {s["param"]: s["suggested"]
+        suggested = {s.param: s.suggested
                      for s in result.param_suggestions}
         assert suggested["INS_HNTCH_MODE"] == 1.0
         assert suggested["INS_HNTCH_REF"] == 0.35
@@ -618,7 +618,7 @@ class TestWholeFlight:
                    in result.details for freq in ("138", "139")
                    )  # precondition: there is a peak to act on
         assert [s for s in result.param_suggestions
-                if s["param"].startswith("INS_HNT")] == []
+                if s.param.startswith("INS_HNT")] == []
         assert t("notch_tuning.no_notch_source") in result.details
         assert result.summary == t("notch_tuning.summary_no_source")
         assert result.status == "info"

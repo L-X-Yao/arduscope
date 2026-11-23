@@ -73,7 +73,9 @@ LEGACY_PARAMS = {
 }
 
 _GET_PARAM = re.compile(r'get_param\(\s*"([A-Z][A-Z0-9_]*)"')
-_SUGGESTION = re.compile(r'"param"\s*:\s*"([A-Z][A-Z0-9_]*)"')
+_SUGGESTION = re.compile(
+    r'(?:"param"\s*:\s*|ParamSuggestion\s*\(\s*param\s*=\s*)'
+    r'"([A-Z][A-Z0-9_]*)"')
 # Prose token: at least one underscore, so plain words are not candidates.
 _PROSE = re.compile(r'\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\b')
 
@@ -131,10 +133,13 @@ def collect() -> dict[str, list[tuple[str, int]]]:
     for path in _code_files():
         rel = os.path.relpath(path, REPO_ROOT)
         with open(path, encoding="utf-8") as fh:
-            for lineno, text in enumerate(fh, 1):
-                for pattern in (_GET_PARAM, _SUGGESTION):
-                    for name in pattern.findall(text):
-                        add(name, rel, lineno)
+            text = fh.read()
+        for lineno, line in enumerate(text.splitlines(), 1):
+            for match in _GET_PARAM.finditer(line):
+                add(match.group(1), rel, lineno)
+        for match in _SUGGESTION.finditer(text):
+            lineno = text.count("\n", 0, match.start(1)) + 1
+            add(match.group(1), rel, lineno)
 
     for rel in LOCALE_FILES:
         path = os.path.join(REPO_ROOT, rel)

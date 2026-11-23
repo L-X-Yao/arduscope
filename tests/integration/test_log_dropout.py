@@ -93,7 +93,7 @@ class TestLogReplay:
         r = _run({"PM": _pm_healthy(), "DSF": _dsf(0), "RFRH": _rfrh()},
                  params={"LOG_REPLAY": 1})
         assert r.status == "good"          # healthy log, debug flag on
-        assert any(s["param"] == "LOG_REPLAY" and s["suggested"] == 0
+        assert any(s.param == "LOG_REPLAY" and s.suggested == 0
                    for s in r.param_suggestions)
         assert r.action_level == "apply_param"
 
@@ -112,5 +112,5 @@ class TestLogReplay:
                   "RFRH": _rfrh()},
                  params={"LOG_REPLAY": 1})
         assert r.status == "warning"
-        assert any(s["param"] == "LOG_REPLAY" for s in r.param_suggestions)
+        assert any(s.param == "LOG_REPLAY" for s in r.param_suggestions)
         assert r.action_level == "apply_param"

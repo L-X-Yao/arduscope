@@ -11,6 +11,7 @@ from arduscope.lib.agent.config import AgentConfig
 from arduscope.lib.agent.tools import MAX_RESULT_BYTES, ToolBox, _json_size
 from arduscope.lib.pipeline import PipelineResult
 from arduscope.lib.results import AnalysisResult
+from arduscope.lib.suggestions import ParamSuggestion
 from arduscope.lib.threshold_sources import THRESHOLD_SOURCES
 from arduscope.lib.thresholds import Thresholds
 from arduscope.lib.vehicle_detect import VehicleInfo
@@ -68,6 +69,19 @@ def test_list_and_get_result():
 
     missing = box.call("get_result", {"key": "nope"})
     assert "error" in missing
+
+
+def test_get_result_serializes_typed_suggestions():
+    suggestion = ParamSuggestion(
+        param="MOT_SPIN_MIN", current=0.15, suggested=0.13, reason="gap")
+    pipeline = _pipeline(results={
+        "motor": AnalysisResult(title="Motor", status="good", summary="test",
+                                param_suggestions=[suggestion]),
+    })
+    payload = ToolBox(pipeline, AgentConfig(
+        provider="openai", model="m", api_key="k")).call(
+            "get_result", {"key": "motor"})
+    assert payload["param_suggestions"] == [suggestion.to_dict()]
 
 
 def test_gps_fields_are_stripped_by_default():

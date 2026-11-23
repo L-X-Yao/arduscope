@@ -21,6 +21,8 @@ import plotly.graph_objects as go
 from arduscope.lib.hover import airborne, hover_thrust
 from arduscope.lib.i18n import t
 
+from arduscope.lib.suggestions import ParamSuggestion
+
 from . import AnalysisResult, BaseAnalyzer
 
 
@@ -209,12 +211,12 @@ class NotchTuningAnalyzer(BaseAnalyzer):
         suggestions = []
         for r in recommendations:
             if r.get("new") not in (None, "-", ""):
-                suggestions.append({
-                    "param": r["param"],
-                    "current": _to_num(r.get("old", "")),
-                    "suggested": _to_num(r["new"]),
-                    "reason": r.get("reason", ""),
-                })
+                suggestions.append(ParamSuggestion(
+                    param=r["param"],
+                    current=_to_num(r.get("old", "")),
+                    suggested=_to_num(r["new"]),
+                    reason=r.get("reason", ""),
+                ))
 
         # Evidence source
         if status in ("warning", "critical"):

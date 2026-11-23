@@ -272,7 +272,7 @@ class ToolBox:
             "summary": result.summary,
             "details": details,
             "evidence": result.evidence,
-            "param_suggestions": result.param_suggestions,
+            "param_suggestions": [s.to_dict() for s in result.param_suggestions],
             "evidence_source": result.evidence_source,
             "confidence": result.confidence,
             "action_level": result.action_level,

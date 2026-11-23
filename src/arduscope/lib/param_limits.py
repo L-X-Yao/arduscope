@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import numbers
 import re
+from dataclasses import replace
+
+from .suggestions import ParamSuggestion
 
 _RANGES = [
     # libraries/Filter/HarmonicNotchFilter.cpp
@@ -51,7 +54,8 @@ def param_range(name: str) -> tuple[float, float] | None:
     return None
 
 
-def limit_suggestions(suggestions: list[dict]) -> list[dict]:
+def limit_suggestions(
+        suggestions: list[ParamSuggestion]) -> list[ParamSuggestion]:
     """Keep every suggestion inside the parameter's documented range.
 
     A value past the limit is pulled back to it. If the current value is
@@ -61,9 +65,9 @@ def limit_suggestions(suggestions: list[dict]) -> list[dict]:
     """
     kept = []
     for suggestion in suggestions:
-        limits = param_range(suggestion["param"])
-        value = suggestion["suggested"]
-        current = suggestion["current"]
+        limits = param_range(suggestion.param)
+        value = suggestion.suggested
+        current = suggestion.current
         # numbers.Real, not (int, float): numpy's float32 and int64 are
         # neither, and a value of those types went through unchecked.
         if limits is None or not isinstance(value, numbers.Real):
@@ -74,5 +78,6 @@ def limit_suggestions(suggestions: list[dict]) -> list[dict]:
             kept.append(suggestion)
         elif (isinstance(current, numbers.Real) and low <= current <= high
               and min(max(value, low), high) != current):
-            kept.append({**suggestion, "suggested": min(max(value, low), high)})
+            kept.append(replace(
+                suggestion, suggested=min(max(value, low), high)))
     return kept

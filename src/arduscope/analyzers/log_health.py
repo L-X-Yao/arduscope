@@ -16,6 +16,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 from arduscope.lib.i18n import t
+from arduscope.lib.suggestions import ParamSuggestion
 from . import AnalysisResult, BaseAnalyzer
 
 
@@ -302,12 +303,12 @@ class LogHealthAnalyzer(BaseAnalyzer):
             details.append(t("log_health.replay_detected"))
             log_replay = self.reader.get_param("LOG_REPLAY", 0)
             if log_replay >= 1:
-                replay_suggestion = {
-                    "param": "LOG_REPLAY",
-                    "current": int(log_replay),
-                    "suggested": 0,
-                    "reason": t("log_health.replay_suggest_reason"),
-                }
+                replay_suggestion = ParamSuggestion(
+                    param="LOG_REPLAY",
+                    current=int(log_replay),
+                    suggested=0,
+                    reason=t("log_health.replay_suggest_reason"),
+                )
 
         # -----------------------------------------------------------
         # 9. Abrupt log end while armed (power interruption forensics)
@@ -381,12 +382,12 @@ class LogHealthAnalyzer(BaseAnalyzer):
                              is not None else t("log_health.vehicle_default")),
             )
             if logs_above_default:
-                suggestions.append({
-                    "param": "LOG_BITMASK",
-                    "current": int(log_bitmask),
-                    "suggested": recommended_bitmask,
-                    "reason": t("log_health.suggest_reason"),
-                })
+                suggestions.append(ParamSuggestion(
+                    param="LOG_BITMASK",
+                    current=int(log_bitmask),
+                    suggested=recommended_bitmask,
+                    reason=t("log_health.suggest_reason"),
+                ))
             if replay_suggestion is not None:
                 suggestions.append(replay_suggestion)
         elif overall_status == "warning":
@@ -397,12 +398,12 @@ class LogHealthAnalyzer(BaseAnalyzer):
                 bitmask_info=bitmask_info,
             )
             if logs_above_default:
-                suggestions.append({
-                    "param": "LOG_BITMASK",
-                    "current": int(log_bitmask),
-                    "suggested": recommended_bitmask,
-                    "reason": t("log_health.suggest_reason"),
-                })
+                suggestions.append(ParamSuggestion(
+                    param="LOG_BITMASK",
+                    current=int(log_bitmask),
+                    suggested=recommended_bitmask,
+                    reason=t("log_health.suggest_reason"),
+                ))
             if replay_suggestion is not None:
                 suggestions.append(replay_suggestion)
         elif replay_suggestion is not None:

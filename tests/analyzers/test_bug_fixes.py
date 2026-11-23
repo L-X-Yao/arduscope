@@ -405,7 +405,7 @@ class TestPidGroundTestEarlyReturn:
         # the cur*1.12 suggestion is a 0->0 no-op and gets dropped.
         # The BUGGY truthiness fallback would have emitted an
         # ATC_RAT_RLL_P suggestion from the bait value.
-        assert not any(s["param"].startswith("ATC_")
+        assert not any(s.param.startswith("ATC_")
                        for s in result.param_suggestions)
 
     def test_sub_action_level_checks_suggestions_before_good(self):

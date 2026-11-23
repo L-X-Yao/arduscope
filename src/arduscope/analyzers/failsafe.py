@@ -24,6 +24,7 @@ from arduscope.lib.ekf_failsafe import (
 from arduscope.lib.ekf_lanes import primary_lane_rows
 from arduscope.lib.i18n import t
 from arduscope.lib.np_helpers import safe_nanmax
+from arduscope.lib.suggestions import ParamSuggestion
 from . import AnalysisResult, BaseAnalyzer
 
 
@@ -462,7 +463,7 @@ class FailsafeAnalyzer(BaseAnalyzer):
 
         fs_ekf = self.reader.get_param("FS_EKF_THRESH", 0.8)
 
-        suggestions: list[dict] = []
+        suggestions: list[ParamSuggestion] = []
         if overall == "critical":
             summary = t("failsafe.summary_critical")
             plain_summary = t("failsafe.plain_critical")

@@ -292,10 +292,10 @@ class TestBatch4PidLogic:
         res = PIDTuningAnalyzer(reader, Thresholds(), _vehicle()).analyze()
         # Invariant: a constant I-term is not windup, and no no-op 0->0
         # suggestion survives (for ATC_RAT_RLL_I or any param).
-        assert not any(s["param"] == "ATC_RAT_RLL_I"
+        assert not any(s.param == "ATC_RAT_RLL_I"
                        for s in res.param_suggestions)
-        assert all(round(float(s["suggested"]), 6)
-                   != round(float(s["current"]), 6)
+        assert all(round(float(s.suggested), 6)
+                   != round(float(s.current), 6)
                    for s in res.param_suggestions)
 
     def test_tracking_gate_live_in_degs(self):

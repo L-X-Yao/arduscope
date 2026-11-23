@@ -17,6 +17,8 @@ import plotly.graph_objects as go
 
 from arduscope.lib.i18n import t
 
+from arduscope.lib.suggestions import ParamSuggestion
+
 from . import AnalysisResult, BaseAnalyzer
 
 
@@ -39,7 +41,7 @@ class AirspeedAnalyzer(BaseAnalyzer):
     def analyze(self) -> AnalysisResult:
         details = []
         figures = []
-        param_suggestions: list[dict] = []
+        param_suggestions: list[ParamSuggestion] = []
 
         # -----------------------------------------------------------
         # 1. Read ARSP data
@@ -244,12 +246,12 @@ class AirspeedAnalyzer(BaseAnalyzer):
                         # measure when persistent disagreement is critical.
                         arspd_use = self.reader.get_param("ARSPD_USE", 1)
                         if arspd_use == 1:
-                            param_suggestions.append({
-                                "param": "ARSPD_USE",
-                                "current": 1,
-                                "suggested": 0,
-                                "reason": t("airspeed.arspd_use_reason"),
-                            })
+                            param_suggestions.append(ParamSuggestion(
+                                param="ARSPD_USE",
+                                current=1,
+                                suggested=0,
+                                reason=t("airspeed.arspd_use_reason"),
+                            ))
                     elif (abs(mean_signed) > th.airspeed_gps_diff_warn
                             or frac_over_5 > th.airspeed_gps_frac_warn):
                         status = self.worst_status(status, "warning")

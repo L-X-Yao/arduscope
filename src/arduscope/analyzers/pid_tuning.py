@@ -27,6 +27,8 @@ from arduscope.lib.i18n import t
 from arduscope.lib.plane_phase import (
     MIN_FIXED_WING_S, covered_seconds, stat_at, vtol_windows_mask)
 
+from arduscope.lib.suggestions import ParamSuggestion
+
 from . import AnalysisResult, BaseAnalyzer
 
 
@@ -218,7 +220,7 @@ class PIDTuningAnalyzer(BaseAnalyzer):
                      axes=", ".join(axis_summaries))
 
         # Aggregate param_suggestions from all sub-results
-        all_param_suggestions: list[dict] = []
+        all_param_suggestions: list[ParamSuggestion] = []
         for r in sub_results:
             all_param_suggestions.extend(r.param_suggestions)
 
@@ -228,8 +230,8 @@ class PIDTuningAnalyzer(BaseAnalyzer):
         # export with meaningless rows.
         all_param_suggestions = [
             s for s in all_param_suggestions
-            if round(float(s.get("suggested", 0)), 6)
-            != round(float(s.get("current", 0)), 6)
+            if round(float(s.suggested), 6)
+            != round(float(s.current), 6)
         ]
 
         if overall_status in ("critical", "warning"):
@@ -367,7 +369,7 @@ class PIDTuningAnalyzer(BaseAnalyzer):
         figures = []
         status = "good"
         suggestions: list[str] = []
-        param_suggestions: list[dict] = []
+        param_suggestions: list[ParamSuggestion] = []
 
         # ------------------------------------------------------------------
         # PRIMARY PID quality metric: RATE.*out RMS (METHODIC tuning guide)
@@ -790,12 +792,12 @@ class PIDTuningAnalyzer(BaseAnalyzer):
                       label=label, new=f"{new_d:.4f}",
                       pct=f"{round((1 - reduce_pct) * 100)}")
                 )
-                param_suggestions.append({
-                    "param": d_name,
-                    "current": cur_d,
-                    "suggested": new_d,
-                    "reason": t("pid_tuning.reason_d_noise"),
-                })
+                param_suggestions.append(ParamSuggestion(
+                    param=d_name,
+                    current=cur_d,
+                    suggested=new_d,
+                    reason=t("pid_tuning.reason_d_noise"),
+                ))
             elif d_name:
                 suggestions.append(
                     t("pid_tuning.suggest_d_reduce_generic",

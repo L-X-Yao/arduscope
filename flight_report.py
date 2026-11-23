@@ -102,7 +102,7 @@ def _json_entry(r: AnalysisResult) -> dict:
         "action_text": r.action_text,
     }
     if r.param_suggestions:
-        entry["param_suggestions"] = r.param_suggestions
+        entry["param_suggestions"] = [s.to_dict() for s in r.param_suggestions]
     if r.sub_results:
         entry["sub_results"] = [_json_entry(sub) for sub in r.sub_results]
     return entry
@@ -150,7 +150,7 @@ def _csv_row(r: AnalysisResult, title: str) -> list[str]:
         title, r.status, r.summary,
         " | ".join(_strip_html(d) for d in r.details),
         r.evidence_source, r.action_level,
-        " | ".join(f"{s['param']}={s['suggested']}"
+        " | ".join(f"{s.param}={s.suggested}"
                    for s in r.param_suggestions),
     ]
 

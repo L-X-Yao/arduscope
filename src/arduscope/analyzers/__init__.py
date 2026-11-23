@@ -35,6 +35,7 @@ from arduscope.lib.results import (  # noqa: F401 — re-export
     derive_default_action_level,
     worst_action_level,
 )
+from arduscope.lib.suggestions import ParamSuggestion
 from arduscope.lib.thresholds import Thresholds
 from arduscope.lib.vehicle_detect import VehicleInfo
 
@@ -107,7 +108,7 @@ class BaseAnalyzer:
                     plain_summary: str = "",
                     evidence: Optional[list[dict]] = None,
                     evidence_source: str = "",
-                    param_suggestions: Optional[list[dict]] = None,
+                    param_suggestions: Optional[list[ParamSuggestion]] = None,
                     ) -> AnalysisResult:
         """
         Convenience factory for creating an AnalysisResult.

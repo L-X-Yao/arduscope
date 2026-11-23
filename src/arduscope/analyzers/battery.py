@@ -17,6 +17,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 from arduscope.lib.i18n import t
+from arduscope.lib.suggestions import ParamSuggestion
 from . import AnalysisResult, BaseAnalyzer
 
 
@@ -38,7 +39,7 @@ class BatteryAnalyzer(BaseAnalyzer):
     def analyze(self) -> AnalysisResult:
         details = []
         figures = []
-        param_suggestions: list[dict] = []
+        param_suggestions: list[ParamSuggestion] = []
 
         # -----------------------------------------------------------
         # 1. Read BAT data with instance field

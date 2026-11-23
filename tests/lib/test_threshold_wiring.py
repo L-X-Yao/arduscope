@@ -94,7 +94,7 @@ class TestSpinGap:
                              _vehicle()).analyze()
 
     def test_gap_is_the_field(self):
-        assert [s["suggested"] for s in self._run().param_suggestions] == [0.13]
+        assert [s.suggested for s in self._run().param_suggestions] == [0.13]
         assert not self._run(mot_spin_gap_min=0.01).param_suggestions
 
 

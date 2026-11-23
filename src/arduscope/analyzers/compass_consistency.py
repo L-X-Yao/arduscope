@@ -19,6 +19,8 @@ import plotly.graph_objects as go
 
 from arduscope.lib.i18n import t as _t
 
+from arduscope.lib.suggestions import ParamSuggestion
+
 from . import AnalysisResult, BaseAnalyzer
 
 
@@ -65,7 +67,7 @@ class CompassConsistencyAnalyzer(BaseAnalyzer):
     def analyze(self) -> AnalysisResult:
         details: list[str] = []
         figures: list[go.Figure] = []
-        param_suggestions: list[dict] = []
+        param_suggestions: list[ParamSuggestion] = []
 
         # -----------------------------------------------------------
         # 1. Read MAG data
@@ -217,13 +219,13 @@ class CompassConsistencyAnalyzer(BaseAnalyzer):
             else:
                 param = _USE_PARAMS.get(outlier)
                 if param and self.reader.get_param(param, 1) == 1:
-                    param_suggestions.append({
-                        "param": param,
-                        "current": 1,
-                        "suggested": 0,
-                        "reason": _t("compass_consistency.disable_reason",
-                                     id=outlier),
-                    })
+                    param_suggestions.append(ParamSuggestion(
+                        param=param,
+                        current=1,
+                        suggested=0,
+                        reason=_t("compass_consistency.disable_reason",
+                                  id=outlier),
+                    ))
 
         # -----------------------------------------------------------
         # 6. Summary

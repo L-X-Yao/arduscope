@@ -17,6 +17,8 @@ import plotly.graph_objects as go
 
 from arduscope.lib.i18n import t
 
+from arduscope.lib.suggestions import ParamSuggestion
+
 from . import AnalysisResult, BaseAnalyzer
 
 
@@ -64,7 +66,7 @@ class IMUConsistencyAnalyzer(BaseAnalyzer):
     def analyze(self) -> AnalysisResult:
         details = []
         figures = []
-        param_suggestions: list[dict] = []
+        param_suggestions: list[ParamSuggestion] = []
 
         # -----------------------------------------------------------
         # 1. Read IMU data with instance field
@@ -451,7 +453,7 @@ class IMUConsistencyAnalyzer(BaseAnalyzer):
                       n=len(imu_types),
                       types=", ".join(imu_types))]
         figures = []
-        param_suggestions: list[dict] = []
+        param_suggestions: list[ParamSuggestion] = []
         overall_status = "good"
         instance_colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
 

@@ -100,7 +100,7 @@ class TestTECSTuning:
         analyzer = TECSTuningAnalyzer(reader, _thresholds(reader), _vehicle())
         result = analyzer.analyze()
         assert result.status == "critical"
-        assert any(s["param"] == "TECS_SPDWEIGHT"
+        assert any(s.param == "TECS_SPDWEIGHT"
                    for s in result.param_suggestions)
 
     def test_both_critical(self):
@@ -253,7 +253,7 @@ class TestTECSCruiseRows:
 
         assert result.status == "critical"
         assert _speed_rms(result) == 6.0
-        assert any(s["param"] == "TECS_SPDWEIGHT"
+        assert any(s.param == "TECS_SPDWEIGHT"
                    for s in result.param_suggestions)
 
     def test_rotor_only_flight_is_not_graded(self):
@@ -474,7 +474,7 @@ class TestSpeedWeightNeedsAirspeed:
 
     @staticmethod
     def _suggests_it(result):
-        return any(s["param"] == "TECS_SPDWEIGHT" for s in result.param_suggestions)
+        return any(s.param == "TECS_SPDWEIGHT" for s in result.param_suggestions)
 
     def test_a_sensor_in_use_gets_the_suggestion(self):
         assert self._suggests_it(self._result(1))

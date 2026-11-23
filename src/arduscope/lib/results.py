@@ -13,6 +13,7 @@ from typing import Optional
 import plotly.graph_objects as go
 
 from .param_limits import limit_suggestions
+from .suggestions import ParamSuggestion
 
 
 ACTION_OK = "ok"
@@ -78,7 +79,7 @@ class AnalysisResult:
     plain_summary: str = ""
     evidence: list[dict] = field(default_factory=list)
     evidence_source: str = ""
-    param_suggestions: list[dict] = field(default_factory=list)
+    param_suggestions: list[ParamSuggestion] = field(default_factory=list)
     registry_key: str = ""
     # The analyzer raised, so this card holds no conclusion at all. Kept
     # apart from status: a failure is neither "info" nor a finding, and
@@ -110,18 +111,13 @@ class AnalysisResult:
                 f"but action_level={self.action_level!r} "
                 f"(must be {ACTION_APPLY_PARAM!r} or {ACTION_SAFETY_STOP!r})"
             )
-        # Structural invariant: every suggestion must be exportable to
-        # the unified .param table — a dict carrying all four fields.
+        # Structural invariant: every suggestion is a typed, exportable row.
         for s in self.param_suggestions:
-            if (not isinstance(s, dict)
-                    or not s.get("param")
-                    or "current" not in s
-                    or "suggested" not in s
-                    or "reason" not in s):
-                raise AssertionError(
-                    f"AnalysisResult malformed param_suggestion in "
-                    f"{self.registry_key or self.title!r}: {s!r} "
-                    f"(need param/current/suggested/reason)"
+            if not isinstance(s, ParamSuggestion):
+                raise TypeError(
+                    f"AnalysisResult param_suggestions in "
+                    f"{self.registry_key or self.title!r} must contain "
+                    f"ParamSuggestion objects, got {type(s).__name__}: {s!r}"
                 )
         # Every suggestion passes through here, so this is where the
         # documented ranges are enforced.

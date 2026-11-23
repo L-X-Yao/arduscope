@@ -832,7 +832,7 @@ class TestAttitudeSynthetic:
                                    _vehicle()).analyze()
         assert result.status in ("warning", "critical")  # precondition
         assert result.param_suggestions, "autotune suggestion missing"
-        params_suggested = [s["param"] for s in result.param_suggestions]
+        params_suggested = [s.param for s in result.param_suggestions]
         assert "AUTOTUNE_AXES" in params_suggested
         assert result.action_level == "apply_param"
 

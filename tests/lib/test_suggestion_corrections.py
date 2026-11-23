@@ -16,6 +16,7 @@ from arduscope.lib.param_conflict import (
 )
 from arduscope.lib.param_limits import limit_suggestions, param_range
 from arduscope.lib.results import AnalysisResult
+from arduscope.lib.suggestions import ParamSuggestion
 from arduscope.lib.thresholds import Thresholds
 from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
@@ -23,9 +24,9 @@ from tests.test_synthetic_coverage import SyntheticReader
 pytestmark = pytest.mark.fast
 
 
-def _suggestion(param, current, suggested) -> dict:
-    return {"param": param, "current": current, "suggested": suggested,
-            "reason": "r"}
+def _suggestion(param, current, suggested) -> ParamSuggestion:
+    return ParamSuggestion(param=param, current=current, suggested=suggested,
+                           reason="r")
 
 
 class TestParamLimits:
@@ -48,7 +49,7 @@ class TestParamLimits:
 
     def test_value_past_the_limit_is_pulled_back(self):
         kept = limit_suggestions([_suggestion("INS_HNTCH_BW", 40, 290)])
-        assert kept[0]["suggested"] == 250.0
+        assert kept[0].suggested == 250.0
 
     def test_current_already_out_of_range_drops_the_suggestion(self):
         assert limit_suggestions(
@@ -72,7 +73,7 @@ class TestParamLimits:
         went through the limiter unchecked."""
         kept = limit_suggestions(
             [_suggestion("INS_HNTCH_BW", number(40), number(290))])
-        assert kept[0]["suggested"] == 250.0
+        assert kept[0].suggested == 250.0
 
 
 class TestLimitsThroughAnalysisResult:
@@ -80,7 +81,7 @@ class TestLimitsThroughAnalysisResult:
         result = AnalysisResult(
             title="x", action_level="apply_param",
             param_suggestions=[_suggestion("INS_HNTCH_BW", 40, 290)])
-        assert result.param_suggestions[0]["suggested"] == 250.0
+        assert result.param_suggestions[0].suggested == 250.0
 
     def test_action_falls_back_when_nothing_is_left(self):
         result = AnalysisResult(
@@ -111,8 +112,8 @@ class TestLogBitmask:
         result = LogHealthAnalyzer(reader, Thresholds(),
                                    _vehicle(vehicle_type)).analyze()
         assert result.status in ("warning", "critical")     # precondition
-        return [s["suggested"] for s in result.param_suggestions
-                if s["param"] == "LOG_BITMASK"], result
+        return [s.suggested for s in result.param_suggestions
+                if s.param == "LOG_BITMASK"], result
 
     def test_plane_on_its_default_gets_no_suggestion(self):
         suggested, result = self._suggested(65535, "ArduPlane")
@@ -161,7 +162,7 @@ class TestCompassOutlier:
     def test_third_compass_identifies_the_bad_one(self, bad, param):
         result = self._run({i: 400.0 if i == bad else 0.0 for i in range(3)})
         assert result.status == "critical"
-        assert [s["param"] for s in result.param_suggestions] == [param]
+        assert [s.param for s in result.param_suggestions] == [param]
 
     def test_two_compasses_cannot_say_which(self):
         result = self._run({0: 0.0, 1: 400.0})
