@@ -9,6 +9,19 @@ itself.
 
 Without a model, analysis is exactly as before.
 
+## Package layout
+
+The agent package is `src/arduscope/agent/` (`arduscope.agent`), separate from
+the shared `arduscope.lib` primitives. The public entry point and configuration
+imports are:
+
+```python
+from arduscope.agent import analyze_with_agent
+from arduscope.agent.config import AgentConfig
+```
+
+There is no compatibility shim for the former import path.
+
 ## Command line
 
 ```bash

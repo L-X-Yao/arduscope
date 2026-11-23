@@ -17,8 +17,10 @@ releases are not published.
 - The online agent moved from `arduscope.lib.agent` to `arduscope.agent`;
   there is no compatibility shim.
 - Report surfaces now share the CJK font stack and the accent color through
-  `arduscope.lib.theme`; generated CSS is byte-identical to the previous
-  output.
+  `arduscope.lib.theme`; the duplicated monospace value lives there too, and
+  generated CSS is byte-identical to the previous output.
+- Architecture and contributor documentation now record the completed
+  hardening and the final package layout.
 
 ## [0.13.4] - 2026-11-23
 

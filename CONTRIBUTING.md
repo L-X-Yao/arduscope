@@ -64,16 +64,25 @@ class MyCheckAnalyzer(BaseAnalyzer):
 
 ## Adding param_suggestions
 
-Each suggestion is a dict with four keys:
+Construct a frozen `ParamSuggestion` for each row:
 
 ```python
-{"param": "NAME", "current": val, "suggested": val, "reason": t("key")}
+from arduscope.lib.suggestions import ParamSuggestion
+
+ParamSuggestion(
+    param="NAME",
+    current=val,
+    suggested=val,
+    reason=t("key"),
+)
 ```
 
 Pass the list to `make_result(param_suggestions=[...])` and set
-`action_level="apply_param"` whenever suggestions exist. The report
-generator exports these to a `.param` file that Mission Planner can
-import directly.
+`action_level="apply_param"` whenever suggestions exist. `AnalysisResult`
+rejects dictionary rows. Export boundaries call `to_dict()`, which preserves
+the `param`, `current`, `suggested`, `reason` wire format; analyzer authors do
+not serialize suggestions themselves. The report generator exports them to a
+`.param` file that Mission Planner can import directly.
 
 That file may get loaded on an aircraft, so a suggestion needs more than a
 threshold does:
@@ -95,18 +104,30 @@ back anything that looks missing.
 Add a new field to the `Thresholds` dataclass in `src/arduscope/lib/thresholds.py`.
 
 - Name the field as `<category>_<metric>_<level>` (e.g. `gps_hdop_warn`).
-- Cite the source in an inline comment using the prefix convention:
+- Keep the human rationale in an inline comment using the prefix convention:
   - `A:` -- authoritative (METHODIC doc, ArduPilot wiki, ArduPilot source code).
   - `A(soft):` -- an ArduPilot value used as a proxy, outside its own purpose.
   - `D:` -- derived from an authoritative source with stated reasoning.
   - `E:` -- engineering estimate (legacy/secondary, avoid for new thresholds).
-- Every threshold must have a corresponding entry in
-  `docs/convergence_criteria.md`.
+- Add exactly one `ThresholdSource` for the field to
+  `src/arduscope/lib/threshold_sources.py`, with the same level and the full
+  citation used in the convergence table.
+- Regenerate `docs/convergence_criteria.md` with
+  `python3 tools/check_thresholds.py --write`; do not edit its table rows by
+  hand. Then run `python3 tools/check_thresholds.py` to check field coverage,
+  source levels, defaults and the generated table.
 
 Example:
 
 ```python
 gps_hdop_warn: float = 1.5       # D: quality target, stricter than pre-arm 2.0
+```
+
+The corresponding machine-readable entry is:
+
+```python
+"gps_hdop_warn": ThresholdSource(
+    "D", "quality target, stricter than pre-arm 2.0"),
 ```
 
 ## Adding cross-correlation rules
@@ -154,6 +175,18 @@ All user-facing strings go through `src/arduscope/lib/i18n.py`. When adding a ne
 ```
 python3 -m pytest tests/ -q
 ```
+
+The focused consistency checks are:
+
+```
+python3 tools/lint_project.py
+python3 tools/check_thresholds.py
+python3 tools/check_suggestions.py
+python3 tools/check_i18n.py
+```
+
+`tools/check_thresholds.py` also has `--write`, used only to regenerate the
+convergence-criteria table after a threshold or source-map change.
 
 Real-log tests skip without the logs, which are not in the repository, and SITL
 tests skip without `tests/sitl/logs`. A skip is not a pass: CI runs under half
