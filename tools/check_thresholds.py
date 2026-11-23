@@ -49,7 +49,7 @@ def render_table() -> str:
     lines = [TABLE_HEADER, TABLE_SEPARATOR]
     for name, source in THRESHOLD_SOURCES.items():
         if not hasattr(defaults, name):
-            continue
+            raise ValueError(f"orphan source: {name}")
         value = getattr(defaults, name)
         lines.append(
             f"| `{name}` | {value!r} | {source.level} | {source.citation} |")

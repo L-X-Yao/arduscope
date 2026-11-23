@@ -57,3 +57,10 @@ def test_package_does_not_introspect_threshold_source_code():
                  for path in (REPO_ROOT / "src" / "arduscope").rglob("*.py")
                  if "getsource(" in path.read_text(encoding="utf-8")]
     assert offenders == []
+
+
+def test_render_refuses_an_orphan_source(monkeypatch):
+    monkeypatch.setitem(ct.THRESHOLD_SOURCES, "orphan_threshold",
+                        ct.THRESHOLD_SOURCES["vibe_warn"])
+    with pytest.raises(ValueError, match="orphan source: orphan_threshold"):
+        ct.render_table()
