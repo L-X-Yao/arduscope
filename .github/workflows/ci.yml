@@ -77,6 +77,9 @@ jobs:
       - name: Check the suggestion registry
         run: python tools/check_suggestions.py
 
+      - name: Check threshold sources
+        run: python tools/check_thresholds.py
+
       - name: Run tests
         run: python -m pytest tests/ -q --tb=short -m "not sitl"
 

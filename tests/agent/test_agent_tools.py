@@ -11,6 +11,7 @@ from arduscope.lib.agent.config import AgentConfig
 from arduscope.lib.agent.tools import MAX_RESULT_BYTES, ToolBox, _json_size
 from arduscope.lib.pipeline import PipelineResult
 from arduscope.lib.results import AnalysisResult
+from arduscope.lib.threshold_sources import THRESHOLD_SOURCES
 from arduscope.lib.thresholds import Thresholds
 from arduscope.lib.vehicle_detect import VehicleInfo
 from tests.test_synthetic_coverage import SyntheticReader
@@ -160,8 +161,17 @@ def test_spectrum_finds_the_injected_frequency():
 def test_threshold_returns_value_and_source():
     box = _box()
     result = box.call("get_threshold", {"field": "vibe_warn"})
+    source = THRESHOLD_SOURCES["vibe_warn"]
     assert result["value"] == 15
-    assert "METHODIC" in result["source"]
+    assert result["source"] == f"{source.level}: {source.citation}"
+
+
+def test_every_threshold_has_a_documented_source():
+    box = _box()
+    for field in Thresholds.__dataclass_fields__:
+        result = box.call("get_threshold", {"field": field})
+        source = THRESHOLD_SOURCES[field]
+        assert result["source"] == f"{source.level}: {source.citation}"
 
 
 def test_every_result_fits_the_limit():

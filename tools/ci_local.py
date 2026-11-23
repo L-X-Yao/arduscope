@@ -78,6 +78,10 @@ def main():
         "Suggestion registry (check_suggestions.py)",
         [sys.executable, "tools/check_suggestions.py"],
     ))
+    results.append(_run(
+        "Threshold sources (check_thresholds.py)",
+        [sys.executable, "tools/check_thresholds.py"],
+    ))
 
     # 3. Import check
     results.append(_run(

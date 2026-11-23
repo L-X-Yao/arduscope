@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Changed
+- Threshold citations now come from a generated source registry checked
+  against the convergence-criteria table.
+
 ## [0.13.4] - 2026-11-23
 
 ### Fixed

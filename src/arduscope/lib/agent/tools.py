@@ -8,7 +8,6 @@ egress policy strips.
 from __future__ import annotations
 
 import html as _html
-import inspect
 import json
 import re
 
@@ -16,6 +15,7 @@ import numpy as np
 
 from arduscope.lib.fft_helpers import do_fft, find_peaks
 from arduscope.lib.i18n import t
+from arduscope.lib.threshold_sources import THRESHOLD_SOURCES
 from arduscope.lib.thresholds import Thresholds
 
 from .config import AgentConfig
@@ -467,17 +467,7 @@ class ToolBox:
                 "source": source}
 
 
-_THRESHOLD_SOURCE_RE = re.compile(
-    r"^\s*(\w+):\s*[^=\n]+=\s*[^#\n]*#\s*(.+)$", re.MULTILINE)
-
-
 def _threshold_source(field: str) -> str:
-    """The inline source comment beside a Thresholds field."""
-    try:
-        source = inspect.getsource(Thresholds)
-    except OSError:
-        return ""
-    for match in _THRESHOLD_SOURCE_RE.finditer(source):
-        if match.group(1) == field:
-            return match.group(2).strip()
-    return ""
+    """The documented source for a Thresholds field."""
+    source = THRESHOLD_SOURCES.get(field)
+    return f"{source.level}: {source.citation}" if source else ""
