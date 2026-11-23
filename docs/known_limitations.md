@@ -195,11 +195,15 @@ them readable, on the current gate baseline.
   hover. A QuadPlane counts as in the air 0.5 m above the height it armed at,
   by `QTUN.Alt`. A log that opens in flight counts from its first row, so what
   it flew at or below that height is not seen.
-- **Six suggestion rules have no flight behind them**:
-  `ARSPD_USE`, `AUTOTUNE_AXES`, `COMPASS_USE`, `GPS_AUTO_SWITCH`,
-  `INS_HNTC2_*` and `RLL_RATE_D`. See
-  [suggestion_evidence.md](suggestion_evidence.md). The flown ones flew in
-  SITL, which can rule a value out and cannot prove it on an aircraft.
+- **Five suggestion rules have SITL scenarios, not real flights, behind
+  them**: `ARSPD_USE`, `AUTOTUNE_AXES`, `COMPASS_USE`, `GPS_AUTO_SWITCH` and
+  `INS_HNTC2_*` fire in named scenarios in `docs/sitl.md`. SITL can rule a
+  value out and cannot prove it on an aircraft. `RLL_RATE_D` (with its
+  `PTCH_RATE_D` and `YAW_RATE_D` siblings) stays unexercised for a
+  structural reason: the rule's oscillation gate reads the `RATE` message,
+  which the fixed-wing controller does not log, so no plane log can satisfy
+  it as the analyzer stands. See
+  [suggestion_evidence.md](suggestion_evidence.md).
 
 ## Logs
 

@@ -624,7 +624,7 @@
         "SIM_ARSPD_RATIO": 15
       },
       "expected": {
-        "analyzers_warning_or_critical": [
+        "analyzers_critical": [
           "airspeed"
         ],
         "suggestions_include": [
@@ -814,6 +814,9 @@
         "INS_HNTC2_BW": 20
       },
       "expected": {
+        "analyzers_warning_or_critical": [
+          "notch_tuning"
+        ],
         "suggestions_exclude": [
           "INS_HNTC2_ENABLE",
           "INS_HNTC2_MODE",

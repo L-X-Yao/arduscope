@@ -56,9 +56,10 @@ The Plane rate-loop D row stays unflown for a structural reason, not a
 missing flight: the rule's oscillation gate reads the `RATE` message, which
 the fixed-wing controller does not log, so no plane log can satisfy it as
 the analyzer stands (the SITL suite records the same in `docs/sitl.md`).
-The `AUTOTUNE_AXES`, `GPS_AUTO_SWITCH`, `COMPASS_USE` and `INS_HNTC2_*`
-rows above were exercised in SITL, named in the Flight column; SITL shows
-the rule firing, it does not replace a flight on an aircraft.
+The `ARSPD_USE`, `AUTOTUNE_AXES`, `GPS_AUTO_SWITCH`, `COMPASS_USE` and
+`INS_HNTC2_*` rows above were exercised in SITL, named in the Flight
+column; SITL shows the rule firing, it does not replace a flight on an
+aircraft.
 
 Throttle tracking was flown through climbs and descents with REF at the hover
 throttle and with a REF the throttle never reaches (T2, T1). The two came out

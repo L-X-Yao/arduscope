@@ -42,10 +42,10 @@ instead of producing a log with no flight in it.
 | `copter_motor_noise_climbs` | Copter | Motor noise through climbs and descents | Notch suggestions: the same set with `FREQ` 95-115 Hz |
 | `copter_autotune_axes` | Copter | High vibration with `AUTOTUNE_AXES=1` | `attitude` warning or critical; `AUTOTUNE_AXES=7` suggested |
 | `copter_gps_glitch_dual` | Copter | `copter_gps_glitch` with a second GPS and `GPS_AUTO_SWITCH=0` | `gps`, `gps_glitch` warning or critical; cross rule `gps_glitch_ekf`; `GPS_AUTO_SWITCH=1` suggested |
-| `plane_airspeed_offset` | Plane | Pitot reporting 36% of true airspeed (`SIM_ARSPD_RATIO=15`) | `airspeed` warning or critical; `ARSPD_USE=0` suggested |
+| `plane_airspeed_offset` | Plane | Pitot reporting 36% of true airspeed (`SIM_ARSPD_RATIO=15`) | `airspeed` critical; `ARSPD_USE=0` suggested |
 | `copter_compass_outlier` | Copter | 600 mGauss X offset injected on compass 2 in flight | `compass_consistency` warning or critical; `COMPASS_USE2=0` suggested |
 | `copter_second_notch_band` | Copter | Motor noise near 105 Hz, static first notch at 40 Hz | `INS_HNTC2` set suggested: `ENABLE=1`, `MODE=3`, `REF=1`, `FREQ` 95-115 Hz, `BW` |
-| `copter_static_dual_notch` | Copter | Both notches enabled and static off the peak | No `INS_HNTC2_*` suggestion (`suggestions_exclude`); exercises the second-notch branch and the static attenuation report, with no status assertion |
+| `copter_static_dual_notch` | Copter | Both notches enabled and static off the peak | `notch_tuning` warning or critical (the different-band branch ran); no `INS_HNTC2_*` suggestion (`suggestions_exclude`) |
 
 The complete expected blocks are in `scenarios.json`; the table is a summary,
 not a second source. A scenario can also set `sitl_params` and a speedup.
@@ -57,14 +57,15 @@ expectation for:
 
 - pipeline completion, vehicle detection, analyzer count and required fields;
 - health score floor;
-- named analyzers good, warning or critical, or not critical;
+- named analyzers good, warning or critical, exactly critical, or not
+  critical;
 - cross-correlation rules that should fire;
 - suggested parameters, their exact values and their ranges;
 - parameters a scenario asserts are NOT suggested (`suggestions_exclude`);
 - `.param` export, including the no-suggestion case;
 - every analyzer result has its required fields.
 
-A full run has 182 tests. The skips are optional expectation blocks: a
+A full run has 196 tests. The skips are optional expectation blocks: a
 scenario without `analyzers_good`, `cross_rules_should_fire`,
 `suggestions_include` or a related key skips that test. They are not missing
 logs.
@@ -120,7 +121,7 @@ suggestion still needs a real flight or a waiver in
    blindly: decide what the fault should produce from the ArduPilot source or
    the wiki.
 2. Add the key to that scenario's `expected` block in `scenarios.json`:
-   `analyzers_good`, `analyzers_warning_or_critical`,
+   `analyzers_good`, `analyzers_warning_or_critical`, `analyzers_critical`,
    `analyzers_not_critical`, `cross_rules_should_fire`, `health_score_min`,
    `suggestions_include`, `suggestions_equal`, `suggestions_between`,
    `suggestions_exclude`.
