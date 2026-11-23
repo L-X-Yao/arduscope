@@ -178,6 +178,18 @@ class TestParamNamePattern:
         assert cp.main() == 1
         assert "ParamSuggestion requires a param keyword" in capsys.readouterr().out
 
+    def test_main_summarizes_unknown_and_malformed_together(
+            self, tmp_path, monkeypatch, capsys):
+        path = tmp_path / "bad.py"
+        path.write_text(
+            'ParamSuggestion(param="NOT_A_PARAM", current=0, suggested=1, reason="")\n'
+            'ParamSuggestion("A_B", 0, 1, "test")', encoding="utf-8")
+        monkeypatch.setattr(cp, "_code_files", lambda: [str(path)])
+        monkeypatch.setattr(cp, "LOCALE_FILES", [])
+        assert cp.main() == 1
+        assert ("1 unknown parameter name(s), 1 malformed ParamSuggestion call(s)"
+                in capsys.readouterr().out)
+
     def test_dict_suggestion_still_matches(self):
         assert cp._SUGGESTION.findall('{"param": "A_B", "suggested": 1}') == [
             "A_B"]

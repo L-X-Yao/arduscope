@@ -218,12 +218,8 @@ def main() -> int:
     for error in scan_errors:
         print(f"  {RED}FAIL{RESET}  {error}")
     if bad or scan_errors:
-        if bad:
-            print(f"\n{RED}{BOLD}FAILED{RESET}: {len(bad)} unknown parameter "
-                  "name(s)")
-        else:
-            print(f"\n{RED}{BOLD}FAILED{RESET}: {len(scan_errors)} malformed "
-                  "ParamSuggestion call(s)")
+        print(f"\n{RED}{BOLD}FAILED{RESET}: {len(bad)} unknown parameter "
+              f"name(s), {len(scan_errors)} malformed ParamSuggestion call(s)")
         return 1
 
     print(f"  {GREEN}PASS{RESET}  every referenced parameter resolves")
