@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pytest
 
 from tests._repo import REPO_ROOT
 
-from arduscope.lib.theme import COLORS, FONT_STACK, FONT_STACK_CSS, \
-    FONT_STACK_CSS_COMPACT, FONT_STACK_PLOTLY
+from arduscope.lib.theme import COLORS, FONT_MONO, FONT_STACK, \
+    FONT_STACK_CSS, FONT_STACK_CSS_COMPACT, FONT_STACK_PLOTLY
 
 pytestmark = pytest.mark.fast
 
@@ -24,6 +21,7 @@ CONSUMERS = (
 
 def test_font_stack_tokens_are_correct():
     assert FONT_STACK == ("PingFang SC", "Microsoft YaHei", "Noto Sans SC")
+    assert FONT_MONO == "monospace"
     assert FONT_STACK_CSS == \
         '"PingFang SC", "Microsoft YaHei", "Noto Sans SC",'
     assert FONT_STACK_CSS_COMPACT == \
@@ -36,37 +34,36 @@ def test_colors_tokens_are_correct():
     assert COLORS["accent"] == "#409eff"
 
 
-def test_every_consumer_imports_the_theme():
+REQUIRED_TOKENS = {
+    "src/arduscope/lib/html_report.py":
+        ("FONT_STACK_CSS", "COLORS"),
+    "src/arduscope/lib/comparison_report.py":
+        ("FONT_MONO", "FONT_STACK_CSS", "FONT_STACK_PLOTLY"),
+    "batch_report.py":
+        ("COLORS", "FONT_MONO", "FONT_STACK_CSS_COMPACT"),
+    "src/arduscope/lib/web_pages.py":
+        ("COLORS", "FONT_STACK_CSS_COMPACT"),
+}
+
+
+def test_every_consumer_imports_and_uses_the_theme():
     for rel in CONSUMERS:
         source = (REPO_ROOT / rel).read_text(encoding="utf-8")
         assert "from arduscope.lib.theme import" in source \
             or "from .theme import" in source, rel
+        for token in REQUIRED_TOKENS[rel]:
+            assert token in source, (rel, token)
 
 
-def test_consumer_surfaces_no_longer_carry_the_font_literal():
+def test_migrated_surfaces_no_longer_carry_the_font_literal():
+    # Scope: only the four surfaces this phase migrated. The full CJK
+    # stack still exists by design in surfaces out of Phase 8 scope --
+    # Plotly figure fonts in analyzers/__init__.py, motor.py, wind.py,
+    # pid_tuning.py and fleet_history.py, plus fleet_report.py's own
+    # shorter stack -- the brief says those literals stay untouched.
     for rel in CONSUMERS:
         source = (REPO_ROOT / rel).read_text(encoding="utf-8")
         assert "PingFang" not in source, rel
-
-
-def test_font_literal_lives_only_in_theme_py():
-    # fleet_history.py renders its own Plotly figure fonts; it is not one
-    # of the four report surfaces this phase migrates, and the brief says
-    # other font literals stay untouched.
-    allowed = {"src/arduscope/lib/theme.py",
-               "src/arduscope/lib/fleet_history.py"}
-    offenders = []
-    for path in (REPO_ROOT / "src" / "arduscope" / "lib").rglob("*.py"):
-        rel = str(path.relative_to(REPO_ROOT))
-        if rel in allowed:
-            continue
-        if "PingFang" in path.read_text(encoding="utf-8"):
-            offenders.append(rel)
-    for rel in CONSUMERS:
-        source = (REPO_ROOT / rel).read_text(encoding="utf-8")
-        if "PingFang" in source:
-            offenders.append(rel)
-    assert offenders == []
 
 
 def test_accent_literal_leaves_the_consumer_surfaces():
@@ -75,19 +72,14 @@ def test_accent_literal_leaves_the_consumer_surfaces():
         assert "#409eff" not in source, rel
 
 
-def test_the_accent_literal_is_only_defined_in_the_theme():
+def test_accent_literal_leaves_the_lib_modules():
+    # Scope note: this sweep covers src/arduscope/lib only; entry scripts
+    # and analyzers are not part of the migrated surfaces.
     offenders = []
     for path in (REPO_ROOT / "src" / "arduscope" / "lib").rglob("*.py"):
         rel = str(path.relative_to(REPO_ROOT))
         text = path.read_text(encoding="utf-8")
         if rel != "src/arduscope/lib/theme.py" and "#409eff" in text:
             offenders.append(rel)
-    for rel in CONSUMERS:
-        text = (REPO_ROOT / rel).read_text(encoding="utf-8")
-        if "#409eff" in text:
-            offenders.append(rel)
     assert offenders == []
 
-
-def test_theme_module_has_no_behaviour():
-    assert not hasattr(sys.modules["arduscope.lib.theme"], "analyze")

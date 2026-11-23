@@ -17,7 +17,8 @@ import plotly.offline
 from arduscope.lib.log_metadata import format_flight_time
 from arduscope.lib.i18n import t
 from arduscope.lib.thresholds import Thresholds
-from arduscope.lib.theme import FONT_STACK_CSS, FONT_STACK_PLOTLY
+from arduscope.lib.theme import FONT_MONO, FONT_STACK_CSS, \
+    FONT_STACK_PLOTLY
 from arduscope.lib.trend_analyzer import (
     analyze_trends,
     TrendReport,
@@ -754,7 +755,7 @@ body {{
     font-size: 12px;
 }}
 /* Parameter diff styles */
-.param-table .pname {{ font-family: monospace; font-size: 12px; text-align: left; }}
+.param-table .pname {{ font-family: {FONT_MONO}; font-size: 12px; text-align: left; }}
 .param-table .pcat {{ font-size: 11px; color: #999; }}
 .param-table .val-changed {{
     background: #fff3cd; font-weight: 600; color: #856404;

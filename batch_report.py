@@ -37,7 +37,8 @@ if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
 
 from arduscope.lib.csv_safe import SafeWriter
-from arduscope.lib.theme import COLORS, FONT_STACK_CSS_COMPACT
+from arduscope.lib.theme import COLORS, FONT_MONO, \
+    FONT_STACK_CSS_COMPACT
 from arduscope.lib.i18n import t
 from arduscope.lib.html_report import HtmlReportGenerator
 from arduscope.lib.ai_diagnosis import generate_diagnosis
@@ -381,7 +382,7 @@ table{{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;
 th{{background:#f7f8fa;padding:10px 8px;text-align:center;font-weight:600;
     border-bottom:2px solid #eee;position:sticky;top:0}}
 td{{padding:8px;text-align:center;border-bottom:1px solid #f0f0f0}}
-.fname{{text-align:left;font-family:monospace;font-size:12px;max-width:300px;
+.fname{{text-align:left;font-family:{FONT_MONO};font-size:12px;max-width:300px;
         overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 .row-err td{{background:#fff5f5}}
 a{{color:{_ACCENT};text-decoration:none}}

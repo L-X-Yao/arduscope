@@ -20,6 +20,10 @@ FONT_STACK_CSS = ", ".join(_QUOTED) + ","
 FONT_STACK_CSS_COMPACT = ",".join(_QUOTED) + ","
 FONT_STACK_PLOTLY = ", ".join(FONT_STACK)
 
+# The shared monospace value; html_report's 'Consolas', 'Monaco', monospace
+# stack is a different, single-surface stack and stays literal.
+FONT_MONO = "monospace"
+
 COLORS = {
     # Interactive accent: links, buttons, focus rings, the map accent and
     # info toasts. Every use in every surface is this exact literal.
