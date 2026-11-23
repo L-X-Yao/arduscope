@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.13.4] - 2026-11-23
 
 ### Fixed
 - Fixed-wing rate-loop D suggestions now use the logged PID error's
