@@ -762,10 +762,18 @@ class PIDTuningAnalyzer(BaseAnalyzer):
         # an oscillation, so moving a gain takes one, by the same test that
         # grades the axis: on the ground its peak counts too, as a copter that
         # shakes and never lifts off spends most of the log still.
-        oscillating = rate_out_rms is not None and (
+        rate_oscillating = rate_out_rms is not None and (
             rate_out_rms >= self.thresholds.pid_rate_out_warn
             or (ground_vib_mode and rate_out_peak
                 >= self.thresholds.pid_ground_vib_peak))
+        # Fixed-wing PID Tar/Act are the controller's desired and achieved
+        # rates (AP_FW_Controller.cpp), and there is no fixed-wing RATE row.
+        # Reuse the existing error zero-crossing metric and its secondary
+        # threshold for this phase only; Copter and VTOL keep RATE.*Out.
+        plane_oscillating = (
+            phase == "plane"
+            and osc_crossings_per_sec > self.thresholds.pid_osc_crossings_warn)
+        oscillating = rate_oscillating or plane_oscillating
         if d_noise_ratio >= self.thresholds.pid_dterm_noise_warn and oscillating:
             if d_noise_ratio >= self.thresholds.pid_dterm_noise_crit:
                 reduce_pct = 0.80

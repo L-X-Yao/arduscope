@@ -665,6 +665,57 @@
       ]
     },
     {
+      "name": "plane_rate_d",
+      "vehicle": "ArduPlane",
+      "description": "High fixed-wing roll D gain with gyro noise and no D filtering, so the PID error oscillates and RLL_RATE_D is reduced",
+      "sitl_params": {
+        "RLL_RATE_D": 0.025,
+        "RLL_RATE_FLTD": 0,
+        "INS_GYRO_FILTER": 100,
+        "SIM_GYR1_RND": 20
+      },
+      "expected": {
+        "analyzers_warning_or_critical": [
+          "pid_tuning"
+        ],
+        "suggestions_include": [
+          "RLL_RATE_D"
+        ],
+        "suggestions_equal": {
+          "RLL_RATE_D": 0.0225
+        }
+      },
+      "steps": [
+        {
+          "mission": [
+            [
+              300,
+              0,
+              80
+            ],
+            [
+              300,
+              600,
+              80
+            ],
+            [
+              -300,
+              600,
+              80
+            ],
+            [
+              -300,
+              0,
+              80
+            ]
+          ]
+        },
+        {
+          "wait_disarm": 300
+        }
+      ]
+    },
+    {
       "name": "copter_compass_outlier",
       "vehicle": "ArduCopter",
       "description": "A 600 mGauss X offset injected on compass 2 in flight while the other two agree, so COMPASS_USE2 0 is suggested",

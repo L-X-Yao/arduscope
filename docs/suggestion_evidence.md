@@ -36,7 +36,7 @@ Columns:
 | `ATC_RAT_RLL_FLTD` `ATC_RAT_PIT_FLTD` `Q_A_RAT_RLL_FLTD` `Q_A_RAT_PIT_FLTD` | notch_tuning | INS_GYRO_FILTER/2, when above it | A: wiki setting-up-for-tuning | F2, Z4 | flown |
 | `MOT_THST_HOVER` `Q_M_THST_HOVER` | notch_tuning | Median throttle in level hover, where the parameter is over 0.12 from it | D: AP_MotorsMulticopter.cpp THST_HOVER, measured inside the gate of update_throttle_hover | H1 | flown |
 | `ATC_RAT_*_D` `Q_A_RAT_*_D` | pid_tuning | x0.9, x0.8 when noise is critical, on an oscillating axis | A: wiki ac_rollpitchtuning | D1 | flown |
-| `RLL_RATE_D` `PTCH_RATE_D` `YAW_RATE_D` | pid_tuning | Same rule, on the Plane rate loop | D: Copter rule applied to Plane | - | not_flown |
+| `RLL_RATE_D` `PTCH_RATE_D` `YAW_RATE_D` | pid_tuning | Same rule, on the Plane rate loop | D: Copter rule applied to Plane | SITL plane_rate_d | flown |
 | `MOT_SPIN_MIN` `Q_M_SPIN_MIN` | motor | MOT_SPIN_ARM + 0.03 | A: wiki set-motor-range | S1 | flown |
 | `TECS_SPDWEIGHT` | tecs_tuning | + 0.5, up to 2.0, with airspeed in use | D: AP_TECS.cpp SPDWEIGHT | P1 | flown |
 | `ARSPD_USE` | airspeed | 0 on critical disagreement with GPS | D: AP_Airspeed_Params.cpp USE | SITL plane_airspeed_offset | flown |
@@ -52,10 +52,11 @@ that lands near the edge of the band, and `INS_HNTCH_REF` 1 on an RPM sensor
 notch, which takes the same path through the firmware as the ESC notch that
 was flown.
 
-The Plane rate-loop D row stays unflown for a structural reason, not a
-missing flight: the rule's oscillation gate reads the `RATE` message, which
-the fixed-wing controller does not log, so no plane log can satisfy it as
-the analyzer stands (the SITL suite records the same in `docs/sitl.md`).
+The Plane rate-loop D gate uses the existing `Tar-Act` zero-crossing rate
+because the fixed-wing controller logs those fields in PID records but does
+not write `RATE`. In `plane_rate_d`, the roll axis reached 8.7 crossings/s
+with 39% D noise, so the existing 0.9 rule changed `RLL_RATE_D` from 0.025
+to 0.0225. The PTCH/YAW siblings have synthetic coverage of the same gate.
 The `ARSPD_USE`, `AUTOTUNE_AXES`, `GPS_AUTO_SWITCH`, `COMPASS_USE` and
 `INS_HNTC2_*` rows above were exercised in SITL, named in the Flight
 column; SITL shows the rule firing, it does not replace a flight on an

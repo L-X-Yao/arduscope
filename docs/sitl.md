@@ -43,6 +43,7 @@ instead of producing a log with no flight in it.
 | `copter_autotune_axes` | Copter | High vibration with `AUTOTUNE_AXES=1` | `attitude` warning or critical; `AUTOTUNE_AXES=7` suggested |
 | `copter_gps_glitch_dual` | Copter | `copter_gps_glitch` with a second GPS and `GPS_AUTO_SWITCH=0` | `gps`, `gps_glitch` warning or critical; cross rule `gps_glitch_ekf`; `GPS_AUTO_SWITCH=1` suggested |
 | `plane_airspeed_offset` | Plane | Pitot reporting 36% of true airspeed (`SIM_ARSPD_RATIO=15`) | `airspeed` critical; `ARSPD_USE=0` suggested |
+| `plane_rate_d` | Plane | Roll D=0.025, gyro noise and no D filtering | `pid_tuning` warning or critical; PID error crosses 8.7/s with 39% D noise; `RLL_RATE_D=0.0225` suggested |
 | `copter_compass_outlier` | Copter | 600 mGauss X offset injected on compass 2 in flight | `compass_consistency` warning or critical; `COMPASS_USE2=0` suggested |
 | `copter_second_notch_band` | Copter | Motor noise near 105 Hz, static first notch at 40 Hz | `INS_HNTC2` set suggested: `ENABLE=1`, `MODE=3`, `REF=1`, `FREQ` 95-115 Hz, `BW` |
 | `copter_static_dual_notch` | Copter | Both notches enabled and static off the peak | `notch_tuning` warning or critical (the different-band branch ran); no `INS_HNTC2_*` suggestion (`suggestions_exclude`) |
@@ -65,24 +66,25 @@ expectation for:
 - `.param` export, including the no-suggestion case;
 - every analyzer result has its required fields.
 
-A full run has 196 tests. The skips are optional expectation blocks: a
+A full run has 210 tests. The skips are optional expectation blocks: a
 scenario without `analyzers_good`, `cross_rules_should_fire`,
 `suggestions_include` or a related key skips that test. They are not missing
 logs.
 
 ## Coverage
 
-Twelve analyzers are named directly in an expectation:
+Thirteen analyzers are named directly in an expectation:
 
 `attitude`, `airspeed`, `battery`, `compass`, `compass_consistency`, `ekf`,
-`gps`, `gps_glitch`, `imu_consistency`, `motor`, `tecs_tuning`, `vibration`.
+`gps`, `gps_glitch`, `imu_consistency`, `motor`, `pid_tuning`, `tecs_tuning`,
+`vibration`.
 
 `notch_tuning` is exercised through the four motor-noise scenarios'
-suggestions — including the second-band set and the enabled-HNTC2 exclusion —
-but no status is asserted. `summary` and `flight_profile` run in the pipeline
-but have no expectation. The other analyzers have no SITL expectation:
+suggestions; the static dual-notch scenario also asserts its status.
+`summary` and `flight_profile` run in the pipeline but have no expectation.
+The other analyzers have no SITL expectation:
 `board_power`, `clock_health`, `cruise_efficiency`, `ekf_vel_divergence`,
-`failsafe`, `gyro_saturation`, `log_health`, `mission`, `pid_tuning`, `power`,
+`failsafe`, `gyro_saturation`, `log_health`, `mission`, `power`,
 `rangefinder`, `rc_input`, `servo_dither`, `temperature`,
 `throttle_collapse`, `vtol_transition`, `wind`.
 
@@ -101,15 +103,8 @@ Priority order is by what a wrong result would cost:
    scenario covers only the pack voltage.
 3. **Plane and VTOL**: `vtol_transition`, `mission`, `throttle_collapse`,
    `wind`, `cruise_efficiency`.
-4. **Control and sensors**: `pid_tuning`, `gyro_saturation`, `servo_dither`,
-   `rangefinder`, `ekf_vel_divergence`, `log_health`, `clock_health`,
-   `rc_input`.
-5. **`RLL_RATE_D` on the plane rate loop**: the D-reduction rule's
-   oscillation gate reads the `RATE` message, which the fixed-wing controller
-   does not log (`pid_tuning.py` skips the rate-output block for the plane
-   phase), so no flight — SITL or real — can fire it as the analyzer stands.
-   Exercising it needs an analyzer change that grades plane oscillation from
-   `PIDR`, which is out of scope here; the row stays `not_flown`.
+4. **Control and sensors**: `gyro_saturation`, `servo_dither`, `rangefinder`,
+   `ekf_vel_divergence`, `log_health`, `clock_health`, `rc_input`.
 
 SITL can rule a suggestion out; it cannot prove one on an aircraft. A
 suggestion still needs a real flight or a waiver in

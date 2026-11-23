@@ -80,11 +80,7 @@ DYNAMIC_SITES: dict[str, tuple[str, ...]] = {
 # pattern>". These predate the rule. This list is the escape hatch, so a new
 # suggestion gets here only by someone deciding, in review, that it should
 # ship unflown.
-NOT_FLOWN_WAIVERS: dict[str, str] = {
-    "pid_tuning:RLL_RATE_D": "the oscillation gate reads the RATE message, "
-                             "which the plane controller does not log; "
-                             "unreachable without an analyzer change",
-}
+NOT_FLOWN_WAIVERS: dict[str, str] = {}
 
 
 @dataclass(frozen=True)

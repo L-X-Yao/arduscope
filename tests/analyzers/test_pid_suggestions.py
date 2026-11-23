@@ -173,6 +173,106 @@ class TestDTermGate:
             {"PIDR": pid}, self._rate(0.12))
 
 
+class TestPlaneDTermGate:
+    """Plane has no RATE message; its PID error supplies the oscillation gate."""
+
+    CASES = [
+        ("PIDR", "RLL_RATE_D"),
+        ("PIDP", "PTCH_RATE_D"),
+        ("PIDY", "YAW_RATE_D"),
+    ]
+    PARAMS = {
+        "RLL_RATE_P": 0.1, "RLL_RATE_I": 0.1, "RLL_RATE_D": 0.01,
+        "PTCH_RATE_P": 0.1, "PTCH_RATE_I": 0.1, "PTCH_RATE_D": 0.01,
+        "YAW_RATE_ENABLE": 1, "YAW_RATE_P": 0.1, "YAW_RATE_I": 0.1,
+        "YAW_RATE_D": 0.01, "Q_ENABLE": 0,
+    }
+
+    @staticmethod
+    def _pid(oscillating=True, quiet=False, warning_noise=False):
+        tar = 0.01 * _tar()
+        act = tar.copy()
+        if oscillating:
+            act -= 0.1 * np.sign(np.sin(2 * np.pi * 4.0 * TS))
+        pid = _pid(tar, act)
+        pid["D"] = (np.full(N, 0.01) if quiet else
+                    0.05 * np.sin(2 * np.pi * 7.0 * TS))
+        if warning_noise:
+            pid["P"] = 0.1 * np.sin(2 * np.pi * 1.3 * TS)
+        return pid
+
+    @staticmethod
+    def _preconditions(pid, oscillating, noise):
+        err = pid["Tar"] - pid["Act"]
+        crossings = np.sum(np.diff(np.sign(err)) != 0) / 100.0
+        total = pid["P"] + pid["I"] + pid["D"] + pid["FF"]
+        ratio = np.std(pid["D"]) / np.std(total)
+        th = Thresholds()
+        if oscillating:
+            assert crossings > th.pid_osc_crossings_warn
+        else:
+            assert crossings == 0
+        if noise == "critical":
+            assert ratio >= th.pid_dterm_noise_crit
+        elif noise == "warning":
+            assert th.pid_dterm_noise_warn <= ratio < th.pid_dterm_noise_crit
+        else:
+            assert ratio < th.pid_dterm_noise_warn
+
+    def _run_plane(self, message, **kwargs):
+        pid = self._pid(**kwargs)
+        self._preconditions(
+            pid, kwargs.get("oscillating", True),
+            "quiet" if kwargs.get("quiet") else
+            "warning" if kwargs.get("warning_noise") else "critical")
+        return _run({message: pid}, self.PARAMS, vehicle_type="ArduPlane")
+
+    @pytest.mark.parametrize("message,param", CASES)
+    def test_oscillating_high_d_noise_gets_the_critical_step(
+            self, message, param):
+        result = self._run_plane(message)
+
+        suggestion = next(s for s in result.param_suggestions
+                          if s["param"] == param)
+        assert suggestion["current"] == 0.01
+        assert suggestion["suggested"] == 0.008
+
+    def test_warning_d_noise_gets_the_smaller_step(self):
+        result = self._run_plane("PIDR", warning_noise=True)
+
+        suggestion = next(s for s in result.param_suggestions
+                          if s["param"] == "RLL_RATE_D")
+        assert suggestion["suggested"] == 0.009
+
+    @pytest.mark.parametrize("message,param", CASES)
+    def test_high_d_noise_without_oscillation_changes_nothing(
+            self, message, param):
+        result = self._run_plane(message, oscillating=False)
+
+        assert param not in [s["param"] for s in result.param_suggestions]
+
+    @pytest.mark.parametrize("message,param", CASES)
+    def test_quiet_d_with_oscillation_changes_nothing(self, message, param):
+        result = self._run_plane(message, quiet=True)
+
+        assert param not in [s["param"] for s in result.param_suggestions]
+
+    def test_copter_crossings_do_not_replace_the_rate_gate(self):
+        result = _run({"PIDR": self._pid()}, GAINS)
+
+        assert "ATC_RAT_RLL_D" not in [
+            s["param"] for s in result.param_suggestions]
+
+    def test_vtol_crossings_do_not_replace_the_rate_gate(self):
+        gains = {"Q_A_RAT_RLL_P": 0.2, "Q_A_RAT_RLL_I": 0.2,
+                 "Q_A_RAT_RLL_D": 0.004, "Q_ENABLE": 1}
+        result = _run({"PIQR": self._pid()}, gains,
+                      vehicle_type="ArduPlane", quadplane=True)
+
+        assert "Q_A_RAT_RLL_D" not in [
+            s["param"] for s in result.param_suggestions]
+
+
 def test_small_absolute_error_gets_no_advice():
     tar = 0.001 * _tar()                       # about 0.06 deg/s
     result = _run({"PIDR": _pid(tar, np.zeros(N))}, GAINS)
