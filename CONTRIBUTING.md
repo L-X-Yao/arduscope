@@ -180,9 +180,12 @@ The focused consistency checks are:
 
 ```
 python3 tools/lint_project.py
-python3 tools/check_thresholds.py
-python3 tools/check_suggestions.py
+python3 tools/check_analyzers.py
 python3 tools/check_i18n.py
+python3 tools/check_msg_fields.py
+python3 tools/check_params.py
+python3 tools/check_suggestions.py
+python3 tools/check_thresholds.py
 ```
 
 `tools/check_thresholds.py` also has `--write`, used only to regenerate the
