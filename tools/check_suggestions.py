@@ -148,8 +148,11 @@ class _Sites(ast.NodeVisitor):
                 node.func.attr if isinstance(node.func, ast.Attribute) else "")
         if name == "ParamSuggestion":
             keyword = next((k for k in node.keywords if k.arg == "param"), None)
-            if keyword is not None:
-                self._record(keyword.value)
+            if keyword is None:
+                raise ValueError(
+                    f"{self.module}:{node.lineno}: ParamSuggestion requires "
+                    "a param keyword")
+            self._record(keyword.value)
         self.generic_visit(node)
 
     def _record(self, value: ast.expr) -> None:
@@ -299,7 +302,12 @@ def main(argv: list[str] | None = None) -> int:
         rows, errors = parse_registry(f.read())
     errors += check_rows(rows, NOT_FLOWN_WAIVERS)
     _report("Registry rows", errors)
-    code_errors = check_code(rows, scan_analyzers(), DYNAMIC_SITES)
+    try:
+        scanned = scan_analyzers()
+    except ValueError as exc:
+        code_errors = [str(exc)]
+    else:
+        code_errors = check_code(rows, scanned, DYNAMIC_SITES)
     _report("Registry against the code", code_errors)
     errors += code_errors
     for path in args.baseline:

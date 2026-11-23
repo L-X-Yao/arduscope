@@ -69,6 +69,15 @@ class TestTheRepository:
         errors = cs.check_rows([*registry, row], cs.NOT_FLOWN_WAIVERS)
         assert len(errors) == 1 and "no waiver" in errors[0]
 
+    def test_main_reports_a_malformed_typed_call(self, monkeypatch, capsys):
+        def fail_to_scan():
+            raise ValueError("mod:4: ParamSuggestion requires a param keyword")
+        monkeypatch.setattr(cs, "scan_analyzers", fail_to_scan)
+        assert cs.main([]) == 1
+        output = capsys.readouterr().out
+        assert "FAIL" in output
+        assert "mod:4: ParamSuggestion requires a param keyword" in output
+
 
 class TestScan:
     def test_literal_name(self):
@@ -134,11 +143,40 @@ def f(r):
 """)
         assert not names and not dynamic
 
+    def test_typed_call_without_param_keyword_fails_closed(self):
+        with pytest.raises(
+                ValueError, match="mod:2: ParamSuggestion requires a param keyword"):
+            cs.scan_source("mod", (
+                'def f():\n'
+                '    return ParamSuggestion("A_B", 0, 1, "test")\n'))
+
 
 class TestParamNamePattern:
     def test_typed_suggestion_matches_across_lines(self):
-        assert cp._SUGGESTION.findall(
-            'ParamSuggestion(\n    param="A_B",\n    suggested=1)') == ["A_B"]
+        names, errors = cp.scan_param_suggestions(
+            'ParamSuggestion(\n    param="A_B",\n    suggested=1)', "mod")
+        assert names == [("A_B", 2)]
+        assert errors == []
+
+    def test_typed_positional_call_is_an_error(self):
+        names, errors = cp.scan_param_suggestions(
+            'ParamSuggestion("A_B", 0, 1, "test")', "mod")
+        assert names == []
+        assert errors == ["mod:1: ParamSuggestion requires a param keyword"]
+
+    def test_typed_text_in_a_docstring_is_not_a_call(self):
+        names, errors = cp.scan_param_suggestions(
+            '"""ParamSuggestion(param="A_B")"""', "mod")
+        assert names == [] and errors == []
+
+    def test_main_rejects_a_typed_call_without_param(
+            self, tmp_path, monkeypatch, capsys):
+        path = tmp_path / "bad.py"
+        path.write_text('ParamSuggestion("A_B", 0, 1, "test")', encoding="utf-8")
+        monkeypatch.setattr(cp, "_code_files", lambda: [str(path)])
+        monkeypatch.setattr(cp, "LOCALE_FILES", [])
+        assert cp.main() == 1
+        assert "ParamSuggestion requires a param keyword" in capsys.readouterr().out
 
     def test_dict_suggestion_still_matches(self):
         assert cp._SUGGESTION.findall('{"param": "A_B", "suggested": 1}') == [

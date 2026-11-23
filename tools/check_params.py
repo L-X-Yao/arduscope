@@ -27,6 +27,7 @@ Exit 0 = every name resolves; 1 = at least one does not.
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -73,11 +74,34 @@ LEGACY_PARAMS = {
 }
 
 _GET_PARAM = re.compile(r'get_param\(\s*"([A-Z][A-Z0-9_]*)"')
-_SUGGESTION = re.compile(
-    r'(?:"param"\s*:\s*|ParamSuggestion\s*\(\s*param\s*=\s*)'
-    r'"([A-Z][A-Z0-9_]*)"')
+_SUGGESTION = re.compile(r'"param"\s*:\s*"([A-Z][A-Z0-9_]*)"')
 # Prose token: at least one underscore, so plain words are not candidates.
 _PROSE = re.compile(r'\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\b')
+
+
+def scan_param_suggestions(
+        source: str, where: str) -> tuple[list[tuple[str, int]], list[str]]:
+    """Read literal names from typed calls; reject calls without `param=`."""
+    names = []
+    errors = []
+    tree = ast.parse(source, filename=where)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        name = (func.id if isinstance(func, ast.Name) else
+                func.attr if isinstance(func, ast.Attribute) else "")
+        if name != "ParamSuggestion":
+            continue
+        keyword = next((k for k in node.keywords if k.arg == "param"), None)
+        if keyword is None:
+            errors.append(
+                f"{where}:{node.lineno}: ParamSuggestion requires "
+                "a param keyword")
+        elif (isinstance(keyword.value, ast.Constant)
+              and isinstance(keyword.value.value, str)):
+            names.append((keyword.value.value, keyword.value.lineno))
+    return names, errors
 
 
 def load_table() -> tuple[set[str], set[str]]:
@@ -123,7 +147,7 @@ def _code_files() -> list[str]:
     return [f for f in files if os.path.isfile(f)]
 
 
-def collect() -> dict[str, list[tuple[str, int]]]:
+def collect(scan_errors: list[str] | None = None) -> dict[str, list[tuple[str, int]]]:
     """{param_name: [(where, line), ...]} across code and locales."""
     found: dict[str, list[tuple[str, int]]] = {}
 
@@ -140,6 +164,11 @@ def collect() -> dict[str, list[tuple[str, int]]]:
         for match in _SUGGESTION.finditer(text):
             lineno = text.count("\n", 0, match.start(1)) + 1
             add(match.group(1), rel, lineno)
+        names, errors = scan_param_suggestions(text, rel)
+        for name, lineno in names:
+            add(name, rel, lineno)
+        if scan_errors is not None:
+            scan_errors.extend(errors)
 
     for rel in LOCALE_FILES:
         path = os.path.join(REPO_ROOT, rel)
@@ -158,7 +187,8 @@ def main() -> int:
     prefixes, leaves = load_table()
     with open(TABLE_PATH, encoding="utf-8") as fh:
         commit = json.load(fh)["_source"]["commit"]
-    found = collect()
+    scan_errors = []
+    found = collect(scan_errors)
     print(f"{len(leaves)} leaves / {len(prefixes)} prefixes "
           f"(AP @ {commit}), {len(found)} names referenced")
 
@@ -185,8 +215,15 @@ def main() -> int:
                 where += f" (+{len(sites) - 3} more)"
             print(f"  {RED}FAIL{RESET}  {name} — no such parameter "
                   f"[{where}]")
-        print(f"\n{RED}{BOLD}FAILED{RESET}: {len(bad)} unknown parameter "
-              f"name(s)")
+    for error in scan_errors:
+        print(f"  {RED}FAIL{RESET}  {error}")
+    if bad or scan_errors:
+        if bad:
+            print(f"\n{RED}{BOLD}FAILED{RESET}: {len(bad)} unknown parameter "
+                  "name(s)")
+        else:
+            print(f"\n{RED}{BOLD}FAILED{RESET}: {len(scan_errors)} malformed "
+                  "ParamSuggestion call(s)")
         return 1
 
     print(f"  {GREEN}PASS{RESET}  every referenced parameter resolves")
