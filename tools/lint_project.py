@@ -99,7 +99,7 @@ def check_locale_key_completeness() -> list[str]:
 
     # Collect all t("key") and _t("key") calls from analyzers/, lib/
     # and the entry modules
-    py_files = collect_py_files("src/arduscope/analyzers", "src/arduscope/lib", *ENTRY_FILES)
+    py_files = collect_py_files("src/arduscope/analyzers", "src/arduscope/lib", "src/arduscope/agent", *ENTRY_FILES)
     # Pattern: t("key") or _t("key") with single or double quotes
     t_call_pat = re.compile(r"""(?:^|(?<=\W))_?t\(\s*["']([^"']+)["']""")
 
@@ -228,7 +228,7 @@ def check_import_shadowing() -> list[str]:
     section("4. Import shadowing check")
     errors: list[str] = []
 
-    py_files = collect_py_files("src/arduscope/analyzers", "src/arduscope/lib", *ENTRY_FILES)
+    py_files = collect_py_files("src/arduscope/analyzers", "src/arduscope/lib", "src/arduscope/agent", *ENTRY_FILES)
 
     # Check files that import bare `t` in ANY position of the import
     # list (`import t`, `import set_locale, t`, ...) — the old
@@ -379,9 +379,10 @@ _ENTRY_IMPORT = re.compile(
     r"^\s*(?:from\s+(?:%s)(?:\.|\s|$)|import\s+(?:%s)(?:\.|\s|$))"
     % ("|".join(ENTRY_MODULES), "|".join(ENTRY_MODULES)))
 _AGENT_IMPORT = re.compile(
-    r"^\s*(?:from\s+(?:arduscope\.)?lib\.agent(?:\.|\s|$)"
-    r"|import\s+(?:arduscope\.)?lib\.agent(?:\.|\s|$)"
-    r"|from\s+(?:arduscope\.)?lib\s+import\s+agent(?:\.|\s|$))")
+    r"^\s*(?:from\s+(?:arduscope\.)?(?:lib\.)?agent(?:\.|\s|$)"
+    r"|import\s+(?:arduscope\.)?(?:lib\.)?agent(?:\.|\s|$)"
+    r"|from\s+(?:(?:arduscope\.)?lib|arduscope)\s+import\s+agent"
+    r"(?:\.|\s|$))")
 
 
 def check_dependency_direction() -> list[str]:

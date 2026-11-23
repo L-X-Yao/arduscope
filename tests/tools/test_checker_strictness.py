@@ -40,6 +40,11 @@ def test_analyzer_import_regex_matches_both_namespaces(line):
     "from arduscope.lib.agent import analyze_with_agent",
     "from lib import agent",
     "from arduscope.lib import agent",
+    "from agent import analyze_with_agent",
+    "from arduscope.agent import analyze_with_agent",
+    "from arduscope.agent.card import analyze_with_agent",
+    "import arduscope.agent",
+    "from arduscope import agent",
 ])
 def test_agent_import_regex_matches_both_namespaces(line):
     assert lint_project._AGENT_IMPORT.match(line)

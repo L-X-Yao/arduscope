@@ -15,7 +15,7 @@ from arduscope.lib.i18n import set_locale, t
 @pytest.fixture
 def app(monkeypatch, tmp_path):
     import web_app
-    import arduscope.lib.agent.config as agent_config
+    import arduscope.agent.config as agent_config
 
     original_report_dir = web_app.REPORT_DIR
     original_history_file = web_app.STATE.history.path
@@ -50,7 +50,7 @@ def test_settings_page_opens_on_loopback(app):
 def test_settings_page_names_the_configured_path(app):
     """The page used to read a CONFIG_PATH copied at import time, so a
     patched config still showed the real path."""
-    import arduscope.lib.agent.config as agent_config
+    import arduscope.agent.config as agent_config
     resp = app.get("/settings")
     assert agent_config.CONFIG_PATH in resp.text
 
@@ -92,7 +92,7 @@ def test_settings_page_is_404_when_exposed(app, monkeypatch):
 
 
 def test_settings_post_saves_and_hides_the_key(app, tmp_path):
-    import arduscope.lib.agent.config as agent_config
+    import arduscope.agent.config as agent_config
     resp = app.post_json("/api/settings", {
         "provider": "openai",
         "base_url": "https://api.deepseek.com",

@@ -62,9 +62,9 @@ from arduscope.lib import fleet_history
 from arduscope.lib.html_report import HtmlReportGenerator
 from arduscope.lib.ai_diagnosis import generate_diagnosis
 from arduscope.lib.issues import AnalysisIssue
-from arduscope.lib.agent import analyze_with_agent
-from arduscope.lib.agent.config import ConfigError, load_config, update_config
-from arduscope.lib.agent.providers import NoProviderPackage, test_connection
+from arduscope.agent import analyze_with_agent
+from arduscope.agent.config import ConfigError, load_config, update_config
+from arduscope.agent.providers import NoProviderPackage, test_connection
 from arduscope.lib.report_session import AnalysisRequest, ReportSession
 from arduscope.lib.templates import get_template
 from arduscope.lib.web_limits import (  # noqa: F401 - two re-exported for tests
@@ -729,7 +729,7 @@ def settings_page():
 
 
 def _empty_agent_config():
-    from arduscope.lib.agent.config import AgentConfig
+    from arduscope.agent.config import AgentConfig
     return AgentConfig()
 
 

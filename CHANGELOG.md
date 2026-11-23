@@ -14,6 +14,8 @@ releases are not published.
   against the convergence-criteria table.
 - Parameter suggestions now use a typed internal representation with
   unchanged export formats.
+- The online agent moved from `arduscope.lib.agent` to `arduscope.agent`;
+  there is no compatibility shim.
 
 ## [0.13.4] - 2026-11-23
 

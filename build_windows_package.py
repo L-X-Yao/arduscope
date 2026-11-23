@@ -698,9 +698,9 @@ def main():
             print(f"  Warning: {fname} not found")
 
     # Copy subdirectories (all .py files, auto-discovers new analyzers and
-    # subpackages such as lib/agent). A top-level listdir here shipped
-    # v0.10.0 without lib/agent, and every entry point that imports it
-    # failed on Windows.
+    # subpackages such as agent, formerly lib/agent). A top-level listdir
+    # here shipped v0.10.0 without lib/agent, and every entry point that
+    # imports it failed on Windows.
     file_count = copy_module_files(script_dir, la_dir)
 
     # Copy data directories (locales, etc.) preserving structure

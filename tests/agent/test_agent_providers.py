@@ -8,8 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from arduscope.lib.agent.config import AgentConfig
-from arduscope.lib.agent.providers import (AnthropicAdapter, NoToolSupport,
+from arduscope.agent.config import AgentConfig
+from arduscope.agent.providers import (AnthropicAdapter, NoToolSupport,
                                  OpenAIAdapter, ProviderError, ToolCall)
 
 pytestmark = pytest.mark.fast

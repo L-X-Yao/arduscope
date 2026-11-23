@@ -172,7 +172,7 @@ def main() -> int:
     errors: list[str] = []
     dynamic = 0
     n_files = 0
-    for d in ("src/arduscope/analyzers", "src/arduscope/lib"):
+    for d in ("src/arduscope/analyzers", "src/arduscope/lib", "src/arduscope/agent"):
         full = os.path.join(REPO_ROOT, d)
         for fname in sorted(os.listdir(full)):
             if fname.endswith(".py"):

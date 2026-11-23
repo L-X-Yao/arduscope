@@ -7,8 +7,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from arduscope.lib.agent.config import AgentConfig
-from arduscope.lib.agent.tools import MAX_RESULT_BYTES, ToolBox, _json_size
+from arduscope.agent.config import AgentConfig
+from arduscope.agent.tools import MAX_RESULT_BYTES, ToolBox, _json_size
 from arduscope.lib.pipeline import PipelineResult
 from arduscope.lib.results import AnalysisResult
 from arduscope.lib.suggestions import ParamSuggestion

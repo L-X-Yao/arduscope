@@ -8,7 +8,7 @@ import stat
 
 import pytest
 
-from arduscope.lib.agent.config import (AgentConfig, ConfigError, load_config,
+from arduscope.agent.config import (AgentConfig, ConfigError, load_config,
                               save_config, update_config)
 
 pytestmark = pytest.mark.fast
@@ -76,7 +76,7 @@ def test_a_broken_file_is_an_error(tmp_path):
 
 
 def test_command_line_values_reuse_the_saved_key(tmp_path, monkeypatch):
-    import arduscope.lib.agent.config as agent_config
+    import arduscope.agent.config as agent_config
     path = tmp_path / "agent.json"
     save_config(AgentConfig(provider="openai", model="saved-model",
                             api_key="saved-key"), str(path))

@@ -106,15 +106,17 @@ def test_the_version_lives_in_the_library_package():
 
 
 def test_the_package_check_sees_subpackages():
-    """v0.10.0 shipped without lib/agent because both scans were top-level."""
+    """v0.10.0 shipped without lib/agent (now arduscope/agent) because both
+    scans were top-level."""
     import sys
     sys.path.insert(0, str(ROOT))
     sys.path.insert(0, str(ROOT / "tools"))
     import win_package_check
 
     modules = win_package_check.source_modules(str(ROOT))
-    assert "arduscope/lib/agent/__init__" in modules
-    assert "arduscope/lib/agent/tools" in modules
+    assert "arduscope/agent/__init__" in modules
+    assert "arduscope/agent/tools" in modules
+    assert "arduscope/lib/agent/__init__" not in modules
 
 
 def test_the_windows_build_copies_subpackages(tmp_path):
@@ -123,9 +125,9 @@ def test_the_windows_build_copies_subpackages(tmp_path):
     import build_windows_package as builder
 
     package = tmp_path / "src" / "arduscope"
-    (package / "lib" / "agent").mkdir(parents=True)
-    (package / "lib" / "agent" / "__init__.py").write_text("")
-    (package / "lib" / "agent" / "tools.py").write_text("")
+    (package / "agent").mkdir(parents=True)
+    (package / "agent" / "__init__.py").write_text("")
+    (package / "agent" / "tools.py").write_text("")
     (package / "analyzers").mkdir()
     (package / "analyzers" / "one.py").write_text("")
 
@@ -133,6 +135,6 @@ def test_the_windows_build_copies_subpackages(tmp_path):
     copied = builder.copy_module_files(str(tmp_path), str(out))
 
     assert copied == 3
-    assert (out / "arduscope" / "lib" / "agent" / "__init__.py").is_file()
-    assert (out / "arduscope" / "lib" / "agent" / "tools.py").is_file()
+    assert (out / "arduscope" / "agent" / "__init__.py").is_file()
+    assert (out / "arduscope" / "agent" / "tools.py").is_file()
     assert (out / "arduscope" / "analyzers" / "one.py").is_file()

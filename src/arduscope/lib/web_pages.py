@@ -10,7 +10,7 @@ import html
 import json
 
 from arduscope.lib import fleet_history
-from arduscope.lib.agent import config as agent_config
+from arduscope.agent import config as agent_config
 from arduscope.lib.i18n import get_locale, t
 
 # The services the project tested end to end. Picking one fills in the

@@ -36,8 +36,8 @@ from arduscope.lib.i18n import localized_value, set_locale, t
 from arduscope.lib.log_reader import LogReader, format_byte_size
 from arduscope.lib.html_report import ChartRenderError, HtmlReportGenerator
 from arduscope.lib.ai_diagnosis import generate_diagnosis
-from arduscope.lib.agent import analyze_with_agent
-from arduscope.lib.agent.config import config_from_args
+from arduscope.agent import analyze_with_agent
+from arduscope.agent.config import config_from_args
 from arduscope.lib.param_conflict import distinct_values, merge_suggestions
 from arduscope.lib.report_session import AnalysisRequest, ReportSession
 from arduscope.lib.templates import get_template, list_templates

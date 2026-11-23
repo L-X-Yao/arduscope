@@ -59,7 +59,7 @@ def extract_placeholders(template: str) -> set[str]:
 
 def _source_files() -> list[str]:
     files: list[str] = []
-    for d in ("src/arduscope/analyzers", "src/arduscope/lib"):
+    for d in ("src/arduscope/analyzers", "src/arduscope/lib", "src/arduscope/agent"):
         full = os.path.join(PROJECT_ROOT, d)
         if not os.path.isdir(full):
             continue

@@ -42,7 +42,7 @@ YELLOW = "\033[93m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
 
-CODE_DIRS = ("src/arduscope/analyzers", "src/arduscope/lib")
+CODE_DIRS = ("src/arduscope/analyzers", "src/arduscope/lib", "src/arduscope/agent")
 ENTRY_FILES = ("flight_report.py", "multi_report.py", "batch_report.py",
                "fleet_report.py", "web_app.py")
 LOCALE_FILES = ("src/arduscope/locales/zh.json", "src/arduscope/locales/en.json")

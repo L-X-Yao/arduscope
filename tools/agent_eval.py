@@ -30,8 +30,8 @@ for _path in (_ROOT, _SRC):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-from arduscope.lib.agent.config import AgentConfig  # noqa: E402
-from arduscope.lib.agent.loop import run_agent  # noqa: E402
+from arduscope.agent.config import AgentConfig  # noqa: E402
+from arduscope.agent.loop import run_agent  # noqa: E402
 from arduscope.lib.i18n import set_locale  # noqa: E402
 from arduscope.lib.pipeline import run_analysis  # noqa: E402
 
