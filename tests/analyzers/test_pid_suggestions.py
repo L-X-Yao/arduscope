@@ -251,6 +251,23 @@ class TestPlaneDTermGate:
 
         assert param not in [s["param"] for s in result.param_suggestions]
 
+    def test_bias_with_subthreshold_crossings_changes_nothing(self):
+        pid = self._pid(oscillating=False)
+        error = 0.02 + 0.03 * np.sin(2 * np.pi * 0.75 * TS)
+        pid["Act"] = pid["Tar"] - error
+        crossings = np.sum(np.diff(np.sign(error)) != 0) / 100.0
+        total = pid["P"] + pid["I"] + pid["D"] + pid["FF"]
+        noise_ratio = np.std(pid["D"]) / np.std(total)
+        assert 0 < crossings < Thresholds().pid_osc_crossings_warn
+        assert noise_ratio > Thresholds().pid_dterm_noise_warn
+
+        messages = {message: dict(pid) for message, _param in self.CASES}
+        result = _run(messages, self.PARAMS, vehicle_type="ArduPlane")
+
+        assert len(result.sub_results) == 3  # all three axes ran
+        assert not {"RLL_RATE_D", "PTCH_RATE_D", "YAW_RATE_D"} & {
+            s["param"] for s in result.param_suggestions}
+
     @pytest.mark.parametrize("message,param", CASES)
     def test_quiet_d_with_oscillation_changes_nothing(self, message, param):
         result = self._run_plane(message, quiet=True)
