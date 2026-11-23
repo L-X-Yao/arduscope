@@ -64,3 +64,10 @@ def test_render_refuses_an_orphan_source(monkeypatch):
                         ct.THRESHOLD_SOURCES["vibe_warn"])
     with pytest.raises(ValueError, match="orphan source: orphan_threshold"):
         ct.render_table()
+
+
+def test_check_document_reports_an_orphan_without_raising(monkeypatch):
+    monkeypatch.setitem(ct.THRESHOLD_SOURCES, "orphan_threshold",
+                        ct.THRESHOLD_SOURCES["vibe_warn"])
+    errors = ct.check_document()
+    assert "orphan source: orphan_threshold" in errors

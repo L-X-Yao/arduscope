@@ -77,9 +77,10 @@ def check_document() -> list[str]:
     errors = validate_sources()
     try:
         lines, start, end = _table_span(DOC_PATH.read_text(encoding="utf-8"))
+        rendered = render_table()
     except ValueError as exc:
-        return errors + [str(exc)]
-    if "".join(lines[start:end]) != render_table():
+        return errors if str(exc) in errors else errors + [str(exc)]
+    if "".join(lines[start:end]) != rendered:
         errors.append(
             "docs/convergence_criteria.md table differs; run "
             "tools/check_thresholds.py --write")
