@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Fixed
+- The Windows CI job now runs the new theme and agent tests: the theme
+  accent scan uses POSIX-style relative paths, and the agent configuration
+  mode-bit assertion is skipped where Windows has no POSIX mode bits.
+
 ## [0.14.0] - 2026-11-23
 
 ### Changed

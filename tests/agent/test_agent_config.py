@@ -29,6 +29,8 @@ def test_environment_key_wins(tmp_path, monkeypatch):
     assert config.resolved_key() == "from-env"
 
 
+@pytest.mark.skipif(os.name == "nt",
+                    reason="Windows has no POSIX file mode bits")
 def test_file_is_written_0600(tmp_path):
     path = tmp_path / "agent.json"
     save_config(AgentConfig(provider="openai", model="m",

@@ -84,7 +84,7 @@ def test_accent_literal_leaves_the_lib_modules():
     # remaining entry scripts and analyzers are outside this phase's scan.
     offenders = []
     for path in (REPO_ROOT / "src" / "arduscope" / "lib").rglob("*.py"):
-        rel = str(path.relative_to(REPO_ROOT))
+        rel = path.relative_to(REPO_ROOT).as_posix()
         text = path.read_text(encoding="utf-8")
         if rel != "src/arduscope/lib/theme.py" and "#409eff" in text:
             offenders.append(rel)
