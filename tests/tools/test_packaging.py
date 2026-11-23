@@ -116,7 +116,7 @@ def test_the_package_check_sees_subpackages():
     modules = win_package_check.source_modules(str(ROOT))
     assert "arduscope/agent/__init__" in modules
     assert "arduscope/agent/tools" in modules
-    assert "arduscope/lib/agent/__init__" not in modules
+    assert not any(m.startswith("arduscope/lib/agent/") for m in modules)
 
 
 def test_the_windows_build_copies_subpackages(tmp_path):
