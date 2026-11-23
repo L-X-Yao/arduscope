@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+
 import pytest
 
 from tests._repo import REPO_ROOT
@@ -51,8 +53,12 @@ def test_every_consumer_imports_and_uses_the_theme():
         source = (REPO_ROOT / rel).read_text(encoding="utf-8")
         assert "from arduscope.lib.theme import" in source \
             or "from .theme import" in source, rel
+        # Import aliases are ast.alias nodes, not ast.Name, so only real
+        # uses (including f-string expressions and subscripts) count.
+        used = {node.id for node in ast.walk(ast.parse(source))
+                if isinstance(node, ast.Name)}
         for token in REQUIRED_TOKENS[rel]:
-            assert token in source, (rel, token)
+            assert token in used, (rel, token)
 
 
 def test_migrated_surfaces_no_longer_carry_the_font_literal():
@@ -73,8 +79,9 @@ def test_accent_literal_leaves_the_consumer_surfaces():
 
 
 def test_accent_literal_leaves_the_lib_modules():
-    # Scope note: this sweep covers src/arduscope/lib only; entry scripts
-    # and analyzers are not part of the migrated surfaces.
+    # Scope note: this sweep covers src/arduscope/lib only;
+    # batch_report.py is covered by the consumer assertions above, and the
+    # remaining entry scripts and analyzers are outside this phase's scan.
     offenders = []
     for path in (REPO_ROOT / "src" / "arduscope" / "lib").rglob("*.py"):
         rel = str(path.relative_to(REPO_ROOT))
@@ -82,4 +89,3 @@ def test_accent_literal_leaves_the_lib_modules():
         if rel != "src/arduscope/lib/theme.py" and "#409eff" in text:
             offenders.append(rel)
     assert offenders == []
-
