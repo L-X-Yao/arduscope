@@ -15,6 +15,7 @@ from __future__ import annotations
 import numpy as np
 import plotly.graph_objects as go
 
+from arduscope.lib.attitude_scope import scope_grade_mask
 from arduscope.lib.i18n import t
 
 from arduscope.lib.suggestions import ParamSuggestion
@@ -84,6 +85,19 @@ class AttitudeAnalyzer(BaseAnalyzer):
             )
         armed_mask = self.get_armed_mask(t_att)
 
+        # The Copter attitude rules describe one controller. A fixed-wing
+        # segment is flown by ArduPlane's own controller, which never uses
+        # the 30 deg limit or the autotune ceilings, so it keeps its
+        # metrics and figures but is not graded by them.
+        grade_mask, scope = scope_grade_mask(self.reader, self.vehicle, t_att)
+        if scope == "unknown":
+            return self.make_result(
+                title=t("analyzer.attitude"),
+                status="info",
+                summary=t("attitude.unknown_vehicle"),
+            )
+        grade_mask &= armed_mask
+
         # Require at least 10 armed samples
         if np.sum(armed_mask) < 10:
             return self.make_result(
@@ -114,7 +128,53 @@ class AttitudeAnalyzer(BaseAnalyzer):
                 summary=t("attitude.all_nan"),
             )
 
-        max_rp_rms = max(roll_rms, pitch_rms)
+        # ------------------------------------------------------------------
+        # 2b. Metrics on the samples the Copter rules describe (grade_mask).
+        # The armed figures and detail lines above stay as they are; only
+        # the verdict reads these. For a QuadPlane that is the VTOL time.
+        # ------------------------------------------------------------------
+        n_graded = int(np.sum(grade_mask))
+        if n_graded < 10:
+            graded_rms = graded_peak = 0.0
+            graded_des_range = 0.0
+            graded_p99_ratio = 0.0
+            graded_p99 = 0.0
+            g_roll_rms = g_pitch_rms = 0.0
+        else:
+            g_roll = roll_err[grade_mask]
+            g_pitch = pitch_err[grade_mask]
+            g_roll_rms = float(np.sqrt(np.nanmean(g_roll ** 2)))
+            g_pitch_rms = float(np.sqrt(np.nanmean(g_pitch ** 2)))
+            if np.isnan(g_roll_rms) or np.isnan(g_pitch_rms):
+                return self.make_result(
+                    title=t("analyzer.attitude"),
+                    status="info",
+                    summary=t("attitude.all_nan"),
+                )
+            graded_rms = max(g_roll_rms, g_pitch_rms)
+            graded_peak = max(float(np.nanmax(np.abs(g_roll))),
+                              float(np.nanmax(np.abs(g_pitch))))
+            g_des_roll = des_roll[grade_mask]
+            g_des_pitch = des_pitch[grade_mask]
+            graded_des_range = max(
+                float(np.nanmax(g_des_roll) - np.nanmin(g_des_roll)),
+                float(np.nanmax(g_des_pitch) - np.nanmin(g_des_pitch)))
+            g_p99 = max(float(np.nanpercentile(np.abs(g_roll), 99)),
+                        float(np.nanpercentile(np.abs(g_pitch), 99)))
+            graded_p99 = g_p99
+            graded_p99_ratio = (g_p99 / graded_rms
+                                if graded_rms > 0.3 else 0.0)
+        # Say which samples the verdict is read from, after the armed-wide
+        # numbers above so the reader can tell the two apart.
+        if scope == "fixed_wing":
+            details.append(t("attitude.fixed_wing_not_graded"))
+        elif scope == "vtol" and n_graded < 10:
+            details.append(t("attitude.vtol_no_samples"))
+        elif scope == "vtol":
+            details.append(t("attitude.vtol_graded_detail",
+                             roll=f"{g_roll_rms:.2f}",
+                             pitch=f"{g_pitch_rms:.2f}",
+                             peak=f"{graded_peak:.1f}"))
 
         # Multi-dimensional attitude quality
         roll_err_armed = roll_err[armed_mask]
@@ -131,7 +191,6 @@ class AttitudeAnalyzer(BaseAnalyzer):
                                 - np.nanmin(des_roll_armed))
         des_pitch_range = float(np.nanmax(des_pitch_armed)
                                  - np.nanmin(des_pitch_armed))
-        des_range = max(des_roll_range, des_pitch_range)
 
         # P95 error
         roll_p95 = float(np.nanpercentile(np.abs(roll_err_armed), 95))
@@ -158,67 +217,85 @@ class AttitudeAnalyzer(BaseAnalyzer):
         # -----------------------------------------------------------
         # 3. Status determination (multi-criterion)
         # -----------------------------------------------------------
+        # Every condition reads the graded_* values, i.e. the samples the
+        # Copter rules describe. On a fixed-wing log grade_mask is empty
+        # and nothing below can fire; the card then says why.
         warn_thresh = self.thresholds.att_rms_warn
         crit_thresh = self.thresholds.att_rms_crit
 
-        rms_crit = max_rp_rms >= crit_thresh
-        rms_warn = max_rp_rms >= warn_thresh
+        rms_crit = n_graded >= 10 and graded_rms >= crit_thresh
+        rms_warn = n_graded >= 10 and graded_rms >= warn_thresh
 
         peak_beyond_command = (
-            des_range < 20.0
-            and max_peak_err > crit_thresh
+            n_graded >= 10
+            and graded_des_range < 20.0
+            and graded_peak > crit_thresh
         )
-        peak_warning = max_peak_err > _PEAK_WARN_DEG
-        peak_critical = max_peak_err > _THRUST_ERROR_ANGLE_DEG
+        peak_warning = n_graded >= 10 and graded_peak > _PEAK_WARN_DEG
+        peak_critical = n_graded >= 10 and graded_peak > _THRUST_ERROR_ANGLE_DEG
 
-        p99_roll = float(np.nanpercentile(np.abs(roll_err_armed), 99))
-        p99_pitch = float(np.nanpercentile(np.abs(pitch_err_armed), 99))
-        max_p99 = max(p99_roll, p99_pitch)
-        p99_rms_ratio = max_p99 / max_rp_rms if max_rp_rms > 0.3 else 0.0
+        p99_rms_ratio = graded_p99_ratio
         oscillation_burst = (
-            p99_rms_ratio > 4.0
-            and max_p99 > warn_thresh * 1.5
+            n_graded >= 10
+            and p99_rms_ratio > 4.0
+            and graded_p99 > warn_thresh * 1.5
         )
 
         if rms_crit or peak_critical:
             status = "critical"
             if rms_crit:
                 summary = t("attitude.crit_rms_summary",
-                            roll=f"{roll_rms:.2f}",
-                            pitch=f"{pitch_rms:.2f}",
+                            roll=f"{g_roll_rms:.2f}",
+                            pitch=f"{g_pitch_rms:.2f}",
                             thresh=crit_thresh)
             else:
                 summary = t("attitude.crit_peak_summary",
-                            peak=f"{max_peak_err:.1f}")
+                            peak=f"{graded_peak:.1f}")
+            if scope == "vtol":
+                summary = t("attitude.vtol_summary_prefix") + summary
         elif rms_warn or peak_beyond_command or peak_warning or oscillation_burst:
             status = "warning"
             reasons = []
             if rms_warn:
                 reasons.append(
                     t("attitude.warn_rms_reason",
-                      rms=f"{max_rp_rms:.2f}"))
+                      rms=f"{graded_rms:.2f}"))
             if peak_warning:
                 reasons.append(
                     t("attitude.warn_severe_reason",
-                      peak=f"{max_peak_err:.1f}"))
+                      peak=f"{graded_peak:.1f}"))
             if peak_beyond_command:
                 reasons.append(
                     t("attitude.warn_peak_reason",
-                      peak=f"{max_peak_err:.1f}",
-                      half=f"{des_range/2:.1f}"))
+                      peak=f"{graded_peak:.1f}",
+                      half=f"{graded_des_range/2:.1f}"))
             if oscillation_burst:
                 reasons.append(
                     t("attitude.warn_osc_reason",
                       ratio=f"{p99_rms_ratio:.1f}",
-                      p99=f"{max_p99:.1f}"))
+                      p99=f"{graded_p99:.1f}"))
             summary = t("attitude.warn_summary_prefix") + \
                        t("attitude.semicolon_join").join(reasons)
-        else:
+            if scope == "vtol":
+                summary = t("attitude.vtol_summary_prefix") + summary
+        elif scope == "fixed_wing":
             status = "good"
-            summary = t("attitude.good_summary",
+            summary = t("attitude.fixed_wing_summary",
                         roll=f"{roll_rms:.2f}",
                         pitch=f"{pitch_rms:.2f}",
                         peak=f"{max_peak_err:.1f}")
+        elif scope == "vtol" and n_graded < 10:
+            status = "good"
+            summary = t("attitude.vtol_summary",
+                        roll=f"{roll_rms:.2f}",
+                        pitch=f"{pitch_rms:.2f}",
+                        peak=f"{max_peak_err:.1f}")
+        else:
+            status = "good"
+            summary = t("attitude.good_summary",
+                        roll=f"{g_roll_rms:.2f}",
+                        pitch=f"{g_pitch_rms:.2f}",
+                        peak=f"{graded_peak:.1f}")
 
         # -----------------------------------------------------------
         # 4. Figure: Roll tracking
@@ -380,24 +457,24 @@ class AttitudeAnalyzer(BaseAnalyzer):
                                     warn=warn_thresh, crit=crit_thresh)
             else:
                 evidence_source = t("attitude.evidence_peak_over_limit",
-                                    peak=f"{max_peak_err:.1f}")
+                                    peak=f"{graded_peak:.1f}")
         elif status == "warning":
             if peak_beyond_command:
                 evidence_source = t("attitude.evidence_peak_beyond",
                                     crit=crit_thresh,
-                                    peak=f"{max_peak_err:.1f}",
-                                    half=f"{des_range/2:.1f}")
+                                    peak=f"{graded_peak:.1f}",
+                                    half=f"{graded_des_range/2:.1f}")
             elif oscillation_burst:
                 evidence_source = t("attitude.evidence_osc",
                                     ratio=f"{p99_rms_ratio:.1f}",
-                                    p99=f"{max_p99:.1f}",
+                                    p99=f"{graded_p99:.1f}",
                                     warn=warn_thresh)
             elif rms_warn:
                 evidence_source = t("attitude.evidence_rms",
                                     warn=warn_thresh, crit=crit_thresh)
             elif peak_warning:
                 evidence_source = t("attitude.evidence_peak_severe",
-                                    peak=f"{max_peak_err:.1f}")
+                                    peak=f"{graded_peak:.1f}")
         else:
             evidence_source = ""
 

@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Fixed
+- Attitude criticals and warnings now apply only where the multirotor
+  controller runs: a fixed-wing segment is not graded by the Copter 30°
+  limit or autotune ceilings, and a QuadPlane is graded on its VTOL samples
+  only. An unrecognised vehicle type is not graded.
+
 ## [0.14.2] - 2026-11-24
 
 ### Fixed
