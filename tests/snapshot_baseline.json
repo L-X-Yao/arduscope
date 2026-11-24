@@ -1516,7 +1516,7 @@
       "param_count": 0
     },
     "attitude": {
-      "status": "critical",
+      "status": "warning",
       "action_level": "run_autotune",
       "param_count": 0
     },
@@ -1673,8 +1673,8 @@
       "param_count": 0
     },
     "attitude": {
-      "status": "warning",
-      "action_level": "run_autotune",
+      "status": "good",
+      "action_level": "ok",
       "param_count": 0
     },
     "pid_tuning": {
@@ -1982,8 +1982,8 @@
       "param_count": 0
     },
     "attitude": {
-      "status": "critical",
-      "action_level": "run_autotune",
+      "status": "good",
+      "action_level": "ok",
       "param_count": 0
     },
     "pid_tuning": {
