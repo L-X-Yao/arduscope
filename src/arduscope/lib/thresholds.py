@@ -35,6 +35,9 @@ class Thresholds:
     # (ICM-42688 etc.) degrade EKF quality above 15 m/s².
     vibe_warn: float = 15.0          # A: METHODIC-VIBE "concerning" boundary
     vibe_crit: float = 30.0          # A: METHODIC-VIBE "very bad" boundary
+    # D: one/few-sample spikes are not a vibration condition; apply the
+    # unchanged 15/30 levels to a robust percentile of the armed data.
+    vibe_crit_percentile: float = 99.0
     vibe_clip_warn: int = 100        # A: ARDU-WIKI-VIBE "<100 acceptable"
 
     # -- EKF variance --

@@ -543,9 +543,9 @@ class TestVibrationSynthetic:
     def _build_reader(self, *, n=500, max_vibe=10.0, clips=(0, 0, 0),
                       params=None) -> SyntheticReader:
         ts = np.linspace(0, 300, n)
-        # Deterministic: base at 60% of max, single spike to max
-        vibe_x = np.full(n, max_vibe * 0.6)
-        vibe_x[n // 2] = max_vibe
+        # Sustained level on X: its P99 equals max_vibe. Isolated-spike
+        # rejection has dedicated cases in tests/analyzers/test_vibration_p99.py.
+        vibe_x = np.full(n, max_vibe)
         vibe_y = np.full(n, max_vibe * 0.4)
         vibe_z = np.full(n, max_vibe * 0.3)
         return SyntheticReader(

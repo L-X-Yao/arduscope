@@ -23,6 +23,7 @@ Source key:
 |-------|-------|--------|----------|
 | `vibe_warn` | 15.0 | A | METHODIC-VIBE "concerning" boundary |
 | `vibe_crit` | 30.0 | A | METHODIC-VIBE "very bad" boundary |
+| `vibe_crit_percentile` | 99.0 | D | a single sample is not a vibration condition; the unchanged METHODIC 15/30 thresholds apply to the 99th percentile of each armed primary-IMU axis, rejecting isolated spikes while a sustained condition still crosses them |
 | `vibe_clip_warn` | 100 | A | ARDU-WIKI-VIBE "<100 acceptable" |
 | `ekf_variance_warn` | 0.6 | A | FS_EKF_THRESH Strict preset (ArduCopter/config.h:106) |
 | `ekf_variance_crit` | 0.8 | A | FS_EKF_THRESH default, overridden by log param |

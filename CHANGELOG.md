@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Fixed
+- Vibration warning and critical verdicts now use each armed primary-IMU
+  axis's P99; isolated spikes no longer drive the grade, while max, avg and
+  the independent clip rule remain.
+
 ## [0.14.3] - 2026-11-24
 
 ### Fixed

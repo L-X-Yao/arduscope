@@ -20,8 +20,8 @@ pytestmark = pytest.mark.fast
 
 def test_source_map_has_exactly_one_entry_per_threshold():
     names = {field.name for field in fields(Thresholds)}
-    assert len(names) == 138
-    assert len(THRESHOLD_SOURCES) == 138
+    assert len(names) == 139
+    assert len(THRESHOLD_SOURCES) == 139
     assert set(THRESHOLD_SOURCES) == names
     assert ct.validate_sources() == []
 
@@ -47,7 +47,7 @@ def test_document_values_match_default_reprs():
             cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
             rows[cells[0].strip("`")] = cells
     defaults = Thresholds()
-    assert len(rows) == 138
+    assert len(rows) == 139
     for field in fields(Thresholds):
         assert rows[field.name][1] == repr(getattr(defaults, field.name))
 

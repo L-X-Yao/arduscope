@@ -114,10 +114,18 @@ class VibrationAnalyzer(BaseAnalyzer):
         def _safe_nanmean(arr):
             return float(np.nanmean(arr)) if len(arr) > 0 and not np.all(np.isnan(arr)) else 0.0
 
+        def _safe_nanpercentile(arr):
+            return (float(np.nanpercentile(arr, self.thresholds.vibe_crit_percentile))
+                    if len(arr) > 0 and not np.all(np.isnan(arr)) else 0.0)
+
+        p99_vibe_x = _safe_nanpercentile(vibe_x)
+        p99_vibe_y = _safe_nanpercentile(vibe_y)
+        p99_vibe_z = _safe_nanpercentile(vibe_z)
+        p99_vibe = max(p99_vibe_x, p99_vibe_y, p99_vibe_z)
+
         max_vibe_x = _safe_nanmax(vibe_x)
         max_vibe_y = _safe_nanmax(vibe_y)
         max_vibe_z = _safe_nanmax(vibe_z)
-        max_vibe = max(max_vibe_x, max_vibe_y, max_vibe_z)
 
         avg_vibe_x = _safe_nanmean(vibe_x)
         avg_vibe_y = _safe_nanmean(vibe_y)
@@ -132,15 +140,18 @@ class VibrationAnalyzer(BaseAnalyzer):
 
         details.append(
             t("vibration.vibe_axis_detail", axis="X",
-              avg=f"{avg_vibe_x:.1f}", mx=f"{max_vibe_x:.1f}")
+              avg=f"{avg_vibe_x:.1f}", p99=f"{p99_vibe_x:.1f}",
+              mx=f"{max_vibe_x:.1f}")
         )
         details.append(
             t("vibration.vibe_axis_detail", axis="Y",
-              avg=f"{avg_vibe_y:.1f}", mx=f"{max_vibe_y:.1f}")
+              avg=f"{avg_vibe_y:.1f}", p99=f"{p99_vibe_y:.1f}",
+              mx=f"{max_vibe_y:.1f}")
         )
         details.append(
             t("vibration.vibe_axis_detail", axis="Z",
-              avg=f"{avg_vibe_z:.1f}", mx=f"{max_vibe_z:.1f}")
+              avg=f"{avg_vibe_z:.1f}", p99=f"{p99_vibe_z:.1f}",
+              mx=f"{max_vibe_z:.1f}")
         )
         details.append(
             t("vibration.clip_count",
@@ -150,30 +161,33 @@ class VibrationAnalyzer(BaseAnalyzer):
 
         # -----------------------------------------------------------
         # 3. Status determination + action level.
-        # Source: METHODIC tuning guide (10/15/20/30 m/s² thresholds)
+        # Source: METHODIC tuning guide (10/15/20/30 m/s² thresholds).
+        # Apply them to each axis's armed P99, not a single maximum: a lone
+        # spike is not a vibration condition; a sustained condition still
+        # crosses the unchanged 15/30 thresholds. The clip rule is separate.
         # -----------------------------------------------------------
         warn_thresh = self.thresholds.vibe_warn
         crit_thresh = self.thresholds.vibe_crit
 
         physical_check_steps = t("vibration.physical_check_steps")
 
-        if max_vibe >= crit_thresh:
+        if p99_vibe >= crit_thresh:
             status = "critical"
             summary = t("vibration.critical_summary",
-                        val=f"{max_vibe:.1f}", thresh=crit_thresh)
+                        val=f"{p99_vibe:.1f}", thresh=crit_thresh)
             plain_summary = t("vibration.critical_plain")
             action_text = physical_check_steps
             action_level = "physical_check"
-        elif max_vibe >= warn_thresh:
+        elif p99_vibe >= warn_thresh:
             status = "warning"
             summary = t("vibration.warn_summary",
-                        val=f"{max_vibe:.1f}", thresh=warn_thresh)
+                        val=f"{p99_vibe:.1f}", thresh=warn_thresh)
             plain_summary = t("vibration.warn_plain")
             action_text = physical_check_steps
             action_level = "physical_check"
         else:
             status = "good"
-            summary = t("vibration.good_summary", val=f"{max_vibe:.1f}")
+            summary = t("vibration.good_summary", val=f"{p99_vibe:.1f}")
             plain_summary = t("vibration.good_plain")
             action_text = ""
             action_level = "ok"
@@ -192,7 +206,7 @@ class VibrationAnalyzer(BaseAnalyzer):
             hntch_enable = self.reader.get_param("INS_HNTCH_ENABLE", 0)
             if hntch_enable == 0:
                 plain_summary = t("vibration.good_no_notch_plain",
-                                  val=f"{max_vibe:.1f}")
+                                  val=f"{p99_vibe:.1f}")
                 details.append(t("vibration.good_no_notch_detail"))
 
         # Clip count raises status — clipping means accelerometer
