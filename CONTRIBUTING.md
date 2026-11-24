@@ -1,11 +1,10 @@
 # Contributing to ArduScope
 
-ArduScope is in maintenance mode as of 2026-11-20: the maintainer fixes defects
-and does not schedule new features. Work reopens on new flight logs with ground
-truth, new labels, or a new direction (see [POSITIONING.md](POSITIONING.md)). A
-pull request goes through the gates under "Which gates a change has to pass".
-What follows describes how the code is put together, for a change and for
-anyone who extends a copy of their own.
+ArduScope returned to feature development on 2026-11-24; the 2026-11-20
+maintenance freeze is lifted. Defect fixes and feature work both go through the
+gates under "Which gates a change has to pass" (see
+[POSITIONING.md](POSITIONING.md)). What follows describes how the code is put
+together, for a change and for anyone who extends a copy of their own.
 
 ## How changes are made
 
@@ -14,12 +13,12 @@ release-gate pass per batch. The roles, the review format and the worktree
 rules are in [docs/workflow.md](docs/workflow.md); the gates each kind of
 change has to pass are below.
 
-In maintenance mode, the three-session protocol is the default: one peer
-writes, the other blind-reviews or audits, and the integrator lands the change.
-Docs and CI changes use an integrator self-check and `tools/ci_local.py`. Code
-changes still get one blind review; safety code gets the snapshot and corpus
-steps. The third session is omitted only when a batch has no independent work
-for it.
+The three-session protocol is the default for feature work and for fixes: one
+peer writes, the other blind-reviews or audits, and the integrator lands the
+change. Docs and CI changes use an integrator self-check and
+`tools/ci_local.py`. Code changes still get one blind review; safety code gets
+the snapshot and corpus steps. The third session is omitted only when a batch
+has no independent work for it.
 
 ## External pull requests
 
@@ -215,9 +214,9 @@ reading what changed.
 
 CI checks names, formats and contracts. It has no flight logs and no SITL, so it
 cannot say whether a diagnosis is right, and the defects that shipped in 0.9.x
-passed all of it. Each row includes the rows above it. In maintenance mode,
-docs and CI changes stop at `ci_local`; code changes keep the blind review, and
-safety code keeps the snapshot and corpus steps.
+passed all of it. Each row includes the rows above it. Docs and CI changes stop
+at `ci_local`; code changes keep the blind review, and safety code keeps the
+snapshot and corpus steps.
 
 | Change | Gate |
 |---|---|

@@ -1,8 +1,8 @@
 # Development workflow
 
-ArduScope is in maintenance mode as of 2026-11-20: defect fixes only, no
-scheduled feature work. This page records the process for maintenance fixes
-and the process that applies when work reopens. The code-facing rules stay in
+ArduScope returned to feature development on 2026-11-24; the 2026-11-20
+maintenance freeze is lifted. This page records the process for feature work
+and for fix-only batches. The code-facing rules stay in
 [CONTRIBUTING.md](../CONTRIBUTING.md), `CLAUDE.md` and
 [POSITIONING.md](../POSITIONING.md).
 
@@ -12,14 +12,13 @@ assets.
 
 ## Modes
 
-### Maintenance (current)
+### Maintenance (when the maintainer calls a fix-only batch)
 
 - Three sessions by default: the integrator and two peers. One peer writes when
   assigned, the other is the blind reviewer or does an independent audit; the
   integrator writes otherwise. A session never reviews its own code change. The
   third session is omitted only when the batch has no independent work for it.
-- No scheduled capability probes while idle. Re-probe after a model switch or
-  when feature work resumes.
+- No scheduled capability probes while idle. Re-probe after a model switch.
 - The change tiers below set the review and gate level.
 
 | Change | Writer | Review | Gate |
@@ -35,7 +34,7 @@ the release path. Policy documents (`POSITIONING*.md`, this file,
 and CI changes may be made directly by the integrator, without a brief or a
 worktree; they still run `ci_local`.
 
-### Feature development (when reopened)
+### Feature development (current)
 
 - Three sessions: the integrator and two peers.
 - Capability probes, role rotation and the full task lifecycle below apply.
@@ -48,16 +47,16 @@ worktree; they still run `ci_local`.
   against the ArduPilot source, merges, and runs the gate once per batch.
 - **Writer** -- one task at a time, in a git worktree outside the repository,
   on a local branch. Runs targeted tests and `tools/check_i18n.py`, commits,
-  and does not push or run the full gate. In maintenance mode the integrator
-  may take this role for docs and CI changes.
+  and does not push or run the full gate. The integrator may take this role for
+  docs and CI changes.
 - **Blind reviewer** -- sees the diff and the task brief, not the writer's
   report. Does not edit files.
 
 Roles are earned by capability probes, not model names: five rule traps, a
 seeded bug fix in a worktree without touching its test, and a grading task on
 a data packet. Both peers passed on 2026-11-16; writing and reviewing rotate
-every task. Re-probe after a model switch or when feature work resumes. Probes
-are not scheduled in maintenance mode.
+every task. Re-probe after a model switch. Probes are not scheduled during a
+fix-only batch.
 
 A review answers in three tiers: **blockers** stop the merge, **must-fix**
 items are fixed before the merge, **suggestions** are recorded and taken or

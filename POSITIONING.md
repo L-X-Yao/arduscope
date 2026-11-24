@@ -91,7 +91,7 @@ Today:
 
 ## 6. Maintenance and development
 
-**ArduScope is in maintenance mode as of 2026-11-20. The maintainer fixes defects and does not schedule new features. Work reopens on new flight logs with ground truth, new labels, or a new direction. The online analysis agent remains part of the tool.**
+**ArduScope returned to feature development on 2026-11-24; the maintenance freeze that began 2026-11-20 is lifted. Defect fixes and feature work both go through the gates in [CONTRIBUTING.md](CONTRIBUTING.md). Diagnostic strictness and the release discipline are unchanged. The online analysis agent remains part of the tool.**
 
 Pull requests go through the gates in [CONTRIBUTING.md](CONTRIBUTING.md). One that changes analyzer logic or a threshold waits for the maintainer to run the snapshot and corpus steps, on logs that are not public.
 

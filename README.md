@@ -212,7 +212,7 @@ No entry-point changes needed. Automatically registered in CLI, Web, and multi-l
 
 ## Positioning
 
-ArduScope is for **ArduPilot tuning engineers**. Strictness is a feature, not a bug: finding a threshold strict is no ground for loosening it. Log data is welcome for calibrating thresholds, and so is a false alarm reported with its log. A request to lower the standard is not accepted. ArduScope is in maintenance mode as of 2026-11-20: the maintainer fixes defects and does not schedule new features. Work reopens on new flight logs with ground truth, new labels, or a new direction. The online analysis agent remains part of the tool. See [POSITIONING.md](POSITIONING.md).
+ArduScope is for **ArduPilot tuning engineers**. Strictness is a feature, not a bug: finding a threshold strict is no ground for loosening it. Log data is welcome for calibrating thresholds, and so is a false alarm reported with its log. A request to lower the standard is not accepted. ArduScope returned to feature development on 2026-11-24; the 2026-11-20 maintenance freeze is lifted. Diagnostic strictness and the release discipline are unchanged. The online analysis agent remains part of the tool. See [POSITIONING.md](POSITIONING.md).
 
 ## Known limitations
 
