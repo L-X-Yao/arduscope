@@ -108,14 +108,26 @@ them readable, on the current gate baseline.
   keep the older continuous-second model.
   Different badges are therefore a deliberate distinction, not by themselves
   evidence of a contradiction or of the Plane mode gate changing a verdict.
-- **`attitude` still grades one-sample peaks.** A single roll or pitch error
-  above 30 deg is critical because ArduPilot's
-  `AC_ATTITUDE_THRUST_ERROR_ANGLE=30°` is the thrust-angle error hard limit
-  above which yaw corrections are limited; a peak above 15 deg is now only a
-  warning. The 15, and
-  the 20 and 4.0 beside it in `src/arduscope/analyzers/attitude.py`, remain engineering
-  values with no source, outside `src/arduscope/lib/thresholds.py` and its checks. The
-  existing RMS criteria can still make sustained tracking error critical.
+- **`attitude` grades only where the multirotor controller runs, and a peak
+  past 30 deg must persist.** `AC_ATTITUDE_THRUST_ERROR_ANGLE=30°` and the
+  autotune ceilings come from `AC_AttitudeControl`, so a fixed-wing segment
+  is not graded by them; a QuadPlane is graded on its VTOL samples only, and
+  not at all when the log has no VTOL phase source. A peak past 30 deg is
+  critical only after it outlasts `ANG_LIM_TC` (1.0 s default). What remains
+  unsourced: the 15 deg peak screen, and the 20 and 4.0 beside it in
+  `src/arduscope/analyzers/attitude.py`, are engineering values outside
+  `src/arduscope/lib/thresholds.py` and its checks. The RMS rule is still an
+  average over the graded time: one excursion of a few seconds can carry it
+  past 5 deg on an otherwise well-tracked flight, and it is graded critical.
+- **The share of false criticals is now estimated, from a small sample.** A
+  read of 50 critical cards across 43 logs on 2026-11-24 found 25 of the 49
+  decided cards false (51% crude; 52.6% when weighted by each analyzer's
+  share of criticals), concentrated in `attitude`, `battery`/`power` and
+  `vibration`. It is a small sample with no external ground truth: eight
+  cards per major analyzer. `battery` and `power` voltage was fixed in
+  v0.14.2 and `attitude` scope and peak persistence in this batch;
+  `vibration` is unchanged, so its share is expected to stay. Read the
+  figures on a card, not its badge alone.
 - **`notch_tuning` no longer grades attitude by proxies.** Roll/pitch range,
   mean tracking error and peak angular rate remain informational details. The
   unsourced 2.5/5 deg and 100 deg/s severity rules were removed: attitude

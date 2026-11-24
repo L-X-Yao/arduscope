@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 import plotly.graph_objects as go
 
-from arduscope.lib.attitude_scope import scope_grade_mask
+from arduscope.lib.attitude_scope import scope_grade_mask, sustained_seconds
 from arduscope.lib.i18n import t
 
 from arduscope.lib.suggestions import ParamSuggestion
@@ -140,6 +140,7 @@ class AttitudeAnalyzer(BaseAnalyzer):
             graded_p99_ratio = 0.0
             graded_p99 = 0.0
             g_roll_rms = g_pitch_rms = 0.0
+            graded_over_seconds = 0.0
         else:
             g_roll = roll_err[grade_mask]
             g_pitch = pitch_err[grade_mask]
@@ -162,9 +163,14 @@ class AttitudeAnalyzer(BaseAnalyzer):
             g_p99 = max(float(np.nanpercentile(np.abs(g_roll), 99)),
                         float(np.nanpercentile(np.abs(g_pitch), 99)))
             graded_p99 = g_p99
+            # Time the larger of the two axis errors spends past the 30 deg
+            # limit, counted only between neighbouring samples.
+            g_over = ((np.abs(g_roll) > _THRUST_ERROR_ANGLE_DEG)
+                      | (np.abs(g_pitch) > _THRUST_ERROR_ANGLE_DEG))
+            graded_over_seconds = sustained_seconds(t_att[grade_mask], g_over)
             graded_p99_ratio = (g_p99 / graded_rms
                                 if graded_rms > 0.3 else 0.0)
-        # Say which samples the verdict is read from, after the armed-wide
+        # Say which samples the verdict is read from, before the armed-wide
         # numbers below so the reader can tell the two apart.
         if scope == "fixed_wing":
             details.append(t("attitude.fixed_wing_not_graded"))
@@ -234,7 +240,20 @@ class AttitudeAnalyzer(BaseAnalyzer):
             and graded_peak > crit_thresh
         )
         peak_warning = n_graded >= 10 and graded_peak > _PEAK_WARN_DEG
-        peak_critical = n_graded >= 10 and graded_peak > _THRUST_ERROR_ANGLE_DEG
+        # The 30 deg limit alone is a state the controller acts on every
+        # loop. It becomes a critical only when the excursion outlasts the
+        # controller's own response time to a step (att_peak_min_duration_s).
+        peak_over_limit = (n_graded >= 10
+                           and graded_peak > _THRUST_ERROR_ANGLE_DEG)
+        peak_critical = (peak_over_limit
+                         and graded_over_seconds
+                         > self.thresholds.att_peak_min_duration_s)
+        if peak_over_limit and not peak_critical:
+            details.append(t("attitude.peak_not_sustained",
+                             peak=f"{graded_peak:.1f}",
+                             seconds=f"{graded_over_seconds:.1f}",
+                             limit=_THRUST_ERROR_ANGLE_DEG,
+                             guard=self.thresholds.att_peak_min_duration_s))
 
         p99_rms_ratio = graded_p99_ratio
         oscillation_burst = (
@@ -252,7 +271,16 @@ class AttitudeAnalyzer(BaseAnalyzer):
                             thresh=crit_thresh)
             else:
                 summary = t("attitude.crit_peak_summary",
-                            peak=f"{graded_peak:.1f}")
+                            peak=f"{graded_peak:.1f}",
+                            seconds=f"{graded_over_seconds:.1f}",
+                            guard=self.thresholds.att_peak_min_duration_s)
+            # Reported whichever rule leads: a reader of an RMS critical
+            # should still learn that the 30 deg limit was passed too.
+            if peak_critical:
+                details.append(t("attitude.peak_sustained",
+                                 limit=_THRUST_ERROR_ANGLE_DEG,
+                                 seconds=f"{graded_over_seconds:.1f}",
+                                 guard=self.thresholds.att_peak_min_duration_s))
             if scope == "vtol":
                 summary = t("attitude.vtol_summary_prefix") + summary
         elif rms_warn or peak_beyond_command or peak_warning or oscillation_burst:
@@ -262,7 +290,14 @@ class AttitudeAnalyzer(BaseAnalyzer):
                 reasons.append(
                     t("attitude.warn_rms_reason",
                       rms=f"{graded_rms:.2f}"))
-            if peak_warning:
+            if peak_over_limit:
+                reasons.append(
+                    t("attitude.warn_not_sustained_reason",
+                      peak=f"{graded_peak:.1f}",
+                      seconds=f"{graded_over_seconds:.1f}",
+                      limit=_THRUST_ERROR_ANGLE_DEG,
+                      guard=self.thresholds.att_peak_min_duration_s))
+            elif peak_warning:
                 reasons.append(
                     t("attitude.warn_severe_reason",
                       peak=f"{graded_peak:.1f}"))
@@ -480,6 +515,12 @@ class AttitudeAnalyzer(BaseAnalyzer):
             elif rms_warn:
                 evidence_source = t("attitude.evidence_rms",
                                     warn=warn_thresh, crit=crit_thresh)
+            elif peak_over_limit:
+                evidence_source = t("attitude.evidence_not_sustained",
+                                    peak=f"{graded_peak:.1f}",
+                                    seconds=f"{graded_over_seconds:.1f}",
+                                    limit=_THRUST_ERROR_ANGLE_DEG,
+                                    guard=self.thresholds.att_peak_min_duration_s)
             elif peak_warning:
                 evidence_source = t("attitude.evidence_peak_severe",
                                     peak=f"{graded_peak:.1f}")

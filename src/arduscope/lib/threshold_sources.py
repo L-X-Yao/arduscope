@@ -36,6 +36,7 @@ THRESHOLD_SOURCES: dict[str, ThresholdSource] = {
     'batt_sensor_min_volt': ThresholdSource('D', 'no flight pack reads below 1 V; a flat sub-volt line is an unpowered or failed sensor, used only when ARM_VOLT=0'),
     'att_rms_warn': ThresholdSource('A(soft)', 'AUTOTUNE_LEVEL_ANGLE_CD Copter (AC_AutoTune.cpp:15,18)'),
     'att_rms_crit': ThresholdSource('A(soft)', 'Copter relaxation ceiling 2x (AC_AutoTune.cpp:332)'),
+    'att_peak_min_duration_s': ThresholdSource('D', 'ANG_LIM_TC default 1.0 s, defined by AC_ATTITUDE_CONTROL_ANGLE_LIMIT_TC (AC_AttitudeControl.h:34, registered at AC_AttitudeControl.cpp:94); the controller time constant for leaning to a demanded angle, so an excursion past AC_ATTITUDE_THRUST_ERROR_ANGLE still present after it is not a step response'),
     'compass_ofs_warn': ThresholdSource('A', 'ARDU-WIKI-COMPASS "likely interference" indicator'),
     'compass_ofs_crit': ThresholdSource('D', 'well above pre-arm 500, still within OFS_MAX 1800'),
     'compass_interference_warn': ThresholdSource('A', 'ARDU-WIKI-COMPASSMOT "acceptable" limit'),

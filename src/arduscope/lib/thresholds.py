@@ -123,6 +123,18 @@ class Thresholds:
     # Defaults are for Copter; Plane overrides in from_params().
     att_rms_warn: float = 2.5        # A(soft): = AUTOTUNE_LEVEL_ANGLE_CD Copter
     att_rms_crit: float = 5.0        # A(soft): = Copter relaxation ceiling 2×
+    # Peak-duration guard for the 30 deg hard limit (Copter / QuadPlane VTOL).
+    # The limit itself (AC_ATTITUDE_THRUST_ERROR_ANGLE) is a state the
+    # controller acts on every loop, so one sample past it is not by itself
+    # a defect. ANG_LIM_TC is the time constant the controller uses to lean
+    # to a demanded angle "so that the vehicle does not lose altitude"; its
+    # default is AC_ATTITUDE_CONTROL_ANGLE_LIMIT_TC (AC_AttitudeControl.h:34,
+    # registered at AC_AttitudeControl.cpp:94). An error that is still past
+    # the limit after that long outlives the controller's own response to a
+    # step, so it is not a step transient.
+    # This is the default, deliberately not the log's own ANG_LIM_TC: the
+    # guard is a fixed diagnostic window, so a log cannot loosen it.
+    att_peak_min_duration_s: float = 1.0  # D: ANG_LIM_TC default
 
     # -- Compass --
     # Source A: ARDU-WIKI-COMPASS (offset >600 = "likely interference")

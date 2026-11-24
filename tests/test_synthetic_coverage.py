@@ -717,10 +717,23 @@ class TestAttitudeSynthetic:
                                    _vehicle()).analyze()
         assert result.status == "critical"
 
-    def _build_peak_reader(self, peak_deg, n=300, actual_roll=0.0) -> SyntheticReader:
+    def _build_peak_reader(self, peak_deg, n=1200, actual_roll=0.0,
+                           duration_s: float = 1.2) -> SyntheticReader:
+        """A commanded step of `peak_deg` held for `duration_s` at mid-log.
+
+        The 30 deg limit is a critical only when the excursion outlasts the
+        controller's lean time constant (att_peak_min_duration_s = 1.0 s),
+        so the default step is held past it. It is held only just past it
+        (1.1 s first row to last, out of a 120 s log): a longer step would
+        also push the RMS and the P99/RMS ratio over their lines, and then
+        those rules, not the 30 deg one, set the evidence these tests read.
+        Pass duration_s=0 for a single sample."""
         ts = np.linspace(0, 120, n)
         des_roll = np.zeros(n)
-        des_roll[n // 2] = peak_deg
+        if duration_s > 0:
+            des_roll[(ts >= 60.0) & (ts < 60.0 + duration_s)] = peak_deg
+        else:
+            des_roll[n // 2] = peak_deg
         return SyntheticReader(
             messages={
                 "ATT": {

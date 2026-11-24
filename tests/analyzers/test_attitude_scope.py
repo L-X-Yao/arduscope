@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from arduscope.analyzers.attitude import AttitudeAnalyzer
-from arduscope.lib.attitude_scope import scope_grade_mask
+from arduscope.lib.attitude_scope import scope_grade_mask, sustained_seconds
 from arduscope.lib.i18n import t as tr
 from arduscope.lib.thresholds import Thresholds
 from arduscope.lib.vehicle_detect import VehicleInfo
@@ -283,3 +283,165 @@ class TestUnknownVehicle:
         assert result.status == "info"
         assert result.summary == tr("attitude.unknown_vehicle")
         assert result.action_level != "apply_param"
+
+
+class TestPeakDurationGuard:
+    """A peak past 30 deg is critical only when it outlasts the
+    controller's lean time constant (att_peak_min_duration_s = 1.0 s)."""
+    VEHICLE = _vehicle("ArduCopter")
+
+    def _excursion(self, samples: int, peak: float = 38.0):
+        """`samples` consecutive samples at `peak`, starting at t=100 s."""
+        n = 4000
+        act = np.zeros(n)
+        a = _at(100.0)
+        act[a:a + samples] = peak
+        return _att(n, np.zeros(n), act)
+
+    def test_precondition_the_metric_is_first_to_last(self):
+        # 10 Hz: N samples span (N - 1) / 10 s. Pins the fixture arithmetic
+        # the boundary tests below depend on.
+        att = self._excursion(11)
+        over = np.abs(att["Pitch"]) > 30.0
+        assert over.sum() == 11
+        assert sustained_seconds(att["_timestamp"], over) == pytest.approx(1.0)
+        att = self._excursion(12)
+        over = np.abs(att["Pitch"]) > 30.0
+        assert sustained_seconds(att["_timestamp"], over) == pytest.approx(1.1)
+
+    @pytest.mark.parametrize("samples,label", [(2, "0.2 s"), (6, "0.6 s"),
+                                               (11, "exactly 1.0 s")])
+    def test_short_excursions_are_not_critical(self, samples, label):
+        result = _run({"ATT": self._excursion(samples)}, self.VEHICLE)
+        assert result.status != "critical", label
+
+    def test_two_samples_at_38_deg_is_a_warning_not_critical(self):
+        result = _run({"ATT": self._excursion(2)}, self.VEHICLE)
+        assert result.status == "warning"
+        assert result.action_level == "run_autotune"
+        assert tr("attitude.peak_not_sustained") not in result.details  # has placeholders
+        assert any(d.startswith(tr("attitude.peak_not_sustained",
+                                   peak="", seconds="", limit="", guard="")
+                       .split("{")[0]) or "30" in d and "not graded" in d.lower()
+                   or "不判 critical" in d for d in result.details)
+        assert result.evidence_source != ""
+
+    def test_exactly_one_second_is_not_critical_the_rule_is_strict(self):
+        result = _run({"ATT": self._excursion(11)}, self.VEHICLE)
+        assert result.status == "warning"
+
+    def test_just_over_one_second_is_critical(self):
+        result = _run({"ATT": self._excursion(12)}, self.VEHICLE)
+        assert result.status == "critical"
+
+    def test_a_genuine_sustained_loss_stays_critical(self):
+        # 5 s at 38 deg in a 400 s log. The pitch RMS is 4.25 deg, under
+        # the 5 deg rule, so the peak rule alone decides: it must say so.
+        result = _run({"ATT": self._excursion(50)}, self.VEHICLE)
+        assert result.status == "critical"
+        assert result.action_level in ("run_autotune", "apply_param")
+        assert result.summary == tr("attitude.crit_peak_summary",
+                                    peak="38.0", seconds="4.9", guard=1.0)
+        assert tr("attitude.peak_sustained", limit=30.0, seconds="4.9",
+                  guard=1.0) in result.details
+
+    def test_a_long_loss_stays_critical_either_way(self):
+        # 20 s at 38 deg: the RMS rule fires too (8.5 deg). Whichever rule
+        # leads, the card is critical and the duration is still reported.
+        result = _run({"ATT": self._excursion(200)}, self.VEHICLE)
+        assert result.status == "critical"
+        assert tr("attitude.peak_sustained", limit=30.0, seconds="19.9",
+                  guard=1.0) in result.details
+
+    def test_a_single_sample_at_47_deg_is_not_critical(self):
+        n = 4000
+        des = np.zeros(n)
+        des[2000] = 47.6
+        result = _run({"ATT": _att(n, des, np.zeros(n))}, self.VEHICLE)
+        assert result.status != "critical"
+
+
+class TestSustainedSeconds:
+    """The duration metric: first-to-last over adjacent samples.
+
+    A run ends at a sample that is not over, and at a telemetry gap of at
+    least two lost samples. One lost sample is ordinary logger jitter and
+    is counted in full."""
+
+    def test_nothing_over_is_zero(self):
+        assert sustained_seconds(np.arange(100) * DT, np.zeros(100, dtype=bool)) == 0.0
+
+    def test_one_sample_over_is_zero(self):
+        # A lone sample cannot show that the excursion lasted anything.
+        over = np.zeros(100, dtype=bool)
+        over[50] = True
+        assert sustained_seconds(np.arange(100) * DT, over) == 0.0
+
+    def test_a_run_is_first_over_to_last_over(self):
+        over = np.zeros(100, dtype=bool)
+        over[40:61] = True              # 21 samples
+        assert sustained_seconds(np.arange(100) * DT, over) == pytest.approx(2.0)
+
+    def test_the_longest_of_two_runs_counts(self):
+        over = np.zeros(200, dtype=bool)
+        over[20:31] = True              # 1.0 s
+        over[100:126] = True            # 2.5 s
+        assert sustained_seconds(np.arange(200) * DT, over) == pytest.approx(2.5)
+
+    def test_a_sample_that_is_not_over_ends_the_run(self):
+        t = np.arange(0.0, 1.1, DT)
+        over = np.r_[np.ones(5, bool), np.zeros(1, bool), np.ones(5, bool)]
+        assert sustained_seconds(t, over) == pytest.approx(0.4)
+
+    def test_one_lost_sample_is_tolerated(self):
+        # 0.0-0.9 s, the 1.0 s row missing, 1.1-1.2 s: one continuous run.
+        t = np.r_[np.arange(0.0, 1.0, DT), 1.1, 1.2]
+        assert sustained_seconds(t, np.ones(len(t), bool)) == pytest.approx(1.2)
+
+    def test_a_telemetry_gap_ends_the_run(self):
+        # 0.0-0.4 s over, 1.5 s missing, 2.0-2.4 s over. The missing time
+        # is unknown and must not be added, nor may it weld the two.
+        t = np.r_[np.arange(0.0, 0.5, DT), np.arange(2.0, 2.5, DT)]
+        assert sustained_seconds(t, np.ones(len(t), bool)) == pytest.approx(0.4)
+
+    def test_two_short_excursions_around_a_gap_do_not_add_up(self):
+        # 0.8 s + 0.8 s would pass a 1.0 s guard if the gap joined them.
+        t = np.r_[np.arange(0.0, 0.9, DT), np.arange(1.2, 2.1, DT)]
+        over = np.ones(len(t), bool)
+        assert sustained_seconds(t, over) < 1.0
+
+    def test_ordinary_jitter_does_not_end_a_run(self):
+        rng = np.random.default_rng(1)
+        t = np.cumsum(np.r_[0.0, rng.uniform(0.07, 0.13, 60)])
+        assert sustained_seconds(t, np.ones(len(t), bool)) == pytest.approx(t[-1] - t[0])
+
+
+class TestGapCannotCreateACritical:
+    """End to end: a dropout must not turn two short dips into one long one."""
+
+    def _two_dips_with_a_gap(self, half_seconds: float, gap_seconds: float):
+        n = 6000
+        act = np.zeros(n)
+        a = _at(100.0)
+        act[a:a + int(round(half_seconds / DT))] = 38.0
+        b = _at(100.0 + half_seconds + gap_seconds)
+        act[b:b + int(round(half_seconds / DT))] = 38.0
+        att = _att(n, np.zeros(n), act)
+        lo = 100.0 + half_seconds
+        hi = 100.0 + half_seconds + gap_seconds
+        keep = ~((att["_timestamp"] > lo) & (att["_timestamp"] < hi))
+        return {k: v[keep] for k, v in att.items()}
+
+    def test_0_8s_dips_around_a_gap_are_not_critical(self):
+        att = self._two_dips_with_a_gap(0.8, 0.3)
+        result = _run({"ATT": att}, _vehicle("ArduCopter"))
+        assert result.status != "critical"
+
+    def test_the_same_data_without_the_gap_is_critical(self):
+        # Control for the test above: it is the gap, not the shape.
+        att = self._two_dips_with_a_gap(0.8, -0.0)
+        n = 6000
+        act = np.zeros(n)
+        act[_at(100.0):_at(101.6)] = 38.0
+        result = _run({"ATT": _att(n, np.zeros(n), act)}, _vehicle("ArduCopter"))
+        assert result.status == "critical"

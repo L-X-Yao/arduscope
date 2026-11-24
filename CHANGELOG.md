@@ -12,8 +12,12 @@ releases are not published.
 ### Fixed
 - Attitude criticals and warnings now apply only where the multirotor
   controller runs: a fixed-wing segment is not graded by the Copter 30°
-  limit or autotune ceilings, and a QuadPlane is graded on its VTOL samples
-  only. An unrecognised vehicle type is not graded.
+  limit or autotune ceilings, a QuadPlane is graded on its VTOL samples
+  only and not at all without a VTOL phase source, and an unrecognised
+  vehicle type is not graded.
+- A roll or pitch peak past the 30° thrust-angle limit is critical only when
+  it lasts longer than `ANG_LIM_TC` (1.0 s default); a brief excursion is a
+  warning, and a telemetry gap no longer joins two short excursions.
 
 ## [0.14.2] - 2026-11-24
 

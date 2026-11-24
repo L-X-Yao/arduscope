@@ -14,6 +14,47 @@ import numpy as np
 from .plane_phase import PLANE_Q_MODES
 
 
+def sustained_seconds(t: np.ndarray, over: np.ndarray) -> float:
+    """Longest time `over` stays True, read from the log's own timestamps.
+
+    The run is counted from the first over sample to the last over sample
+    that is adjacent to it: a run ends at a sample that is not over, and
+    also at a telemetry gap. A gap is when two neighbouring samples are
+    further apart than 2.5x the normal sample period, i.e. at least two
+    samples are missing. It breaks the run rather than joining the two
+    sides, because the missing stretch is unknown time: it could have been
+    over or not over, so it cannot supply the persistence. (Clamping the
+    gap to one period instead would let a dropout weld two short
+    excursions into one long one.) One lost sample is tolerated and its
+    step counts in full: a single skipped row is ordinary logger jitter,
+    and breaking on it would split a genuinely sustained excursion.
+
+    Returns 0.0 when nothing is over, or when only one sample is over: N
+    samples at 10 Hz measure (N - 1) / 10 s, and one sample cannot show
+    that the excursion lasted anything.
+    """
+    over = np.asarray(over, dtype=bool)
+    if not over.any():
+        return 0.0
+    deltas = np.diff(t)
+    positive = deltas[deltas > 0]
+    period = float(np.median(positive)) if len(positive) else 0.0
+    gap_limit = 2.5 * period
+    longest = 0.0
+    current = 0.0
+    for i in range(1, len(over)):
+        if over[i] and over[i - 1]:
+            step = t[i] - t[i - 1]
+            if step > gap_limit:
+                current = 0.0          # a dropout: start a new run here
+            else:
+                current += step
+                longest = max(longest, current)
+        else:
+            current = 0.0
+    return float(longest)
+
+
 def scope_grade_mask(reader, vehicle, t: np.ndarray) -> tuple[np.ndarray, str]:
     """Return (samples to grade, scope) for the Copter attitude rules.
 
