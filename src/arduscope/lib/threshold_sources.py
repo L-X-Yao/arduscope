@@ -12,7 +12,7 @@ class ThresholdSource:
 THRESHOLD_SOURCES: dict[str, ThresholdSource] = {
     'vibe_warn': ThresholdSource('A', 'METHODIC-VIBE "concerning" boundary'),
     'vibe_crit': ThresholdSource('A', 'METHODIC-VIBE "very bad" boundary'),
-    'vibe_crit_percentile': ThresholdSource('D', 'a single sample is not a vibration condition; the unchanged METHODIC 15/30 thresholds apply to the 99th percentile of each armed primary-IMU axis, rejecting isolated spikes while a sustained condition still crosses them'),
+    'vibe_grade_percentile': ThresholdSource('D', 'a single sample is not a vibration condition; the unchanged METHODIC 15/30 thresholds apply to the 99th percentile of each armed primary-IMU axis, rejecting isolated spikes while a sustained condition still crosses them'),
     'vibe_clip_warn': ThresholdSource('A', 'ARDU-WIKI-VIBE "<100 acceptable"'),
     'ekf_variance_warn': ThresholdSource('A', 'FS_EKF_THRESH Strict preset (ArduCopter/config.h:106)'),
     'ekf_variance_crit': ThresholdSource('A', 'FS_EKF_THRESH default, overridden by log param'),

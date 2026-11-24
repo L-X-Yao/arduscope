@@ -37,7 +37,7 @@ class Thresholds:
     vibe_crit: float = 30.0          # A: METHODIC-VIBE "very bad" boundary
     # D: one/few-sample spikes are not a vibration condition; apply the
     # unchanged 15/30 levels to a robust percentile of the armed data.
-    vibe_crit_percentile: float = 99.0  # D: P99 rejects isolated spikes; 15/30 unchanged
+    vibe_grade_percentile: float = 99.0  # D: P99 rejects isolated spikes; 15/30 unchanged
     vibe_clip_warn: int = 100        # A: ARDU-WIKI-VIBE "<100 acceptable"
 
     # -- EKF variance --

@@ -566,7 +566,7 @@ class TestVibrationSynthetic:
         )
 
     def test_low_vibration_good(self):
-        """Max vibe 10 m/s² < warn threshold (15) → good."""
+        """P99 vibe 10 m/s² < warn threshold (15) → good."""
         reader = self._build_reader(max_vibe=10.0)
         result = VibrationAnalyzer(reader, _thresholds(reader),
                                     _vehicle()).analyze()
@@ -574,7 +574,7 @@ class TestVibrationSynthetic:
         assert result.action_level == "ok"
 
     def test_vibration_warning(self):
-        """Max vibe 20 m/s² > warn (15) but < crit (30) → warning."""
+        """P99 vibe 20 m/s² > warn (15) but < crit (30) → warning."""
         reader = self._build_reader(max_vibe=20.0)
         result = VibrationAnalyzer(reader, _thresholds(reader),
                                     _vehicle()).analyze()
@@ -582,7 +582,7 @@ class TestVibrationSynthetic:
         assert result.action_level == "physical_check"
 
     def test_vibration_critical(self):
-        """Max vibe 35 m/s² > crit (30) → critical."""
+        """P99 vibe 35 m/s² > crit (30) → critical."""
         reader = self._build_reader(max_vibe=35.0)
         result = VibrationAnalyzer(reader, _thresholds(reader),
                                     _vehicle()).analyze()

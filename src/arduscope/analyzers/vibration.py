@@ -115,7 +115,7 @@ class VibrationAnalyzer(BaseAnalyzer):
             return float(np.nanmean(arr)) if len(arr) > 0 and not np.all(np.isnan(arr)) else 0.0
 
         def _safe_nanpercentile(arr):
-            return (float(np.nanpercentile(arr, self.thresholds.vibe_crit_percentile))
+            return (float(np.nanpercentile(arr, self.thresholds.vibe_grade_percentile))
                     if len(arr) > 0 and not np.all(np.isnan(arr)) else 0.0)
 
         p99_vibe_x = _safe_nanpercentile(vibe_x)

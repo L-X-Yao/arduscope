@@ -124,15 +124,14 @@ them readable, on the current gate baseline.
   average stay in the details, and clipping still raises warning
   independently. A lone spike no longer drives severity; a sustained or
   crash-level condition still crosses the unchanged 15/30 thresholds.
-
 - **The share of false criticals is now estimated, from a small sample.** A
   read of 50 critical cards across 43 logs on 2026-11-24 found 23 of the 49
   decided cards false (46.9% crude; 45.1% when weighted by each analyzer's
   share of criticals), concentrated in `attitude`, `battery`/`power` and
   `vibration`. It is a small sample with no external ground truth: eight
   cards per major analyzer. `battery` and `power` voltage was fixed in
-  v0.14.2; `attitude` scope and peak persistence and `vibration` P99 are the
-  follow-up fixes. Read the figures on a card, not its badge alone.
+  v0.14.2, `attitude` scope and peak persistence in v0.14.3, and `vibration`
+  P99 in this batch. Read the figures on a card, not its badge alone.
 - **`notch_tuning` no longer grades attitude by proxies.** Roll/pitch range,
   mean tracking error and peak angular rate remain informational details. The
   unsourced 2.5/5 deg and 100 deg/s severity rules were removed: attitude
