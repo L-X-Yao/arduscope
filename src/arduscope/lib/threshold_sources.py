@@ -32,7 +32,7 @@ THRESHOLD_SOURCES: dict[str, ThresholdSource] = {
     'batt_low_mah': ThresholdSource('A', 'overridden by BATT_LOW_MAH (AP_BattMonitor_Params.cpp)'),
     'batt_crt_mah': ThresholdSource('A', 'overridden by BATT_CRT_MAH (AP_BattMonitor_Params.cpp)'),
     'batt_low_timer_default': ThresholdSource('A', 'AP_BattMonitor_Params.cpp LOW_TIMER default 10 s (lines 95-102); fallback when the log has no value'),
-    'batt_config_max_ratio': ThresholdSource('D', 'existing battery configuration detail; a threshold at or above 95% of the highest observed pack voltage is inconsistent with the pack'),
+    'batt_config_max_ratio': ThresholdSource('D', 'existing battery configuration detail; a threshold at or above 95% of the second-highest armed pack voltage is inconsistent with the pack'),
     'batt_sensor_min_volt': ThresholdSource('D', 'no flight pack reads below 1 V; a flat sub-volt line is an unpowered or failed sensor, used only when ARM_VOLT=0'),
     'att_rms_warn': ThresholdSource('A(soft)', 'AUTOTUNE_LEVEL_ANGLE_CD Copter (AC_AutoTune.cpp:15,18)'),
     'att_rms_crit': ThresholdSource('A(soft)', 'Copter relaxation ceiling 2x (AC_AutoTune.cpp:332)'),

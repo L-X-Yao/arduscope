@@ -78,6 +78,14 @@ def test_only_persistence_beyond_the_timer_is_critical(
     assert _run(analyzer, reader).status == expected
 
 
+@pytest.mark.parametrize("end,expected", [(12.0, "good"), (12.5, "critical")])
+@pytest.mark.parametrize("analyzer", ANALYZERS)
+def test_timer_boundary_is_strictly_greater(analyzer, end, expected):
+    ts = np.arange(0.0, 21.0, 0.5)
+    reader = _reader(ts, _dip(ts, 2, end))
+    assert _run(analyzer, reader).status == expected
+
+
 @pytest.mark.parametrize("analyzer", ANALYZERS)
 def test_zero_low_timer_disables_voltage_grading(analyzer):
     ts = np.arange(21.0)
@@ -125,6 +133,22 @@ def test_impossible_arming_voltage_is_a_configuration_warning(analyzer):
     assert any("BATT_ARM_VOLT" in detail for detail in result.details)
 
 
+@pytest.mark.parametrize("spike_t", [-1.0, 5.0])
+@pytest.mark.parametrize("analyzer", ANALYZERS)
+def test_single_high_spike_does_not_validate_the_pack(analyzer, spike_t):
+    ts = np.append(np.arange(21.0), spike_t)
+    volt = np.append(np.full(21, 4.2), 60.0)
+    reader = _reader(ts, volt, {
+        "BATT_ARM_VOLT": 50.0,
+        "BATT_LOW_VOLT": 49.0,
+        "BATT_CRT_VOLT": 48.0,
+    })
+    result = _run(analyzer, reader)
+    assert result.status == "warning"
+    assert result.status != "critical"
+    assert any("BATT_ARM_VOLT" in detail for detail in result.details)
+
+
 @pytest.mark.parametrize("analyzer", ANALYZERS)
 def test_critical_threshold_above_pack_max_is_a_configuration_warning(analyzer):
     ts = np.arange(21.0)
@@ -142,6 +166,7 @@ def test_low_threshold_near_pack_max_is_a_configuration_warning(analyzer):
     result = _run(analyzer, reader)
     assert result.status == "warning"
     assert any("BATT_LOW_VOLT" in detail for detail in result.details)
+    assert sum("BATT_LOW_VOLT" in detail for detail in result.details) == 1
 
 
 @pytest.mark.parametrize("analyzer", ANALYZERS)
@@ -156,8 +181,8 @@ def test_flat_subvolt_sensor_is_not_a_battery_critical(analyzer):
 
 @pytest.mark.parametrize("analyzer", ANALYZERS)
 def test_telemetry_gaps_do_not_join_low_voltage_segments(analyzer):
-    ts = np.array([0, 1, 2, 3, 14, 15, 16, 17, 28, 29, 30, 31, 32], dtype=float)
-    volt = np.array([9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 12], dtype=float)
+    ts = np.array([0, 1, 2, 3, 14, 15, 16, 17, 28, 29, 30, 31, 32, 33], dtype=float)
+    volt = np.array([9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 12, 12], dtype=float)
     reader = _reader(ts, volt)
     assert _run(analyzer, reader).status == "good"
 

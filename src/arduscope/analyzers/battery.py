@@ -190,13 +190,6 @@ class BatteryAnalyzer(BaseAnalyzer):
                                      self.thresholds.batt_crt_mah)
             capacity = get_batt_param("CAPACITY", inst_id, 0.0)
 
-            # Check if BATT_LOW_VOLT seems misconfigured (too high
-            # relative to max observed voltage).
-            if max_volt > 0 and low_volt > max_volt * 0.95:
-                details.append(t("battery.low_volt_too_high_reason",
-                                 low_volt=f"{low_volt:.1f}",
-                                 max_volt=f"{max_volt:.1f}"))
-
             # Firmware semantics: armed samples, a continuous LOW_TIMER
             # interval, and a valid monitor/configuration are all required.
             low_timer = get_batt_param(

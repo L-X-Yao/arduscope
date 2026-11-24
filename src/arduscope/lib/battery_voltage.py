@@ -62,6 +62,15 @@ def _covered_seconds(timestamps: np.ndarray, voltage: np.ndarray,
     return float(longest), seen
 
 
+def _reference_voltage(voltage: np.ndarray) -> float | None:
+    """Second-highest armed sample, so one spike cannot validate a pack."""
+    if not len(voltage):
+        return None
+    if len(voltage) == 1:
+        return float(voltage[0])
+    return float(np.partition(voltage, -2)[-2])
+
+
 def evaluate_voltage(timestamps, voltage, armed_intervals, *,
                      low_volt: float, critical_volt: float, low_timer: float,
                      arm_volt: float, monitor: float,
@@ -94,7 +103,6 @@ def evaluate_voltage(timestamps, voltage, armed_intervals, *,
     if not armed_intervals:
         return result("good", "no_armed")
 
-    observed_max = float(np.max(volts)) if len(volts) else None
     armed = np.zeros(len(ts), dtype=bool)
     for start, end in armed_intervals:
         armed |= (ts >= start) & (ts <= end)
@@ -103,6 +111,7 @@ def evaluate_voltage(timestamps, voltage, armed_intervals, *,
         return result("good", "no_armed")
 
     min_voltage = float(np.min(volts))
+    observed_max = _reference_voltage(volts)
     common = {"min_voltage": min_voltage, "max_voltage": observed_max}
     if low_timer <= 0:
         return result("good", "disabled", **common,
@@ -110,6 +119,9 @@ def evaluate_voltage(timestamps, voltage, armed_intervals, *,
     if arm_volt > 0 and observed_max < arm_volt:
         return result("warning", "arm_volt", **common,
                       parameter=f"{param_prefix}_ARM_VOLT", limit=arm_volt)
+    # A flat sub-volt armed line is still diagnosed, not silently skipped:
+    # this is stricter than the firmware's voltage_used > 0 guard, but the
+    # offline verdict is sensor/configuration warning, not voltage critical.
     if arm_volt == 0 and observed_max < sensor_min_volt:
         return result("warning", "sensor_invalid", **common,
                       parameter=f"{param_prefix}_ARM_VOLT",

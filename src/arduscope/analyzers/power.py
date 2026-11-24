@@ -260,7 +260,7 @@ class PowerAnalyzer(BaseAnalyzer):
             instance=0, param_prefix="BATT",
         )
         details.extend(voltage_details(evaluation, "power"))
-        status = evaluation.status
+        status = self.worst_status(status, evaluation.status)
 
         # -----------------------------------------------------------
         # 9. Summary + actionable advice
