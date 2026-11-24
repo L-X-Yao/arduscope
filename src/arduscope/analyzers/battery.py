@@ -255,8 +255,9 @@ class BatteryAnalyzer(BaseAnalyzer):
             # verifies the coefficient end-to-end. Info only, never
             # drives status. Factory-calibrated monitors (SMBus,
             # DroneCAN) don't need it and are skipped.
+            backfill_monitor = get_batt_param("MONITOR", inst_id, 0.0)
             amp_pervlt = get_batt_param("AMP_PERVLT", inst_id, 0.0)
-            if int(monitor) == 4 and amp_pervlt > 0 and len(ct_valid) > 0:
+            if int(backfill_monitor) == 4 and amp_pervlt > 0 and len(ct_valid) > 0:
                 consumed = float(np.nanmax(ct_valid))
                 if consumed >= self.thresholds.backfill_min_consumed_mah:
                     pervlt_param = (

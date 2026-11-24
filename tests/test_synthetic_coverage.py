@@ -422,6 +422,16 @@ class TestBatterySynthetic:
         assert "BATT_AMP_PERVLT" in hints[0]
         assert result.status == "good"
 
+    def test_backfill_hint_missing_monitor_keeps_legacy_default(self):
+        """A missing BATT_MONITOR must not turn on the backfill hint."""
+        reader = self._build_reader(params={
+            "BATT_AMP_PERVLT": 40.2,
+        })
+        result = BatteryAnalyzer(reader, _thresholds(reader),
+                                  _vehicle()).analyze()
+        assert result.status == "good"
+        assert not [d for d in result.details if "40.2" in d]
+
     def test_backfill_hint_needs_consumption(self):
         """Consumption under the 300 mAh floor → refill ratio is
         charger-resolution noise, no hint."""
