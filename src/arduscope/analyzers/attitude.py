@@ -165,9 +165,11 @@ class AttitudeAnalyzer(BaseAnalyzer):
             graded_p99_ratio = (g_p99 / graded_rms
                                 if graded_rms > 0.3 else 0.0)
         # Say which samples the verdict is read from, after the armed-wide
-        # numbers above so the reader can tell the two apart.
+        # numbers below so the reader can tell the two apart.
         if scope == "fixed_wing":
             details.append(t("attitude.fixed_wing_not_graded"))
+        elif scope == "vtol_unknown_phase":
+            details.append(t("attitude.vtol_unknown_phase"))
         elif scope == "vtol" and n_graded < 10:
             details.append(t("attitude.vtol_no_samples"))
         elif scope == "vtol":
@@ -281,6 +283,12 @@ class AttitudeAnalyzer(BaseAnalyzer):
         elif scope == "fixed_wing":
             status = "good"
             summary = t("attitude.fixed_wing_summary",
+                        roll=f"{roll_rms:.2f}",
+                        pitch=f"{pitch_rms:.2f}",
+                        peak=f"{max_peak_err:.1f}")
+        elif scope == "vtol_unknown_phase":
+            status = "good"
+            summary = t("attitude.vtol_unknown_phase_summary",
                         roll=f"{roll_rms:.2f}",
                         pitch=f"{pitch_rms:.2f}",
                         peak=f"{max_peak_err:.1f}")

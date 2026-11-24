@@ -17,10 +17,14 @@ from .plane_phase import PLANE_Q_MODES
 def scope_grade_mask(reader, vehicle, t: np.ndarray) -> tuple[np.ndarray, str]:
     """Return (samples to grade, scope) for the Copter attitude rules.
 
-    scope is one of "copter", "vtol", "fixed_wing" or "unknown":
+    scope is one of "copter", "vtol", "vtol_unknown_phase", "fixed_wing" or
+    "unknown":
     - copter: every sample;
-    - vtol: QuadPlane samples inside a VTOL window, all samples when the log
-      cannot say which phase it was in (then the mask is all True);
+    - vtol: QuadPlane samples inside a VTOL window;
+    - vtol_unknown_phase: a QuadPlane log with no phase source at all. An
+      empty mask: the log cannot say which time was under the Q controller,
+      so the Copter rules are not graded rather than applied to a fixed-wing
+      segment by default;
     - fixed_wing: an empty mask. The caller keeps the metrics and figures and
       does not grade a Copter critical or warning;
     - unknown: an empty mask; the caller stops rather than guess.
@@ -30,7 +34,7 @@ def scope_grade_mask(reader, vehicle, t: np.ndarray) -> tuple[np.ndarray, str]:
     if vehicle.is_quadplane:
         mask = _vtol_samples(reader, t)
         if mask is None:
-            return np.ones(len(t), dtype=bool), "vtol"
+            return np.zeros(len(t), dtype=bool), "vtol_unknown_phase"
         return mask, "vtol"
     if vehicle.is_plane:
         return np.zeros(len(t), dtype=bool), "fixed_wing"
@@ -41,10 +45,19 @@ def _vtol_samples(reader, t: np.ndarray) -> np.ndarray | None:
     """QuadPlane samples under the Q controller.
 
     Two sources, as in plane_phase.vtol_windows_mask: the Q controller's own
-    log stream (it logs only while running) and the Q modes. Unlike that
-    helper this one leaves out MANUAL and TRAINING: those are servo
-    passthrough, where no attitude controller runs, so neither the Copter
-    nor the fixed-wing rule describes them.
+    log stream (it logs only while running) and the Q modes.
+
+    This is deliberately NOT that helper, and the two differ in one way:
+    vtol_windows_mask also counts MANUAL and TRAINING. It exists to clean up
+    the fixed-wing PID analysis, where those modes leave stale PID rows that
+    must be dropped from the fixed-wing set, so it folds them into "not
+    fixed-wing". Here the question is the opposite one, "is the Copter
+    controller running", and in MANUAL/TRAINING no attitude controller runs
+    at all, so neither the Copter nor the fixed-wing rule describes them.
+    Folding them in would grade servo passthrough by the 30 deg limit.
+
+    The shared part is kept as a separate copy on purpose: changing
+    vtol_windows_mask would change which rows pid_tuning analyses.
     """
     combined: np.ndarray | None = None
     for msg in ("PIQR", "PIQP", "PIQY", "QTUN"):

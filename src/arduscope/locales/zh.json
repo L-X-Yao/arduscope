@@ -398,6 +398,8 @@
   "attitude.fixed_wing_summary": "固定翼姿态：横滚 RMS={roll} 度，俯仰 RMS={pitch} 度，峰值 {peak} 度；Copter 控制器规则不描述固定翼段，不判定 Copter 的 critical 或 warning",
   "attitude.vtol_no_samples": "QuadPlane 日志中没有可用的 VTOL 相位来源（无 Q 控制器数据流，也无 Q 模式），不套用 Copter 规则",
   "attitude.vtol_summary": "QuadPlane 姿态：armed 时间内横滚 RMS={roll} 度，俯仰 RMS={pitch} 度，峰值 {peak} 度；没有可评定的 VTOL 样本",
+  "attitude.vtol_unknown_phase": "QuadPlane 日志没有 VTOL 相位来源（无 Q 控制器数据流，也无 Q 模式）：无法判断哪些时间由旋翼控制器控制，此处不套用 Copter 规则",
+  "attitude.vtol_unknown_phase_summary": "QuadPlane 姿态：armed 时间内横滚 RMS={roll} 度，俯仰 RMS={pitch} 度，峰值 {peak} 度；日志无 VTOL 相位来源，不判定 Copter 的 critical 或 warning",
   "attitude.vtol_graded_detail": "QuadPlane：判定只读 VTOL（旋翼控制器）段的样本；该段横滚 RMS={roll} 度，俯仰 RMS={pitch} 度，峰值 {peak} 度",
   "attitude.vtol_summary_prefix": "VTOL 段：",
   "attitude.pid_info": "（当前 {prefix}_RLL_P={rll}, PIT_P={pit}）",

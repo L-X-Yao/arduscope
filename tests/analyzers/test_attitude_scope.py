@@ -135,10 +135,20 @@ class TestScopeMask:
         assert not mask[(ts > 20) & (ts < 40)].any()
         assert not mask[(ts > 65) & (ts < 75)].any()
 
-    def test_quadplane_without_any_phase_source_keeps_every_sample(self):
+    def test_quadplane_without_any_phase_source_grades_nothing(self):
+        # With no phase source the log cannot say which time was under the
+        # quad controller. Grading everything would put the Copter rules
+        # back on fixed-wing time, so nothing is graded.
         ts = np.arange(50) * DT
         mask, scope = scope_grade_mask(SyntheticReader({}), _vehicle("ArduPlane", True), ts)
-        assert scope == "vtol" and mask.all()
+        assert scope == "vtol_unknown_phase" and not mask.any()
+
+    def test_an_empty_q_stream_is_not_a_phase_source(self):
+        # A PIQR type with one row carries no proximity information.
+        reader = SyntheticReader({"PIQR": {"_timestamp": np.array([5.0])}})
+        ts = np.arange(50) * DT
+        mask, scope = scope_grade_mask(reader, _vehicle("ArduPlane", True), ts)
+        assert scope == "vtol_unknown_phase" and not mask.any()
 
 
 class TestFixedWingIsNotGraded:
@@ -198,6 +208,29 @@ class TestQuadPlane:
         result = AttitudeAnalyzer(reader, Thresholds(), self.VEHICLE).analyze()
         assert result.status == "critical"
         assert result.summary.startswith(tr("attitude.vtol_summary_prefix"))
+
+    def test_no_phase_source_does_not_grade_a_35_deg_excursion(self):
+        # The log cannot say which time was VTOL. Defaulting to "all VTOL"
+        # would grade a fixed-wing excursion by the Copter rule.
+        att = _sustained_pitch_excursion(35.0, 100.0, 20.0)
+        reader = SyntheticReader({"ATT": att}, params=PLANE_Q_ENABLE,
+                                 armed_intervals=[(0.0, 1e9)])
+        result = AttitudeAnalyzer(reader, Thresholds(), self.VEHICLE).analyze()
+        assert result.status == "good"
+        assert result.action_level == "ok"
+        assert result.param_suggestions == []
+        assert result.evidence_source == ""
+        assert tr("attitude.vtol_unknown_phase") in result.details
+        # The excursion is still reported as a number, just not graded.
+        assert any(re.search(r"(?<![\d.])35\.0 deg", d) for d in result.details)
+
+    def test_no_phase_source_does_not_grade_a_7_deg_rms(self):
+        att = _rms_tracking(7.0)
+        reader = SyntheticReader({"ATT": att}, params=PLANE_Q_ENABLE,
+                                 armed_intervals=[(0.0, 1e9)])
+        result = AttitudeAnalyzer(reader, Thresholds(), self.VEHICLE).analyze()
+        assert result.status == "good"
+        assert tr("attitude.vtol_unknown_phase") in result.details
 
     def test_the_same_excursion_in_a_fixed_wing_segment_is_not_graded(self):
         att = _sustained_pitch_excursion(35.0, 100.0, 20.0)

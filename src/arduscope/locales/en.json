@@ -398,6 +398,8 @@
   "attitude.fixed_wing_summary": "Fixed-wing attitude: Roll RMS={roll} deg, Pitch RMS={pitch} deg, peak {peak} deg; Copter controller rules do not describe a fixed-wing segment, so no Copter critical or warning is graded",
   "attitude.vtol_no_samples": "QuadPlane log without a usable VTOL phase source (no Q controller stream and no Q mode): the Copter rules are not graded",
   "attitude.vtol_summary": "QuadPlane attitude: Roll RMS={roll} deg, Pitch RMS={pitch} deg, peak {peak} deg over the armed time; no VTOL samples to grade",
+  "attitude.vtol_unknown_phase": "QuadPlane log with no VTOL phase source (no Q controller stream and no Q mode): it cannot be told which time was under the quad controller, so the Copter rules are not graded here",
+  "attitude.vtol_unknown_phase_summary": "QuadPlane attitude: Roll RMS={roll} deg, Pitch RMS={pitch} deg, peak {peak} deg over the armed time; the log has no VTOL phase source, so no Copter critical or warning is graded",
   "attitude.vtol_graded_detail": "QuadPlane: the verdict is read from the VTOL (quad-controller) samples only; on those, Roll RMS={roll} deg, Pitch RMS={pitch} deg, peak {peak} deg",
   "attitude.vtol_summary_prefix": "VTOL phase: ",
   "attitude.pid_info": " (current {prefix}_RLL_P={rll}, PIT_P={pit})",
