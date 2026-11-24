@@ -120,8 +120,8 @@ them readable, on the current gate baseline.
   average over the graded time: one excursion of a few seconds can carry it
   past 5 deg on an otherwise well-tracked flight, and it is graded critical.
 - **The share of false criticals is now estimated, from a small sample.** A
-  read of 50 critical cards across 43 logs on 2026-11-24 found 25 of the 49
-  decided cards false (51% crude; 52.6% when weighted by each analyzer's
+  read of 50 critical cards across 43 logs on 2026-11-24 found 23 of the 49
+  decided cards false (46.9% crude; 45.1% when weighted by each analyzer's
   share of criticals), concentrated in `attitude`, `battery`/`power` and
   `vibration`. It is a small sample with no external ground truth: eight
   cards per major analyzer. `battery` and `power` voltage was fixed in
