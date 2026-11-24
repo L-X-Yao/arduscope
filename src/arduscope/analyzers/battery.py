@@ -16,6 +16,7 @@ from __future__ import annotations
 import numpy as np
 import plotly.graph_objects as go
 
+from arduscope.lib.battery_voltage import evaluate_voltage, voltage_details
 from arduscope.lib.i18n import t
 from arduscope.lib.suggestions import ParamSuggestion
 from . import AnalysisResult, BaseAnalyzer
@@ -94,6 +95,7 @@ class BatteryAnalyzer(BaseAnalyzer):
         # 4. Analyze each battery instance
         # -----------------------------------------------------------
         status = "good"
+        configuration_warning = False
         instance_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
 
         # Voltage figure
@@ -195,23 +197,24 @@ class BatteryAnalyzer(BaseAnalyzer):
                                  low_volt=f"{low_volt:.1f}",
                                  max_volt=f"{max_volt:.1f}"))
 
-            # Status check — voltage
-            if crt_volt > 0 and min_volt < crt_volt:
-                status = self.worst_status(status, "critical")
-                details.append(
-                    t("battery.volt_below_crit",
-                      inst=inst_id,
-                      min_volt=f"{min_volt:.2f}",
-                      crt_volt=f"{crt_volt:.2f}")
-                )
-            elif low_volt > 0 and min_volt < low_volt:
-                status = self.worst_status(status, "warning")
-                details.append(
-                    t("battery.volt_below_warn",
-                      inst=inst_id,
-                      min_volt=f"{min_volt:.2f}",
-                      low_volt=f"{low_volt:.2f}")
-                )
+            # Firmware semantics: armed samples, a continuous LOW_TIMER
+            # interval, and a valid monitor/configuration are all required.
+            low_timer = get_batt_param(
+                "LOW_TIMER", inst_id, self.thresholds.batt_low_timer_default)
+            arm_volt = get_batt_param("ARM_VOLT", inst_id, 0.0)
+            monitor = get_batt_param("MONITOR", inst_id, 4.0)
+            evaluation = evaluate_voltage(
+                t_inst, v_inst, armed,
+                low_volt=low_volt, critical_volt=crt_volt,
+                low_timer=low_timer, arm_volt=arm_volt, monitor=monitor,
+                config_max_ratio=self.thresholds.batt_config_max_ratio,
+                sensor_min_volt=self.thresholds.batt_sensor_min_volt,
+                instance=inst_id,
+                param_prefix="BATT" if inst_id == 0 else f"BATT{inst_id + 1}",
+            )
+            details.extend(voltage_details(evaluation, "battery"))
+            configuration_warning |= evaluation.config_warning
+            status = self.worst_status(status, evaluation.status)
 
             # Status check — consumed mAh vs failsafe thresholds.
             # ArduPilot triggers low/crt failsafe when remaining capacity
@@ -252,7 +255,6 @@ class BatteryAnalyzer(BaseAnalyzer):
             # verifies the coefficient end-to-end. Info only, never
             # drives status. Factory-calibrated monitors (SMBus,
             # DroneCAN) don't need it and are skipped.
-            monitor = get_batt_param("MONITOR", inst_id, 0.0)
             amp_pervlt = get_batt_param("AMP_PERVLT", inst_id, 0.0)
             if int(monitor) == 4 and amp_pervlt > 0 and len(ct_valid) > 0:
                 consumed = float(np.nanmax(ct_valid))
@@ -349,6 +351,11 @@ class BatteryAnalyzer(BaseAnalyzer):
             plain_summary = t("battery.plain_critical")
             action_text = t("battery.action_critical")
             action_level = "safety_stop"
+        elif configuration_warning:
+            summary = t("battery.summary_config_warning")
+            plain_summary = t("battery.plain_config_warning")
+            action_text = t("battery.action_config_warning")
+            action_level = "physical_check"
         elif status == "warning":
             summary = t("battery.summary_warning")
             plain_summary = t("battery.plain_warning")
@@ -363,6 +370,8 @@ class BatteryAnalyzer(BaseAnalyzer):
         # Evidence source — battery thresholds from FC config and chemistry
         if status == "critical":
             evidence_source = t("battery.evidence_critical")
+        elif configuration_warning:
+            evidence_source = t("battery.evidence_config")
         elif status == "warning":
             evidence_source = t("battery.evidence_warning")
         else:

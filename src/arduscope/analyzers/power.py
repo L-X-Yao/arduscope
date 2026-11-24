@@ -16,6 +16,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 from arduscope.lib.battery_packs import Pack, read_packs, sum_over_packs
+from arduscope.lib.battery_voltage import evaluate_voltage, voltage_details
 from arduscope.lib.i18n import t
 from arduscope.lib.suggestions import ParamSuggestion
 from . import AnalysisResult, BaseAnalyzer
@@ -247,31 +248,19 @@ class PowerAnalyzer(BaseAnalyzer):
             "BATT_CRT_VOLT", self.thresholds.batt_crt_volt
         )
 
-        if armed:
-            armed_mask = np.zeros(len(t_main), dtype=bool)
-            for start, end in armed:
-                armed_mask |= (t_main >= start) & (t_main <= end)
-            if np.sum(armed_mask) > 10:
-                min_volt_armed = float(np.nanmin(v_main[armed_mask]))
-            else:
-                min_volt_armed = float(np.nanmin(v_main))
-        else:
-            min_volt_armed = float(np.nanmin(v_main))
-
-        if crt_volt > 0 and min_volt_armed < crt_volt:
-            status = self.worst_status(status, "critical")
-            details.append(
-                t("power.volt_below_crit",
-                  min_volt=f"{min_volt_armed:.2f}",
-                  crt_volt=f"{crt_volt:.1f}")
-            )
-        elif low_volt > 0 and min_volt_armed < low_volt:
-            status = self.worst_status(status, "warning")
-            details.append(
-                t("power.volt_below_warn",
-                  min_volt=f"{min_volt_armed:.2f}",
-                  low_volt=f"{low_volt:.1f}")
-            )
+        evaluation = evaluate_voltage(
+            t_main, v_main, armed,
+            low_volt=low_volt, critical_volt=crt_volt,
+            low_timer=self.reader.get_param(
+                "BATT_LOW_TIMER", self.thresholds.batt_low_timer_default),
+            arm_volt=self.reader.get_param("BATT_ARM_VOLT", 0.0),
+            monitor=self.reader.get_param("BATT_MONITOR", 4.0),
+            config_max_ratio=self.thresholds.batt_config_max_ratio,
+            sensor_min_volt=self.thresholds.batt_sensor_min_volt,
+            instance=0, param_prefix="BATT",
+        )
+        details.extend(voltage_details(evaluation, "power"))
+        status = evaluation.status
 
         # -----------------------------------------------------------
         # 9. Summary + actionable advice
@@ -284,9 +273,13 @@ class PowerAnalyzer(BaseAnalyzer):
             plain_summary = t("power.plain_critical")
             action_text = t(
                 "power.action_critical",
-                min_volt=f"{min_volt_armed:.2f}",
-                crt_volt=f"{crt_volt:.1f}",
+                min_volt=f"{evaluation.min_voltage:.2f}",
+                crt_volt=f"{evaluation.limit:.1f}",
             )
+        elif evaluation.config_warning:
+            action_level = "physical_check"
+            plain_summary = t("battery.plain_config_warning")
+            action_text = t("battery.action_config_warning")
         elif status == "warning":
             # No auto-suggestion here: the old 0.92 × peak-voltage
             # BATT_LOW_VOLT recommendation had no authoritative source
@@ -294,10 +287,10 @@ class PowerAnalyzer(BaseAnalyzer):
             action_level = "physical_check"
             plain_summary = t("power.plain_warning")
             low_volt_advice = t("power.check_low_volt",
-                                val=f"{min_volt_armed:.2f}")
+                                val=f"{evaluation.min_voltage:.2f}")
             action_text = t(
                 "power.action_warning",
-                min_volt=f"{min_volt_armed:.2f}",
+                min_volt=f"{evaluation.min_voltage:.2f}",
                 low_volt=f"{low_volt:.1f}",
                 low_volt_advice=low_volt_advice,
             )
@@ -308,7 +301,8 @@ class PowerAnalyzer(BaseAnalyzer):
 
         evidence_source = ""
         if status in ("warning", "critical"):
-            evidence_source = t("power.evidence")
+            evidence_source = (t("battery.evidence_config")
+                               if evaluation.config_warning else t("power.evidence"))
 
         return self.make_result(
             title=t("analyzer.power"),

@@ -449,7 +449,7 @@ class TestBatterySynthetic:
         # Instance 1: critically low 19V
         all_ts = np.concatenate([ts, ts])
         all_inst = np.concatenate([np.zeros(n), np.ones(n)])
-        all_volt = np.concatenate([np.full(n, 24.0), np.full(n, 19.0)])
+        all_volt = np.concatenate([np.full(n, 24.0), np.linspace(24.0, 19.0, n)])
         all_curr = np.full(2 * n, 10.0)
         all_rem = np.full(2 * n, 50.0)
         all_currtot = np.full(2 * n, 2000.0)
@@ -469,6 +469,7 @@ class TestBatterySynthetic:
                 "BATT_LOW_VOLT": 21.0,
                 "BATT_CRT_VOLT": 20.0,
             },
+            armed_intervals=[(0.0, 300.0)],
         )
         result = BatteryAnalyzer(reader, _thresholds(reader),
                                   _vehicle()).analyze()
@@ -485,12 +486,8 @@ class TestBatterySynthetic:
         # Should warn because min_volt (22.0) < low_volt (25.0)
         assert result.status in ("warning", "critical")
 
-    def test_low_volt_near_max_is_flagged_without_a_value(self):
-        """BATT_LOW_VOLT misconfigured but voltage never dropped below it.
-        The note must appear; no value is suggested, as none has a source."""
-        # max_volt=25.2, min_volt=24.0, BATT_LOW_VOLT=24.0
-        # 24.0 > 25.2*0.95=23.94 → note fires
-        # 24.0 < 24.0 is False → no warning → status stays "good"
+    def test_low_volt_near_max_is_configuration_warning(self):
+        """Near-max LOW_VOLT is a configuration warning even without a crossing."""
         reader = self._build_reader(
             volt_range=(25.2, 24.0),
             params={
@@ -502,7 +499,7 @@ class TestBatterySynthetic:
         )
         result = BatteryAnalyzer(reader, _thresholds(reader),
                                   _vehicle()).analyze()
-        assert result.status == "good"
+        assert result.status == "warning"
         assert result.param_suggestions == []
         assert any("BATT_LOW_VOLT" in d for d in result.details)
 

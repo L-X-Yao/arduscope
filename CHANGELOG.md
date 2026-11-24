@@ -9,6 +9,11 @@ releases are not published.
 
 ## [Unreleased]
 
+### Fixed
+- Battery and power voltage criticals now require armed, sustained and valid
+  evidence under ArduPilot's LOW_TIMER and configuration rules; ground,
+  drop-out, unpowered and misconfigured readings no longer escalate.
+
 ### Changed
 - Feature development reopened on 2026-11-24; the maintenance freeze is lifted.
 

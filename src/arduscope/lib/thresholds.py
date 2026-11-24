@@ -92,6 +92,12 @@ class Thresholds:
     batt_crt_volt: float = 0.0       # A: overridden by BATT_CRT_VOLT
     batt_low_mah: float = 0.0        # A: overridden by BATT_LOW_MAH
     batt_crt_mah: float = 0.0        # A: overridden by BATT_CRT_MAH
+    # Firmware LOW_TIMER default, used only when the log has no parameter.
+    batt_low_timer_default: float = 10.0  # A: AP_BattMonitor_Params.cpp LOW_TIMER default 10 s
+    # Existing battery configuration screen; not a diagnostic relaxation.
+    batt_config_max_ratio: float = 0.95  # D: threshold >=95% of observed max is inconsistent with the pack
+    # Fallback only when ARM_VOLT=0: a sub-volt line is unpowered or failed.
+    batt_sensor_min_volt: float = 1.0    # D: no flight pack reads below 1 V
     # Charge-backfill calibration hint (analog monitors only): below
     # this consumption the charger's ~10 mAh refill resolution and
     # balance-charge overhead dominate the refill/consumed ratio.
