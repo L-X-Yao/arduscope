@@ -12,7 +12,8 @@ releases are not published.
 ### Fixed
 - Vibration warning and critical verdicts now use each armed primary-IMU
   axis's P99; isolated spikes no longer drive the grade, while max, avg and
-  the independent clip rule remain.
+  the independent clip rule remain. With filtering disabled, a critical-level
+  maximum and low P99 produce a conservative warning instead.
 - The QuadPlane phase mask now unions every Q-controller stream, so a stalled
   stream no longer hides later VTOL samples used by PID and TECS analysis.
 

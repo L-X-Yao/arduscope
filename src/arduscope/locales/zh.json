@@ -1771,6 +1771,8 @@
   "vibration.thresh_warn": "注意 ({val})",
   "vibration.time_s": "时间 (s)",
   "vibration.vibe_axis_detail": "振动 {axis}: 平均 {avg} m/s², P99 {p99} m/s², 最大 {mx} m/s²",
+  "vibration.warn_no_filter_plain": "陷波滤波器未开且存在临界级峰值，但 P99 未达临界；检查机械振动与滤波配置。",
+  "vibration.warn_no_filter_summary": "陷波滤波器未开：峰值 {peak} m/s² 达到临界阈值 {thresh}，但 P99 仅为 {p99}，判 warning 而非 critical",
   "vibration.warn_plain": "振动偏高。",
   "vibration.warn_summary": "振动偏高 (P99 {val} m/s², 阈值 {thresh})",
   "vibration.warn_summary_clip": "振动 RMS 正常但加速度计 Clip 计数过高 ({total} 次)",

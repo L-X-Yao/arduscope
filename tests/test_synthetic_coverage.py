@@ -56,6 +56,7 @@ class SyntheticReader:
                  vehicle_type: str = "ArduCopter"):
         self._messages = messages
         self.params = params or {}
+        self.param_history: dict[str, list[tuple[float, float]]] = {}
         self.vehicle_type = vehicle_type
         self.firmware_version = "4.6.3"
         self.board_name = "synthetic"
@@ -120,6 +121,16 @@ class SyntheticReader:
 
     def get_param(self, name: str, default: float = 0.0) -> float:
         return self.params.get(name, default)
+
+    def get_param_at(self, name: str, timestamp: float,
+                     default: float = 0.0) -> float:
+        history = self.param_history.get(name)
+        if not history:
+            return self.get_param(name, default)
+        for changed_at, value in reversed(history):
+            if changed_at <= timestamp:
+                return value
+        return history[0][1]
 
     def get_armed_intervals(self) -> list:
         return self._armed

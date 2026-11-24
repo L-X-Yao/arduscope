@@ -126,6 +126,8 @@ class VibrationAnalyzer(BaseAnalyzer):
         max_vibe_x = _safe_nanmax(vibe_x)
         max_vibe_y = _safe_nanmax(vibe_y)
         max_vibe_z = _safe_nanmax(vibe_z)
+        max_vibes = (max_vibe_x, max_vibe_y, max_vibe_z)
+        max_vibe = max(max_vibes)
 
         avg_vibe_x = _safe_nanmean(vibe_x)
         avg_vibe_y = _safe_nanmean(vibe_y)
@@ -204,7 +206,27 @@ class VibrationAnalyzer(BaseAnalyzer):
             # the parameter recommendations — we just need to make sure
             # vibration's "all good" plain summary doesn't mask it.
             hntch_enable = self.reader.get_param("INS_HNTCH_ENABLE", 0)
-            if hntch_enable == 0:
+            hntch_at_peak = hntch_enable
+            if max_vibe >= crit_thresh:
+                peak_axis = max_vibes.index(max_vibe)
+                peak_values = (vibe_x, vibe_y, vibe_z)[peak_axis]
+                peak_time = float(ts[int(np.nanargmax(peak_values))])
+                hntch_at_peak = self.reader.get_param_at(
+                    "INS_HNTCH_ENABLE", peak_time, hntch_enable)
+            if (hntch_at_peak == 0 and max_vibe >= crit_thresh
+                    and status == "good"):
+                # P99 remains the only route to critical. With filtering
+                # disabled at the peak, a critical-level maximum is still a
+                # conservative warning because the log offers no attenuation
+                # evidence. A post-flight parameter change cannot hide it.
+                status = "warning"
+                summary = t("vibration.warn_no_filter_summary",
+                            peak=f"{max_vibe:.1f}", p99=f"{p99_vibe:.1f}",
+                            thresh=crit_thresh)
+                plain_summary = t("vibration.warn_no_filter_plain")
+                action_text = physical_check_steps
+                action_level = "physical_check"
+            elif hntch_enable == 0:
                 plain_summary = t("vibration.good_no_notch_plain",
                                   val=f"{p99_vibe:.1f}")
                 details.append(t("vibration.good_no_notch_detail"))

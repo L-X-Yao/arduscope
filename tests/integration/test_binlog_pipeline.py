@@ -52,6 +52,21 @@ class TestParsing:
         assert reader.get_flight_duration() == pytest.approx(40.0, abs=0.1)
         assert reader.get_armed_intervals()
 
+    def test_parameter_lookup_uses_the_value_in_force(self, tmp_path):
+        log = binlog.BinLog()
+        log.write("MSG", 1_000_000, "ArduCopter V4.6.3 (abc12345)")
+        log.write("MODE", 1_000_000, 0, 0, 0)
+        log.write("PARM", 1_000_000, "INS_HNTCH_ENABLE", 0.0, 0.0)
+        log.write("PARM", 3_000_000, "INS_HNTCH_ENABLE", 1.0, 0.0)
+        log.write("ATT", 4_000_000, 0, 0, 0, 0, 0, 0, 0)
+        reader = LogReader(log.save(tmp_path / "param_change.bin"))
+
+        assert reader.get_param("INS_HNTCH_ENABLE") == 1.0
+        assert reader.get_param_at("INS_HNTCH_ENABLE", -1.0) == 0.0
+        assert reader.get_param_at("INS_HNTCH_ENABLE", 1.9) == 0.0
+        assert reader.get_param_at("INS_HNTCH_ENABLE", 2.0) == 1.0
+        assert reader.get_param_at("MISSING", 2.0, 7.0) == 7.0
+
     def test_preloaded_values(self, copter_log):
         reader = LogReader(copter_log, preload_types=["ATT", "BAT"])
         att = reader.get_messages_as_arrays("ATT", ["Yaw", "DesYaw"])
@@ -212,6 +227,7 @@ class TestDiskCache:
                             "mavlink_connection", forbid)
         warm = LogReader(copter_log, disk_cache=True)
         assert warm.params == cold.params
+        assert warm.param_history == cold.param_history
         assert warm.isb_batches.keys() == cold.isb_batches.keys()
         assert warm._fully_cached == cold._fully_cached
         np.testing.assert_array_equal(

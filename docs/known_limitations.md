@@ -122,8 +122,10 @@ them readable, on the current gate baseline.
 - **`vibration` uses a robust per-axis level, not one sample.** The warning
   and critical verdicts use P99 over the armed, primary-IMU samples. Max and
   average stay in the details, and clipping still raises warning
-  independently. A lone spike no longer drives severity; a sustained or
-  crash-level condition still crosses the unchanged 15/30 thresholds.
+  independently. A lone spike no longer drives a critical verdict; with the
+  notch filter disabled, a critical-level maximum remains a conservative
+  warning. A sustained or crash-level condition still crosses the unchanged
+  15/30 thresholds.
 - **The share of false criticals is now estimated, from a small sample.** A
   read of 50 critical cards across 43 logs on 2026-11-24 found 23 of the 49
   decided cards false (46.9% crude; 45.1% when weighted by each analyzer's

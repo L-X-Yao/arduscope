@@ -30,7 +30,7 @@ _CACHE_DIR = os.environ.get(
 
 # Bump whenever parsing changes what ends up in the cache. Part of the
 # cache key, so a stale entry can never mask a parser regression.
-_CACHE_VERSION = 5
+_CACHE_VERSION = 6
 
 # Official family name followed by a semantic-ish version token. Punctuation
 # and brackets are allowed between them; a vendor prefix/version is ignored.
@@ -319,6 +319,9 @@ class LogReader:
 
         # Metadata populated during pre-scan
         self.params: dict[str, float] = {}
+        # Relative-time parameter values let analyzers use the configuration
+        # in force at a sample, not a post-flight change left in params.
+        self.param_history: dict[str, list[tuple[float, float]]] = {}
         self.mode_list: list[ModeChange] = []
         self.errors: list[ErrorEvent] = []
         self.events: list[Event] = []
@@ -442,6 +445,9 @@ class LogReader:
                 value = getattr(m, 'Value', None)
                 if name is not None and value is not None:
                     self.params[name] = value
+                    relative_ts = self._relative_ts(ts, first_timestamp)
+                    self.param_history.setdefault(name, []).append(
+                        (relative_ts, float(value)))
                 continue
 
             elif msg_type == 'MODE':
@@ -806,6 +812,21 @@ class LogReader:
         """Get a parameter value from the log, with default fallback."""
         return self.params.get(name, default)
 
+    def get_param_at(self, name: str, timestamp: float,
+                     default: float = 0.0) -> float:
+        """Get the value in force at a timestamp relative to log start.
+
+        PARM records can include changes made after flight. Before the first
+        record, use that first value: it is the earliest state the log proves.
+        """
+        history = self.param_history.get(name)
+        if not history:
+            return self.get_param(name, default)
+        for changed_at, value in reversed(history):
+            if changed_at <= timestamp:
+                return value
+        return history[0][1]
+
     def has_message(self, msg_type: str) -> bool:
         """Check if a message type exists in the log."""
         return msg_type in self.available_messages
@@ -972,6 +993,7 @@ class LogReader:
             with open(path, "rb") as f:
                 data = pickle.load(f)  # noqa: S301
             self.params = data["params"]
+            self.param_history = data["param_history"]
             self.mode_list = data["mode_list"]
             self.errors = data["errors"]
             self.events = data["events"]
@@ -998,6 +1020,7 @@ class LogReader:
             os.makedirs(_CACHE_DIR, exist_ok=True)
             data = {
                 "params": self.params,
+                "param_history": self.param_history,
                 "mode_list": self.mode_list,
                 "errors": self.errors,
                 "events": self.events,

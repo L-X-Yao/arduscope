@@ -1771,6 +1771,8 @@
   "vibration.thresh_warn": "Warning ({val})",
   "vibration.time_s": "Time (s)",
   "vibration.vibe_axis_detail": "Vibration {axis}: avg {avg} m/s², P99 {p99} m/s², max {mx} m/s²",
+  "vibration.warn_no_filter_plain": "Notch filter is off and a critical-level peak exists, but P99 is below critical; inspect vibration and filtering.",
+  "vibration.warn_no_filter_summary": "Notch filter disabled: peak {peak} m/s² reaches the critical threshold {thresh}, but P99 is only {p99}; warning, not critical",
   "vibration.warn_plain": "Vibration elevated.",
   "vibration.warn_summary": "Vibration elevated (P99 {val} m/s², threshold {thresh})",
   "vibration.warn_summary_clip": "Vibration RMS normal but accelerometer clip count too high ({total})",
