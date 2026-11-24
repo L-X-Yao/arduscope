@@ -69,12 +69,15 @@ def vtol_windows_mask(reader, ts: np.ndarray) -> np.ndarray | None:
         if not reader.has_message(msg):
             continue
         ref = reader.get_messages_as_arrays(msg, [])["_timestamp"]
-        if len(ref) > 1:
-            idx = np.searchsorted(ref, ts)
-            prev_gap = np.abs(ts - ref[np.clip(idx - 1, 0, len(ref) - 1)])
-            next_gap = np.abs(ref[np.clip(idx, 0, len(ref) - 1)] - ts)
-            combined = np.minimum(prev_gap, next_gap) <= 0.5
-            break
+        if len(ref) < 2:
+            continue
+        idx = np.searchsorted(ref, ts)
+        prev_gap = np.abs(ts - ref[np.clip(idx - 1, 0, len(ref) - 1)])
+        next_gap = np.abs(ref[np.clip(idx, 0, len(ref) - 1)] - ts)
+        near = np.minimum(prev_gap, next_gap) <= 0.5
+        # No stream is preferred: a stalled PIQ stream must not hide a
+        # complete QTUN phase. Single rows carry no proximity information.
+        combined = near if combined is None else (combined | near)
     if reader.has_message("MODE"):
         mode = reader.get_messages_as_arrays("MODE", ["Mode"])
         mts, mvals = mode["_timestamp"], mode["Mode"]

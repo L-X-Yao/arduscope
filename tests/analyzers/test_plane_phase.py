@@ -95,3 +95,28 @@ class TestVtolWindows:
 
         assert mask[10] and mask[35]
         assert not mask[20] and not mask[50]
+
+    def test_partial_piqr_does_not_hide_full_qtun(self):
+        reader = SyntheticReader(messages={
+            "PIQR": {"_timestamp": np.array([10.0, 10.04])},
+            "QTUN": {"_timestamp": np.arange(30.0, 50.0, 0.04)},
+        })
+        mask = vtol_windows_mask(reader, self.TS)
+        assert mask[10]
+        assert mask[35] and mask[49]
+        assert not mask[25] and not mask[60]
+
+    def test_single_row_streams_still_mean_no_phase_source(self):
+        reader = SyntheticReader(messages={
+            "PIQR": {"_timestamp": np.array([5.0])},
+            "QTUN": {"_timestamp": np.array([9.0])},
+        })
+        assert vtol_windows_mask(reader, self.TS) is None
+
+    def test_passthrough_modes_stay_in_the_pid_mask(self):
+        reader = SyntheticReader(messages={"MODE": {
+            "_timestamp": np.array([30.0, 40.0, 50.0]),
+            "Mode": np.array([0.0, 3.0, 5.0])}})
+        mask = vtol_windows_mask(reader, self.TS)
+        assert mask[30] and mask[40]
+        assert not mask[50]
