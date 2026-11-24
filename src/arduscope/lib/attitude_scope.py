@@ -101,16 +101,22 @@ def _vtol_samples(reader, t: np.ndarray) -> np.ndarray | None:
     vtol_windows_mask would change which rows pid_tuning analyses.
     """
     combined: np.ndarray | None = None
+    # Every Q stream is unioned; none is preferred. The streams do not
+    # cover the same time: one can stall (a PIQR with two rows) while
+    # another keeps logging the whole VTOL phase. Stopping at the first
+    # usable stream would throw the complete one away and leave a real VTOL
+    # excursion ungraded.
     for msg in ("PIQR", "PIQP", "PIQY", "QTUN"):
         if not reader.has_message(msg):
             continue
         ref = reader.get_messages_as_arrays(msg, [])["_timestamp"]
-        if len(ref) > 1:
-            idx = np.searchsorted(ref, t)
-            prev_gap = np.abs(t - ref[np.clip(idx - 1, 0, len(ref) - 1)])
-            next_gap = np.abs(ref[np.clip(idx, 0, len(ref) - 1)] - t)
-            combined = np.minimum(prev_gap, next_gap) <= 0.5
-            break
+        if len(ref) < 2:
+            continue
+        idx = np.searchsorted(ref, t)
+        prev_gap = np.abs(t - ref[np.clip(idx - 1, 0, len(ref) - 1)])
+        next_gap = np.abs(ref[np.clip(idx, 0, len(ref) - 1)] - t)
+        near = np.minimum(prev_gap, next_gap) <= 0.5
+        combined = near if combined is None else (combined | near)
     if reader.has_message("MODE"):
         mode = reader.get_messages_as_arrays("MODE", ["Mode"])
         mts, mvals = mode["_timestamp"], mode["Mode"]

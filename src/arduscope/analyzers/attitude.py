@@ -502,7 +502,16 @@ class AttitudeAnalyzer(BaseAnalyzer):
                 evidence_source = t("attitude.evidence_peak_over_limit",
                                     peak=f"{graded_peak:.1f}")
         elif status == "warning":
-            if peak_beyond_command:
+            # The same order as the reasons in the summary. A peak past the
+            # 30 deg limit leads: it is the sourced finding, and its
+            # evidence is what explains why the card is not critical.
+            if peak_over_limit:
+                evidence_source = t("attitude.evidence_not_sustained",
+                                    peak=f"{graded_peak:.1f}",
+                                    seconds=f"{graded_over_seconds:.1f}",
+                                    limit=_THRUST_ERROR_ANGLE_DEG,
+                                    guard=self.thresholds.att_peak_min_duration_s)
+            elif peak_beyond_command:
                 evidence_source = t("attitude.evidence_peak_beyond",
                                     crit=crit_thresh,
                                     peak=f"{graded_peak:.1f}",
@@ -515,12 +524,6 @@ class AttitudeAnalyzer(BaseAnalyzer):
             elif rms_warn:
                 evidence_source = t("attitude.evidence_rms",
                                     warn=warn_thresh, crit=crit_thresh)
-            elif peak_over_limit:
-                evidence_source = t("attitude.evidence_not_sustained",
-                                    peak=f"{graded_peak:.1f}",
-                                    seconds=f"{graded_over_seconds:.1f}",
-                                    limit=_THRUST_ERROR_ANGLE_DEG,
-                                    guard=self.thresholds.att_peak_min_duration_s)
             elif peak_warning:
                 evidence_source = t("attitude.evidence_peak_severe",
                                     peak=f"{graded_peak:.1f}")

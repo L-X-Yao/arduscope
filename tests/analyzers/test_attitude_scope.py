@@ -135,6 +135,54 @@ class TestScopeMask:
         assert not mask[(ts > 20) & (ts < 40)].any()
         assert not mask[(ts > 65) & (ts < 75)].any()
 
+    def test_every_q_stream_is_unioned_none_is_preferred(self):
+        # The streams do not cover the same time. PIQR has stalled to two
+        # rows at 50 s while QTUN logs the whole 50-60 s VTOL phase. Using
+        # only the first stream found would grade two samples' worth of a
+        # phase that lasted ten seconds.
+        reader = SyntheticReader({
+            "PIQR": {"_timestamp": np.array([50.0, 50.1])},
+            "QTUN": {"_timestamp": np.arange(50.0, 60.0, DT)},
+        })
+        ts = np.arange(800) * DT
+        mask, scope = scope_grade_mask(reader, _vehicle("ArduPlane", True), ts)
+        assert scope == "vtol"
+        assert mask[(ts > 51) & (ts < 59)].all()
+        assert not mask[(ts > 65) & (ts < 75)].any()
+
+    def test_a_stalled_first_stream_cannot_hide_a_complete_later_one(self):
+        # Reverse order too: a complete PIQR must not be discarded because
+        # a two-row QTUN comes with it.
+        reader = SyntheticReader({
+            "PIQR": {"_timestamp": np.arange(50.0, 60.0, DT)},
+            "QTUN": {"_timestamp": np.array([50.0, 50.1])},
+        })
+        ts = np.arange(800) * DT
+        mask, _ = scope_grade_mask(reader, _vehicle("ArduPlane", True), ts)
+        assert mask[(ts > 51) & (ts < 59)].all()
+
+    def test_streams_in_different_phases_are_both_kept(self):
+        # PIQR covers 20-30 s, QTUN covers 70-80 s: two separate VTOL phases.
+        reader = SyntheticReader({
+            "PIQR": {"_timestamp": np.arange(20.0, 30.0, DT)},
+            "QTUN": {"_timestamp": np.arange(70.0, 80.0, DT)},
+        })
+        ts = np.arange(1000) * DT
+        mask, _ = scope_grade_mask(reader, _vehicle("ArduPlane", True), ts)
+        assert mask[(ts > 21) & (ts < 29)].all()
+        assert mask[(ts > 71) & (ts < 79)].all()
+        assert not mask[(ts > 45) & (ts < 55)].any()
+
+    def test_a_stream_with_one_row_is_skipped_and_the_rest_still_count(self):
+        # One row carries no proximity information; it must not end the search.
+        reader = SyntheticReader({
+            "PIQR": {"_timestamp": np.array([50.0])},
+            "QTUN": {"_timestamp": np.arange(50.0, 60.0, DT)},
+        })
+        ts = np.arange(800) * DT
+        mask, scope = scope_grade_mask(reader, _vehicle("ArduPlane", True), ts)
+        assert scope == "vtol" and mask[(ts > 51) & (ts < 59)].all()
+
     def test_quadplane_without_any_phase_source_grades_nothing(self):
         # With no phase source the log cannot say which time was under the
         # quad controller. Grading everything would put the Copter rules
@@ -146,6 +194,16 @@ class TestScopeMask:
     def test_an_empty_q_stream_is_not_a_phase_source(self):
         # A PIQR type with one row carries no proximity information.
         reader = SyntheticReader({"PIQR": {"_timestamp": np.array([5.0])}})
+        ts = np.arange(50) * DT
+        mask, scope = scope_grade_mask(reader, _vehicle("ArduPlane", True), ts)
+        assert scope == "vtol_unknown_phase" and not mask.any()
+
+    def test_only_single_row_streams_is_still_no_phase_source(self):
+        # Skipping a one-row stream must not turn None into an empty mask.
+        reader = SyntheticReader({
+            "PIQR": {"_timestamp": np.array([5.0])},
+            "QTUN": {"_timestamp": np.array([9.0])},
+        })
         ts = np.arange(50) * DT
         mask, scope = scope_grade_mask(reader, _vehicle("ArduPlane", True), ts)
         assert scope == "vtol_unknown_phase" and not mask.any()
@@ -231,6 +289,40 @@ class TestQuadPlane:
         result = AttitudeAnalyzer(reader, Thresholds(), self.VEHICLE).analyze()
         assert result.status == "good"
         assert tr("attitude.vtol_unknown_phase") in result.details
+
+    def test_a_real_loss_in_the_qtun_phase_is_not_missed(self):
+        # Regression. PIQR stalled to two rows at 60 s; QTUN logs the whole
+        # VTOL phase, 50-150 s. A 5 s excursion past 30 deg at 100 s is
+        # under the quad controller. Reading only the first usable stream
+        # graded 12 of 1001 samples of that phase and called this `good`.
+        n = 4000
+        act = np.zeros(n)
+        act[_at(100.0):_at(105.0)] = 38.0
+        reader = SyntheticReader({
+            "ATT": _att(n, np.zeros(n), act),
+            "PIQR": {"_timestamp": np.array([60.0, 60.1])},
+            "QTUN": {"_timestamp": np.arange(50.0, 150.0, DT)},
+        }, params=PLANE_Q_ENABLE, armed_intervals=[(0.0, 1e9)])
+        result = AttitudeAnalyzer(reader, Thresholds(), self.VEHICLE).analyze()
+        assert result.status == "critical"
+        assert result.action_level in ("run_autotune", "apply_param")
+        assert tr("attitude.peak_sustained", limit=30.0, seconds="4.9",
+                  guard=1.0) in result.details
+        assert result.summary.startswith(tr("attitude.vtol_summary_prefix"))
+
+    def test_a_brief_dip_in_the_qtun_phase_is_still_only_a_warning(self):
+        # The same log shape with a 0.2 s dip: the union widens the graded
+        # time, it does not lower the duration guard.
+        n = 4000
+        act = np.zeros(n)
+        act[_at(100.0):_at(100.2)] = 38.0
+        reader = SyntheticReader({
+            "ATT": _att(n, np.zeros(n), act),
+            "PIQR": {"_timestamp": np.array([60.0, 60.1])},
+            "QTUN": {"_timestamp": np.arange(50.0, 150.0, DT)},
+        }, params=PLANE_Q_ENABLE, armed_intervals=[(0.0, 1e9)])
+        assert AttitudeAnalyzer(
+            reader, Thresholds(), self.VEHICLE).analyze().status != "critical"
 
     def test_the_same_excursion_in_a_fixed_wing_segment_is_not_graded(self):
         att = _sustained_pitch_excursion(35.0, 100.0, 20.0)
@@ -319,12 +411,13 @@ class TestPeakDurationGuard:
         result = _run({"ATT": self._excursion(2)}, self.VEHICLE)
         assert result.status == "warning"
         assert result.action_level == "run_autotune"
-        assert tr("attitude.peak_not_sustained") not in result.details  # has placeholders
-        assert any(d.startswith(tr("attitude.peak_not_sustained",
-                                   peak="", seconds="", limit="", guard="")
-                       .split("{")[0]) or "30" in d and "not graded" in d.lower()
-                   or "不判 critical" in d for d in result.details)
-        assert result.evidence_source != ""
+        # The exact formatted line: two samples at 10 Hz span 0.1 s.
+        assert tr("attitude.peak_not_sustained", peak="38.0", seconds="0.1",
+                  limit=30.0, guard=1.0) in result.details
+        # And the evidence is the non-sustained one, not the 15 deg screen's.
+        assert result.evidence_source == tr(
+            "attitude.evidence_not_sustained", peak="38.0", seconds="0.1",
+            limit=30.0, guard=1.0)
 
     def test_exactly_one_second_is_not_critical_the_rule_is_strict(self):
         result = _run({"ATT": self._excursion(11)}, self.VEHICLE)
