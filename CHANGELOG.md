@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.14.1] - 2026-11-24
 
 ### Fixed
 - The Windows CI job now runs the new theme and agent tests: the theme
