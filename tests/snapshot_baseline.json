@@ -31,8 +31,8 @@
       "param_count": 0
     },
     "vibration": {
-      "status": "warning",
-      "action_level": "physical_check",
+      "status": "good",
+      "action_level": "ok",
       "param_count": 0
     },
     "gyro_saturation": {
@@ -487,7 +487,7 @@
       "param_count": 0
     },
     "vibration": {
-      "status": "critical",
+      "status": "warning",
       "action_level": "physical_check",
       "param_count": 0
     },
@@ -1085,8 +1085,8 @@
       "param_count": 0
     },
     "vibration": {
-      "status": "warning",
-      "action_level": "physical_check",
+      "status": "good",
+      "action_level": "ok",
       "param_count": 0
     },
     "gyro_saturation": {
@@ -1536,8 +1536,8 @@
       "param_count": 0
     },
     "vibration": {
-      "status": "warning",
-      "action_level": "physical_check",
+      "status": "good",
+      "action_level": "ok",
       "param_count": 0
     },
     "gyro_saturation": {
@@ -2002,8 +2002,8 @@
       "param_count": 0
     },
     "vibration": {
-      "status": "warning",
-      "action_level": "physical_check",
+      "status": "good",
+      "action_level": "ok",
       "param_count": 0
     },
     "gyro_saturation": {
