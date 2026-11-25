@@ -21,7 +21,21 @@ jobs:
       contents: write
 
     steps:
+      # All of the history, and every branch: the tag check places the tagged
+      # commit against origin/main.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Fetch main
+        run: git fetch origin main
+
+      # A malformed tag, one whose commit is not on main, or one whose version
+      # is not the tagged commit's stops here: nothing is built and no draft
+      # is made. The step also names the version for the package and the notes.
+      - name: Check the release tag
+        id: version
+        run: python3 tools/check_release_tag.py
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
@@ -33,10 +47,6 @@ jobs:
 
       - name: Build wheel and sdist
         run: python -m build
-
-      - name: Extract version from tag
-        id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
       # Standalone Windows package (.pyc mode), on the Python named by
       # DEFAULT_PYTHON in build_windows_package.py. The runner Python above has
