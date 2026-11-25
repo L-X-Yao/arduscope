@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -56,10 +57,12 @@ MIN_AVAILABLE_MEM_GB = 8.0
 # MemAvailable says what the machine has spare. Only the process's own cgroup
 # says what this run may take before the OOM killer comes for it, and a run
 # without a cap has no such number. cgroup v2 names the cgroup in
-# /proc/self/cgroup as "0::/path", and its limits are files under the
-# cgroup2 mount: a byte count, or "max" for no limit.
+# /proc/self/cgroup as "0::/path"; where that is on the filesystem is a
+# question for /proc/self/mountinfo, since the cgroup2 filesystem is not
+# always mounted at /sys/fs/cgroup. Its limits are files in the cgroup's
+# directory: a byte count, or "max" for no limit.
 PROC_CGROUP = "/proc/self/cgroup"
-CGROUP_ROOT = "/sys/fs/cgroup"
+PROC_MOUNTS = "/proc/self/mountinfo"
 CGROUP_LIMITS = (("memory_max", "memory.max"),
                  ("memory_swap_max", "memory.swap.max"))
 
@@ -143,8 +146,58 @@ def available_memory_bytes() -> int | None:
     return None
 
 
+def _unescaped(field: str) -> str:
+    """A mountinfo field as a path: the kernel writes a space as \040."""
+    return re.sub(r"\\([0-7]{3})", lambda found: chr(int(found.group(1), 8)),
+                  field)
+
+
+def cgroup2_mounts(proc_mounts: str = PROC_MOUNTS) -> list[tuple[str, str]]:
+    """(mount point, mount root) of every cgroup2 filesystem mounted, in the
+    order the kernel lists them. Raises OSError when they cannot be read.
+
+    A mountinfo line is "id parent major:minor root mount-point options
+    [optional...] - fstype source super-options", so the root and the mount
+    point come before the options and the fstype after the separator.
+    """
+    try:
+        with open(proc_mounts, encoding="ascii", errors="replace") as f:
+            lines = f.read().splitlines()
+    except OSError as e:
+        raise OSError(f"{proc_mounts}: {e}") from None
+    mounts = []
+    for line in lines:
+        fields = line.split(" ")
+        if len(fields) < 7 or "-" not in fields:
+            continue
+        if fields[fields.index("-") + 1] != "cgroup2":
+            continue
+        mounts.append((_unescaped(fields[4]), _unescaped(fields[3])))
+    return mounts
+
+
+def _cgroup_directory(path: str,
+                      mounts: list[tuple[str, str]]) -> str | None:
+    """Where the process's cgroup is on the filesystem, or None when no
+    cgroup2 mount shows it.
+
+    A mount shows the part of the hierarchy under its mount root. The root
+    is / on a workstation, where systemd-run --scope lands in a scope of a
+    path of its own. In a container the root can be a path, and that
+    subtree, not the hierarchy's root, is what sits at the mount point.
+    """
+    showing = [(point, root) for point, root in mounts
+               if path == root or path.startswith(root.rstrip("/") + "/")]
+    if not showing:
+        return None
+    point, root = max(showing, key=lambda mount: len(mount[1]))
+    # Under a root of / the path keeps its leading slash, and names the
+    # cgroup under the mount point; under any other root it is shortened.
+    return point + (path if root == "/" else path[len(root):])
+
+
 def cgroup_memory_limits(proc_cgroup: str = PROC_CGROUP,
-                         cgroup_root: str = CGROUP_ROOT) -> dict:
+                         proc_mounts: str = PROC_MOUNTS) -> dict:
     """The memory caps on this process's own cgroup, or why they are unknown.
 
     The dict is the gate record's entry as it stands:
@@ -172,7 +225,20 @@ def cgroup_memory_limits(proc_cgroup: str = PROC_CGROUP,
             f"{proc_cgroup} names no cgroup v2 hierarchy (cgroup v1?), so "
             f"its memory limit is not read here")}
     limits["cgroup"] = path
-    directory = cgroup_root.rstrip("/") + path
+    try:
+        mounts = cgroup2_mounts(proc_mounts)
+    except OSError as e:
+        return {**limits, "error": f"cannot list the cgroup2 mounts: {e}"}
+    if not mounts:
+        return {**limits, "error": (
+            f"no cgroup2 filesystem is mounted (cgroup v1?), so the limit "
+            f"of {path} is not read here")}
+    directory = _cgroup_directory(path, mounts)
+    if directory is None:
+        shown = "; ".join(f"{at} shows {of}" for at, of in mounts)
+        return {**limits, "error": (
+            f"{path} is under none of the mounted cgroup2 filesystems "
+            f"({shown}), so its limit is not read here")}
     for key, name in CGROUP_LIMITS:
         try:
             with open(os.path.join(directory, name), encoding="ascii",
@@ -211,8 +277,13 @@ def _corpus_has_log(root: str) -> bool:
 
 def run_checks(sitl_dir: str, steps: list[str], corpora: dict[str, str],
                repo_root: str | None = None,
-               corpora_from_config: bool = True) -> list[str]:
+               corpora_from_config: bool = True,
+               caps: dict | None = None) -> list[str]:
     """Print one PASS/FAIL line per check; return the failed check names.
+
+    caps are the cgroup memory limits as already read; without them they
+    are read here. The gate reads them once and hands the same dict to its
+    record, so a record cannot hold a second reading that was never checked.
 
     corpora_from_config says whether `corpora` came from local_paths.json
     (the gate without --corpus) or from a --corpus override: only in the
@@ -290,7 +361,8 @@ def run_checks(sitl_dir: str, steps: list[str], corpora: dict[str, str],
                f"{available / 1024 ** 3:.1f} GB available "
                f"(need {MIN_AVAILABLE_MEM_GB:.0f})")
 
-    caps = cgroup_memory_limits()
+    if caps is None:
+        caps = cgroup_memory_limits()
     if caps["memory_max"] is None or caps["memory_swap_max"] is None:
         report(False, "cgroup",
                caps.get("error") or "a memory limit was not read")

@@ -8,9 +8,11 @@ corpora.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 from tests._repo import TOOLS_DIR
@@ -341,46 +343,70 @@ class TestCgroupCap:
             capsys.readouterr().out
 
 
+# Any other filesystem, as a real mount table has before the cgroup one.
+PROC_MOUNT = ("112 80 0:59 / /proc rw,nosuid,nodev,noexec,noatime "
+              "shared:16 - proc proc rw")
+CGROUP_V1_MOUNT = ("31 22 0:27 / /sys/fs/cgroup/memory rw,nosuid,nodev "
+                   "- cgroup cgroup memory")
+
+
+def _machine(tmp_path, cgroup="/run-1.scope", proc="v2", memory_max="max",
+             memory_swap_max="max", named=None, mounts=None, where=None,
+             other=()):
+    """A mount table and a proc file naming a cgroup, with the cgroup's two
+    files somewhere under tmp_path. Returns the two files' paths.
+
+    mounts is [(mount point, mount root)] as the table lists them, the
+    default being one cgroup2 mount at <tmp>/cgroup over the whole
+    hierarchy. The two files go to `where`, by default the directory that
+    mount keeps the cgroup in. proc "v2" names the cgroup on cgroup v2,
+    "v1" on v1 only, None writes no file. A limit of None leaves its file
+    out; `named` is what the proc file calls the cgroup when that differs
+    from where it is. `other` lists more lines of the table.
+    """
+    hierarchy = tmp_path / "cgroup"
+    places = mounts if mounts is not None else [(str(hierarchy), "/")]
+    directory = where if where is not None else hierarchy / cgroup.strip("/")
+    directory.mkdir(parents=True)
+    for name, value in (("memory.max", memory_max),
+                        ("memory.swap.max", memory_swap_max)):
+        if value is not None:
+            (directory / name).write_text(value + "\n", encoding="ascii")
+    table = tmp_path / "mountinfo"
+    table.write_text("\n".join(
+        [PROC_MOUNT, *other]
+        + [f"30 22 0:26 {root} {at} rw,nosuid,nodev,noexec,relatime "
+           f"shared:4 - cgroup2 cgroup rw,nsdelegate"
+           for at, root in places]) + "\n", encoding="ascii")
+    path = tmp_path / "self.cgroup"
+    if proc == "v2":
+        # A cgroup v1 line comes first, as under systemd: the reader has
+        # to take the "0::" one.
+        path.write_text(f"11:cpu,cpuacct:{named or cgroup}\n"
+                        f"0::{named or cgroup}\n", encoding="ascii")
+    elif proc == "v1":
+        path.write_text("12:memory:/user.slice/1000.slice\n",
+                        encoding="ascii")
+    return str(path), str(table)
+
+
+def _read(tmp_path, **kwargs) -> dict:
+    named, table = _machine(tmp_path, **kwargs)
+    return gp.cgroup_memory_limits(named, table)
+
+
 class TestCgroupReader:
-    """cgroup_memory_limits on files laid out the way cgroup v2 writes them.
-    Nothing here reads this machine's own cgroup."""
-
-    def _machine(self, tmp_path, cgroup="/run-1.scope", proc="v2",
-                 memory_max="max", memory_swap_max="max", named=None):
-        """A cgroup2 root with one cgroup's two files. proc "v2" names the
-        cgroup on cgroup v2, "v1" on v1 only, None writes no file. A limit of
-        None leaves its file out; named is what the proc file calls it when
-        that differs from where it is."""
-        root = tmp_path / "cgroup"
-        directory = root / cgroup.strip("/")
-        directory.mkdir(parents=True)
-        for name, value in (("memory.max", memory_max),
-                            ("memory.swap.max", memory_swap_max)):
-            if value is not None:
-                (directory / name).write_text(value + "\n", encoding="ascii")
-        path = tmp_path / "self.cgroup"
-        if proc == "v2":
-            # A cgroup v1 line comes first, as under systemd: the reader has
-            # to take the "0::" one.
-            path.write_text(f"11:cpu,cpuacct:{named or cgroup}\n"
-                            f"0::{named or cgroup}\n", encoding="ascii")
-        elif proc == "v1":
-            path.write_text("12:memory:/user.slice/1000.slice\n",
-                            encoding="ascii")
-        return str(path), str(root)
-
-    def _read(self, tmp_path, **kwargs) -> dict:
-        named, root = self._machine(tmp_path, **kwargs)
-        return gp.cgroup_memory_limits(named, root)
+    """cgroup_memory_limits on files laid out the way cgroup v2 and the
+    kernel's mount table write them. Nothing here reads this machine."""
 
     def test_byte_counts_are_read(self, tmp_path):
-        assert self._read(tmp_path, memory_max="12884901888",
-                          memory_swap_max="0") == {
+        assert _read(tmp_path, memory_max="12884901888",
+                     memory_swap_max="0") == {
             "cgroup": "/run-1.scope", "memory_max": 12884901888,
             "memory_swap_max": 0}
 
     def test_max_is_no_limit(self, tmp_path):
-        limits = self._read(tmp_path, memory_max="max", memory_swap_max="0")
+        limits = _read(tmp_path, memory_max="max", memory_swap_max="0")
         assert limits["memory_max"] is None and "error" in limits
         assert ("memory.max is max in "
                 + str(tmp_path / "cgroup" / "run-1.scope")
@@ -388,67 +414,197 @@ class TestCgroupReader:
         assert "MemorySwapMax" in limits["error"]  # the way out is named
 
     def test_an_unlimited_swap_keeps_the_memory_limit(self, tmp_path):
-        limits = self._read(tmp_path, memory_max="12884901888",
-                            memory_swap_max="max")
+        limits = _read(tmp_path, memory_max="12884901888",
+                       memory_swap_max="max")
         assert limits["memory_max"] == 12884901888
         assert limits["memory_swap_max"] is None
         assert "memory.swap.max is max" in limits["error"]
 
     def test_a_missing_file_is_unreadable(self, tmp_path):
-        limits = self._read(tmp_path, memory_max="12884901888",
-                            memory_swap_max=None)
+        limits = _read(tmp_path, memory_max="12884901888",
+                       memory_swap_max=None)
         assert limits["memory_max"] == 12884901888
         assert limits["memory_swap_max"] is None
         assert ("cannot read memory.swap.max in "
                 + str(tmp_path / "cgroup" / "run-1.scope")) in limits["error"]
 
-    def test_a_cgroup_missing_under_the_root_is_unreadable(self, tmp_path):
-        """A container can name a cgroup by its path on the host."""
-        limits = self._read(tmp_path, named="/system.slice/docker-1.scope",
-                            memory_max="1", memory_swap_max="0")
+    def test_a_cgroup_missing_under_the_mount_is_unreadable(self, tmp_path):
+        """A container with a namespace of its own names its cgroup by a
+        path the mount does not have."""
+        limits = _read(tmp_path, named="/system.slice/docker-1.scope",
+                       memory_max="1", memory_swap_max="0")
         assert limits["cgroup"] == "/system.slice/docker-1.scope"
         assert limits["memory_max"] is None
         assert "cannot read memory.max in" in limits["error"]
 
     def test_a_v1_hierarchy_is_not_read(self, tmp_path):
-        limits = self._read(tmp_path, proc="v1", memory_max="1",
-                            memory_swap_max="0")
+        limits = _read(tmp_path, proc="v1", memory_max="1",
+                       memory_swap_max="0")
         assert limits["memory_max"] is None and limits["cgroup"] is None
         assert "no cgroup v2 hierarchy" in limits["error"]
 
     def test_a_missing_proc_file_is_unreadable(self, tmp_path):
-        limits = self._read(tmp_path, proc=None, memory_max="1",
-                            memory_swap_max="0")
+        limits = _read(tmp_path, proc=None, memory_max="1",
+                       memory_swap_max="0")
         assert limits["memory_max"] is None
         assert "cannot read" in limits["error"]
 
     def test_something_other_than_bytes_is_unreadable(self, tmp_path):
-        limits = self._read(tmp_path, memory_max="12 GB", memory_swap_max="0")
+        limits = _read(tmp_path, memory_max="12 GB", memory_swap_max="0")
         assert limits["memory_max"] is None
         assert "'12 GB'" in limits["error"] and "not a byte count" in \
             limits["error"]
 
-    def test_the_root_is_joined_without_a_double_slash(self, tmp_path):
-        """The cgroup at the root of the mount names itself with one slash."""
-        named, root = self._machine(tmp_path, cgroup="/", memory_max="1",
-                                    memory_swap_max="0")
-        limits = gp.cgroup_memory_limits(named, root.rstrip("/"))
+    def test_a_cgroup_at_the_root_of_the_hierarchy_is_the_mount_point(
+            self, tmp_path):
+        limits = _read(tmp_path, cgroup="/", memory_max="1",
+                       memory_swap_max="0")
         assert limits == {"cgroup": "/", "memory_max": 1, "memory_swap_max": 0}
+
+
+class TestWhereTheCgroupIs:
+    """The cgroup2 filesystem is not always at /sys/fs/cgroup: the reader
+    follows /proc/self/mountinfo, and refuses when it cannot."""
+
+    def test_a_hybrid_mount_point_is_followed(self, tmp_path):
+        """systemd's hybrid hierarchy mounts cgroup2 at
+        /sys/fs/cgroup/unified, next to the v1 controllers."""
+        unified = tmp_path / "cgroup" / "unified"
+        limits = _read(tmp_path, mounts=[(str(unified), "/")],
+                       where=unified / "run-1.scope",
+                       other=[CGROUP_V1_MOUNT],
+                       memory_max="1", memory_swap_max="0")
+        assert limits == {"cgroup": "/run-1.scope", "memory_max": 1,
+                          "memory_swap_max": 0}
+
+    def test_a_mount_root_of_its_own_is_where_the_path_starts(self, tmp_path):
+        """A container sharing the host's cgroup namespace names its cgroup
+        by the host's path; what is mounted is only that subtree."""
+        limits = _read(
+            tmp_path, cgroup="/system.slice/docker-1.scope/run-1.scope",
+            mounts=[(str(tmp_path / "cgroup"), "/system.slice/docker-1.scope")],
+            where=tmp_path / "cgroup" / "run-1.scope",
+            memory_max="1", memory_swap_max="0")
+        assert limits == {
+            "cgroup": "/system.slice/docker-1.scope/run-1.scope",
+            "memory_max": 1, "memory_swap_max": 0}
+
+    def test_the_mount_rooted_nearest_takes_precedence(self, tmp_path):
+        """Of two mounts that both show the cgroup, the one rooted nearer."""
+        cgroup = tmp_path / "cgroup"
+        tight = cgroup / "tight"
+        limits = _read(
+            tmp_path, cgroup="/machine/run-1.scope",
+            mounts=[(str(cgroup), "/"), (str(tight), "/machine")],
+            where=tight / "run-1.scope", memory_max="1", memory_swap_max="0")
+        # Under the first mount the cgroup would be at machine/run-1.scope,
+        # which was never written: only the second mount answers.
+        assert not (cgroup / "machine").exists()
+        assert (tight / "run-1.scope" / "memory.max").exists()
+        assert limits == {"cgroup": "/machine/run-1.scope", "memory_max": 1,
+                          "memory_swap_max": 0}
+
+    def test_a_cgroup_under_no_mount_root_is_unreadable(self, tmp_path):
+        limits = _read(tmp_path, cgroup="/elsewhere/run-1.scope",
+                       mounts=[(str(tmp_path / "cgroup"), "/machine/slice")],
+                       memory_max="1", memory_swap_max="0")
+        assert limits["memory_max"] is None
+        assert ("/elsewhere/run-1.scope is under none of the mounted cgroup2 "
+                in limits["error"])
+        assert "shows /machine/slice" in limits["error"]
+
+    def test_no_cgroup2_mount_is_not_read(self, tmp_path):
+        limits = _read(tmp_path, mounts=[], other=[CGROUP_V1_MOUNT],
+                       memory_max="1", memory_swap_max="0")
+        assert limits["memory_max"] is None
+        assert "no cgroup2 filesystem is mounted (cgroup v1?)" in \
+            limits["error"]
+
+    def test_a_space_in_the_mount_point_is_unescaped(self, tmp_path):
+        """The kernel writes a space in a mount point as \040."""
+        spaced = str(tmp_path / "with space")
+        limits = _read(tmp_path, mounts=[(spaced.replace(" ", "\\040"), "/")],
+                       where=tmp_path / "with space" / "run-1.scope",
+                       memory_max="1", memory_swap_max="0")
+        assert limits["memory_max"] == 1
+
+    def test_an_unreadable_mount_table_is_unreadable(self, tmp_path):
+        named, _ = _machine(tmp_path)
+        limits = gp.cgroup_memory_limits(named, str(tmp_path / "no-table"))
+        assert limits["memory_max"] is None
+        assert "cannot list the cgroup2 mounts" in limits["error"]
+
+    def test_the_table_is_read_the_way_the_kernel_writes_it(self, tmp_path):
+        """Optional fields before the separator, an escaped root, and lines
+        of other filesystems, among them a cgroup v1 one."""
+        table = tmp_path / "mountinfo"
+        table.write_text(
+            "25 1 0:21 / /sys rw,nosuid,nodev,noexec shared:5 - sysfs sysfs rw\n"
+            "30 22 0:26 /with\\040space /sys/fs/cgroup rw shared:4 master:7 - "
+            "cgroup2 cgroup rw\n"
+            "31 22 0:27 / /sys/fs/cgroup/memory rw - cgroup cgroup memory\n"
+            "32 22 0:28 /docker/abc /sys/fs/cgroup rw - cgroup2 cgroup rw\n"
+            "garbled\n", encoding="ascii")
+        assert gp.cgroup2_mounts(str(table)) == [
+            ("/sys/fs/cgroup", "/with space"),
+            ("/sys/fs/cgroup", "/docker/abc")]
 
 
 class TestTheRecordNamesTheCap:
     """environment() is what the gate writes into its result."""
 
-    def test_the_entry_is_the_readers_entry(self, monkeypatch):
-        monkeypatch.setattr(gp, "cgroup_memory_limits", lambda: dict(CAPPED))
-        assert gate.environment(version=lambda name: None)["cgroup"] == CAPPED
+    def test_the_entry_is_the_caps_the_gate_hands_over(self, monkeypatch):
+        monkeypatch.setattr(gp, "cgroup_memory_limits", lambda: pytest.fail(
+            "read again"))
+        env = gate.environment(version=lambda name: None, caps=dict(CAPPED))
+        assert env["cgroup"] == CAPPED
 
-    def test_a_run_without_a_cap_says_so_in_the_record(self, monkeypatch):
-        """The preflight stops such a run first; were one recorded anyway,
-        the entry would not pretend to a limit."""
+    def test_a_caller_with_no_caps_gets_a_reading_of_its_own(self, monkeypatch):
+        """Not how a record is made: the gate reads once and hands it over."""
         monkeypatch.setattr(gp, "cgroup_memory_limits", _uncapped)
         entry = gate.environment(version=lambda name: None)["cgroup"]
         assert entry["memory_max"] is None and "no memory cap" in entry["error"]
+
+    def test_the_preflight_checks_the_caps_it_is_given_and_reads_no_other(
+            self, repo, monkeypatch, capsys):
+        monkeypatch.setattr(gp, "cgroup_memory_limits", lambda: pytest.fail(
+            "read again"))
+        assert gp.run_checks(sitl_dir=str(repo / "ardupilot"),
+                             steps=["ci_local"], corpora={},
+                             repo_root=str(repo), caps=dict(CAPPED)) == []
+        assert "PASS cgroup: memory.max 12.0 GB" in capsys.readouterr().out
+        assert "cgroup" in gp.run_checks(
+            sitl_dir=str(repo / "ardupilot"), steps=["ci_local"], corpora={},
+            repo_root=str(repo), caps=_uncapped())
+
+    def test_the_record_holds_the_reading_the_preflight_checked(
+            self, repo, monkeypatch):
+        """The caps were read twice, once for the preflight and once for the
+        record, and nothing checked the second: a pass record could carry a
+        None, or a cap that was lifted in between."""
+        readings = iter([dict(CAPPED), _uncapped()])
+        monkeypatch.setattr(gp, "cgroup_memory_limits", lambda: next(readings))
+        _sitl_binaries(repo)
+        monkeypatch.setattr(gate, "REPO_ROOT", str(repo))
+        monkeypatch.setattr(gate, "GATE_DIR", str(repo / "gate"))
+        monkeypatch.setattr(gate, "ACCEPTED_DIR", str(repo / "gate" / "a"))
+        monkeypatch.setattr(gate, "head_commit", lambda: "abc")
+        monkeypatch.setattr(gate, "tree_is_dirty", lambda: False)
+        monkeypatch.setattr(gate, "_windows_pins", lambda: {})  # not this repo
+        monkeypatch.setattr(gate, "RUNNERS", {
+            name: (lambda args, log_dir: {"status": "pass"})
+            for name in gate.STEPS})
+        # The preflight runs for real, on the fake repository: everything
+        # it measures is stubbed by the fixture but the caps.
+        args = SimpleNamespace(steps=list(gate.STEPS),
+                               sitl_dir=str(repo / "ardupilot"),
+                               corpora={"field": str(repo / "logs")}, corpus=None)
+        assert gate.run_gate(args) == 0
+        record = json.loads(Path(gate.result_path("abc")).read_text("utf-8"))
+        assert record["status"] == "pass"
+        assert record["environment"]["cgroup"] == CAPPED
+
+
 
 
 class TestWiring:

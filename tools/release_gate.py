@@ -171,14 +171,16 @@ def _windows_pins() -> dict[str, str]:
         os.path.join(REPO_ROOT, builder.REQUIREMENTS))
 
 
-def environment(version=metadata.version) -> dict:
+def environment(version=metadata.version, caps: dict | None = None) -> dict:
     """The Python and the libraries the gate ran on, and its memory cap.
 
     The Windows package ships the libraries pinned in win64-requirements.txt.
     A run on other versions checked something a little different, so the
     record names them. So does it name the cgroup memory and swap limits the
-    run sat under: the preflight refuses a run without them, so an entry
-    with "error" in it is from a run that never got past it.
+    run sat under. caps are those limits as the preflight checked them: the
+    gate reads them once and passes the same dict here, so the record cannot
+    hold a second reading that nothing checked. They are read here only for
+    a caller that has none, which is not how a record is made.
     """
     pins = _windows_pins()
 
@@ -192,7 +194,8 @@ def environment(version=metadata.version) -> dict:
     return {"python": platform.python_version(), "libraries": libraries,
             "off_the_windows_pins": [name for name in libraries
                                      if libraries[name] != pins[name]],
-            "cgroup": gate_preflight.cgroup_memory_limits()}
+            "cgroup": (caps if caps is not None
+                       else gate_preflight.cgroup_memory_limits())}
 
 
 def overall(steps: dict[str, dict]) -> str:
@@ -284,9 +287,13 @@ RUNNERS = {"ci_local": step_ci_local, "snapshots": step_snapshots,
 
 
 def run_gate(args) -> int:
+    # The memory caps are read once: the preflight checks this reading, and
+    # the record holds the same one.
+    caps = gate_preflight.cgroup_memory_limits()
     if gate_preflight.run_checks(sitl_dir=args.sitl_dir, steps=args.steps,
                                  corpora=args.corpora, repo_root=REPO_ROOT,
-                                 corpora_from_config=not args.corpus):
+                                 corpora_from_config=not args.corpus,
+                                 caps=caps):
         return 1
     if tree_is_dirty():
         print("Working tree is dirty. A result has to name a commit.")
@@ -295,7 +302,7 @@ def run_gate(args) -> int:
     log_dir = os.path.join(GATE_DIR, commit)
     os.makedirs(log_dir, exist_ok=True)
     started = datetime.datetime.now().isoformat(timespec="seconds")
-    env = environment()
+    env = environment(caps=caps)
     if env["off_the_windows_pins"]:
         print("Note: " + ", ".join(f"{name} {env['libraries'][name]}"
                                     for name in env["off_the_windows_pins"])
