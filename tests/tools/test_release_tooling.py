@@ -7,12 +7,22 @@ commit-msg hook rejects (release is not in the conventional-type
 whitelist) — so the script died mid-run. It now also refuses a commit
 without a pass from tools/release_gate.py, and releases the notes written
 under "## [Unreleased]" rather than generating them.
+
+It also released from any branch, asked about the push once the commit and
+the tag existed (a run with no terminal to answer left both unpushed), and
+did not look at origin before making the tag. The pre-flight is tested at
+two levels: main() with git answered from a table, for the order of the
+questions and for what is written when one is refused; and the questions
+put to real git, against a bare origin under tmp_path, because a mock only
+repeats what a test already believes about git's answers.
 """
 
 from __future__ import annotations
 
+from tests import _gitrepo as gitrepo
 from tests._repo import REPO_ROOT
 
+import builtins
 import hashlib
 import importlib.util
 import re
@@ -128,6 +138,9 @@ class TestReleasePy:
         monkeypatch.setattr(mod, "_clean_dist", lambda: calls.append("dist"))
         monkeypatch.setattr(mod, "_update_version_file", calls.append)
         monkeypatch.setattr(mod, "_update_changelog", calls.append)
+        # A terminal to answer from, and an origin that is level with main.
+        monkeypatch.setattr(mod, "_stdin_is_a_terminal", lambda: True)
+        monkeypatch.setattr(mod, "_require_publishable", lambda tag: None)
         with pytest.raises(SystemExit, match="empty"):
             mod.main()
         assert not calls
@@ -142,12 +155,15 @@ class TestReleasePy:
         dist.mkdir()
         (dist / "sentinel").write_text("keep", encoding="utf-8")
         mod = _load_release()
+        asked = []
         monkeypatch.setattr(sys, "argv",
                             ["release.py", "patch", "--dry-run"])
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(mod, "_current_version", lambda: "0.9.3")
+        monkeypatch.setattr(mod.subprocess, "run", asked.append)
         assert mod.main() is None
         assert "[dry-run]" in capsys.readouterr().out
+        assert asked == []  # not even asked what branch this is on
         assert changelog.read_text(encoding="utf-8") == content
         assert (dist / "sentinel").exists()
 
@@ -161,6 +177,8 @@ class TestReleasePy:
         monkeypatch.setattr(mod.release_gate, "passed", lambda commit: False)
         monkeypatch.setattr(mod, "_current_version", lambda: "0.9.3")
         monkeypatch.setattr(mod, "_update_version_file", calls.append)
+        monkeypatch.setattr(mod, "_stdin_is_a_terminal", lambda: True)
+        monkeypatch.setattr(mod, "_require_publishable", lambda tag: None)
         with pytest.raises(SystemExit, match="No passing gate"):
             mod.main()
         assert not calls
@@ -169,6 +187,423 @@ class TestReleasePy:
 def _clean_repo(command, **kwargs):
     """git on a clean tree, on main, where the new tag does not exist."""
     return SimpleNamespace(returncode=int("--verify" in command), stdout="main")
+
+
+# What main() asks git, by name. A run's trace is compared to these.
+BRANCH = "git rev-parse --abbrev-ref HEAD"
+UNSTAGED = "git diff --quiet"
+STAGED = "git diff --cached --quiet"
+FETCH = "git fetch --no-tags origin main"
+HAS_MAIN = "git rev-parse -q --verify refs/remotes/origin/main"
+COUNT = "git rev-list --left-right --count origin/main...HEAD"
+HAS_TAG = "git rev-parse -q --verify refs/tags/v0.9.4"
+ASKS_TAG = "git ls-remote --exit-code --tags origin refs/tags/v0.9.4"
+LISTED = ["git log --oneline -5 origin/main..HEAD",
+          "git log --oneline -5 HEAD..origin/main"]
+ADD = "git add src/arduscope/__init__.py CHANGELOG.md"
+COMMIT = "git commit -m chore: release v0.9.4"
+TAG = "git tag v0.9.4"
+PUSH = "git push --atomic origin main v0.9.4"
+TREE = [BRANCH, UNSTAGED, STAGED]
+ORIGIN = [FETCH, HAS_MAIN, COUNT]
+NEW_TAG = [HAS_TAG, ASKS_TAG]
+CHECKED = TREE + ORIGIN + NEW_TAG + ["gate"]
+# git on a clean tree, on main, level with origin/main, the tag new on both.
+LEVEL = {BRANCH: "main", COUNT: "0\t0", HAS_TAG: 1, ASKS_TAG: 2}
+
+
+class _Git:
+    """subprocess.run standing in for git.
+
+    `answers` maps a fragment of a command to git's answer: a return code
+    (and no output), or a line of output (and return code 0). A command
+    nothing names succeeds silently, as `git add` does. Every command is
+    appended to `trace` in order, and raises under check=True as
+    subprocess.run would.
+    """
+
+    def __init__(self, trace, **answers):
+        self.trace = trace
+        self.answers = answers
+
+    def __call__(self, command, **kwargs):
+        self.trace.append(" ".join(command))
+        text = " ".join(command)
+        code, out = 0, ""
+        for fragment, answer in self.answers.items():
+            if fragment in text:
+                code, out = ((answer, "") if isinstance(answer, int)
+                             else (0, answer))
+                break
+        if kwargs.get("check") and code:
+            raise subprocess.CalledProcessError(code, command)
+        return SimpleNamespace(returncode=code, stdout=out,
+                               stderr=f"git refused: {text}" if code else "")
+
+
+class _Run:
+    """One call of main(), in a directory that holds a version file (0.9.3)
+    and a dated changelog, with git answered from a table.
+
+    `trace` is every command git was asked, in order, with "gate" where the
+    gate record was read. `untouched` says whether the version file, the
+    changelog and dist/ are as they were.
+    """
+
+    def __init__(self, tmp_path, monkeypatch, gate=True, notes=True,
+                 **answers):
+        self.monkeypatch = monkeypatch
+        self.version_file = tmp_path / "src" / "arduscope" / "__init__.py"
+        self.version_file.parent.mkdir(parents=True)
+        self.version_file.write_text('__version__ = "0.9.3"\n',
+                                     encoding="utf-8")
+        self.changelog = tmp_path / "CHANGELOG.md"
+        body = "### Changed\n- new\n" if notes else ""
+        self.changelog.write_text(
+            f"# Changelog\n\n## [Unreleased]\n\n{body}\n"
+            f"## [0.9.2] - 2026-07-01\n", encoding="utf-8")
+        self.before = self._files()
+        self.dist = tmp_path / "dist"
+        self.dist.mkdir()
+        (self.dist / "sentinel").write_text("keep", encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+        self.trace = []
+        self.mod = _load_release()
+        monkeypatch.setattr(self.mod.subprocess, "run",
+                            _Git(self.trace, **{**LEVEL, **answers}))
+        monkeypatch.setattr(self.mod.release_gate, "head_commit",
+                            lambda: "abc")
+
+        def passed(commit):
+            self.trace.append("gate")
+            return gate
+
+        monkeypatch.setattr(self.mod.release_gate, "passed", passed)
+
+    def _files(self):
+        return (self.version_file.read_text(encoding="utf-8"),
+                self.changelog.read_text(encoding="utf-8"))
+
+    @property
+    def untouched(self) -> bool:
+        """Version file, changelog and dist/ as they were."""
+        return (self._files() == self.before
+                and (self.dist / "sentinel").exists())
+
+    def __call__(self, *argv, terminal=True, prompt=None):
+        """main() with these arguments, a patch release unless one is
+        named. `prompt` answers the question about the push; without one,
+        being asked is a failure of the test."""
+        if not {"patch", "minor", "major"} & set(argv):
+            argv = ("patch", *argv)
+        monkeypatch = self.monkeypatch
+        monkeypatch.setattr(self.mod, "_stdin_is_a_terminal",
+                            lambda: terminal)
+        monkeypatch.setattr(builtins, "input", prompt or (
+            lambda question: pytest.fail(f"asked: {question}")))
+        monkeypatch.setattr(sys, "argv", ["release.py", *argv])
+        self.mod.main()
+
+
+class TestMainAsksInOrder:
+    """Nothing is written until every pre-flight check has passed, and they
+    are asked in order: branch, terminal, tree, origin, gate, notes."""
+
+    def test_a_passing_run_asks_everything_then_commits_tags_and_pushes(
+            self, tmp_path, monkeypatch):
+        run = _Run(tmp_path, monkeypatch)
+        run("patch", "--yes", terminal=False)  # headless: --yes, no question
+        assert run.trace == CHECKED + [ADD, COMMIT, TAG, PUSH]
+        assert not run.untouched
+        assert run.version_file.read_text(
+            encoding="utf-8") == '__version__ = "0.9.4"\n'
+        assert "## [0.9.4] - " in run.changelog.read_text(encoding="utf-8")
+        assert not run.dist.exists()
+
+    @pytest.mark.parametrize("answers, argv, terminal, message, asked", [
+        # Not on main: a branch of its own, or a detached HEAD. Nothing
+        # else is asked.
+        ({BRANCH: "release/rules"}, (), True, "on 'release/rules', not 'main'",
+         [BRANCH]),
+        ({BRANCH: "HEAD"}, (), True, "on 'HEAD', not 'main'", [BRANCH]),
+        # No terminal to answer from, and no --yes.
+        ({}, (), False, "stdin is not a terminal", [BRANCH]),
+        # A dirty tree, unstaged or staged.
+        ({UNSTAGED: 1}, (), True, "is dirty", TREE),
+        ({STAGED: 1}, (), True, "is dirty", TREE),
+        # origin cannot be reached.
+        ({FETCH: 128}, (), True, "git fetch --no-tags origin main failed",
+         TREE + [FETCH]),
+        # No origin/main after the fetch.
+        ({HAS_MAIN: 1}, (), True, "origin/main is not there after the fetch",
+         TREE + [FETCH, HAS_MAIN]),
+        # Not level with origin/main: ahead, behind, both.
+        ({COUNT: "0\t1"}, (), True, "1 commit ahead of origin/main",
+         TREE + ORIGIN + LISTED),
+        ({COUNT: "2\t0"}, (), True, "2 commits behind origin/main",
+         TREE + ORIGIN + LISTED),
+        ({COUNT: "1\t1"}, (), True, "have diverged", TREE + ORIGIN + LISTED),
+        # The tag is already spent: here only, on origin, or origin cannot
+        # say.
+        ({HAS_TAG: 0}, (), True, "exists here but not on origin", CHECKED[:8]),
+        ({ASKS_TAG: 0}, (), True,
+         "already exists on origin. Tags are append-only", CHECKED[:8]),
+        ({ASKS_TAG: 128}, (), True, "Could not ask origin", CHECKED[:8]),
+    ])
+    def test_a_refusal_writes_nothing_and_stops_at_its_check(
+            self, tmp_path, monkeypatch, answers, argv, terminal, message,
+            asked):
+        run = _Run(tmp_path, monkeypatch, **answers)
+        with pytest.raises(SystemExit, match=message):
+            run(*argv, terminal=terminal)
+        assert run.trace == asked
+        assert run.untouched
+
+    def test_the_gate_is_asked_after_origin(self, tmp_path, monkeypatch):
+        run = _Run(tmp_path, monkeypatch, gate=False, notes=False)
+        with pytest.raises(SystemExit, match="No passing gate"):
+            run()
+        assert run.trace == CHECKED
+        assert run.untouched
+
+    def test_the_notes_are_asked_after_the_gate(self, tmp_path, monkeypatch):
+        run = _Run(tmp_path, monkeypatch, notes=False)
+        with pytest.raises(SystemExit, match="empty"):
+            run()
+        assert run.trace == CHECKED
+        assert run.untouched
+
+
+class TestThePush:
+    """The push is asked about once the commit and the tag exist."""
+
+    TAGGED = CHECKED + [ADD, COMMIT, TAG]
+
+    @pytest.mark.parametrize("closed", [EOFError, KeyboardInterrupt])
+    def test_a_closed_prompt_prints_the_push_to_run_by_hand(
+            self, tmp_path, monkeypatch, capsys, closed):
+        """Ctrl-D and Ctrl-C used to end the run with a traceback, and
+        nothing that said the commit and the tag were waiting."""
+        def nobody(question):
+            raise closed()
+
+        run = _Run(tmp_path, monkeypatch)
+        run(prompt=nobody)
+        assert run.trace == self.TAGGED
+        out = capsys.readouterr().out
+        assert "Skipped push" in out and PUSH in out
+
+    def test_no_skips_the_push(self, tmp_path, monkeypatch, capsys):
+        run = _Run(tmp_path, monkeypatch)
+        run(prompt=lambda question: "n")
+        assert run.trace == self.TAGGED
+        out = capsys.readouterr().out
+        assert "Skipped push" in out and PUSH in out
+
+    def test_yes_pushes(self, tmp_path, monkeypatch, capsys):
+        run = _Run(tmp_path, monkeypatch)
+        run(prompt=lambda question: "Y")
+        assert run.trace == self.TAGGED + [PUSH]
+        assert "Pushed" in capsys.readouterr().out
+
+    def test_a_refused_push_fails_and_leaves_the_instruction(
+            self, tmp_path, monkeypatch, capsys):
+        run = _Run(tmp_path, monkeypatch, **{"git push": 1})
+        with pytest.raises(SystemExit) as stopped:
+            run("--yes")
+        assert stopped.value.code == 1
+        assert run.trace == self.TAGGED + [PUSH]
+        out = capsys.readouterr().out
+        assert "Push failed" in out and PUSH in out
+
+
+@pytest.mark.parametrize("code, expected", [(0, True), (2, False)])
+def test_whether_origin_has_the_tag_is_read_from_ls_remote(monkeypatch, code,
+                                                           expected):
+    """git ls-remote --exit-code answers 0 for a ref that is there and 2 for
+    one that is not."""
+    mod = _load_release()
+    monkeypatch.setattr(mod.subprocess, "run", lambda command, **kwargs: (
+        SimpleNamespace(returncode=code, stdout="", stderr="")))
+    assert mod._remote_has("v0.0.2") is expected
+
+
+def test_an_ls_remote_that_could_not_ask_is_not_an_answer(monkeypatch):
+    mod = _load_release()
+    monkeypatch.setattr(mod.subprocess, "run", lambda command, **kwargs: (
+        SimpleNamespace(returncode=128, stdout="", stderr="fatal: no route")))
+    with pytest.raises(mod.Refused, match="no route"):
+        mod._remote_has("v0.0.2")
+
+
+class TestAgainstOrigin:
+    """The questions put to origin, asked of a real bare one: the answers
+    are git's own, not a table's."""
+
+    @pytest.fixture
+    def release(self, tmp_path, monkeypatch):
+        gitrepo.hermetic(monkeypatch)
+        work, origin = gitrepo.repository(tmp_path)
+        monkeypatch.chdir(work)
+        return SimpleNamespace(work=work, origin=origin, mod=_load_release())
+
+    def another_clone(self, release, name="other"):
+        """A second clone of the same origin: what another machine holds."""
+        other = release.work.parent / name
+        gitrepo.git(release.work.parent, "clone", "-q", str(release.origin),
+                    str(other))
+        return other
+
+    def test_main_level_with_origin_and_a_new_tag_pass(self, release, capsys):
+        release.mod._require_publishable("v0.0.2")
+        assert "v0.0.2 is new here and on origin" in capsys.readouterr().out
+
+    def test_an_unpushed_commit_is_ahead_and_named(self, release):
+        gitrepo.commit(release.work, "chore: local work")
+        with pytest.raises(release.mod.Refused, match=(
+                r"1 commit ahead of origin/main:\n[0-9a-f]+ chore: local work")):
+            release.mod._require_publishable("v0.0.2")
+
+    def test_a_commit_only_on_origin_is_behind_once_fetched(self, release):
+        """origin/main in this clone is stale until the preflight fetches."""
+        other = self.another_clone(release)
+        gitrepo.commit(other, "chore: pushed from elsewhere")
+        gitrepo.git(other, "push", "-q", "origin", "main")
+        head = gitrepo.git(release.work, "rev-parse", "HEAD")
+        assert gitrepo.git(release.work, "rev-parse", "origin/main") == head
+        with pytest.raises(release.mod.Refused, match=(
+                r"1 commit behind origin/main:\n"
+                r"[0-9a-f]+ chore: pushed from elsewhere")):
+            release.mod._require_publishable("v0.0.2")
+        assert gitrepo.git(release.work, "rev-parse", "origin/main") != head
+
+    def test_divergence_names_both_sides(self, release):
+        gitrepo.commit(release.work, "chore: local work")
+        other = self.another_clone(release)
+        gitrepo.commit(other, "chore: pushed from elsewhere")
+        gitrepo.git(other, "push", "-q", "origin", "main")
+        with pytest.raises(release.mod.Refused, match=(
+                r"have diverged: 1 commit here, 1 commit on origin:\n"
+                r"[0-9a-f]+ chore: local work\n"
+                r"[0-9a-f]+ chore: pushed from elsewhere")):
+            release.mod._require_publishable("v0.0.2")
+
+    def test_a_tag_made_here_is_local_only(self, release):
+        gitrepo.git(release.work, "tag", "v0.0.2")
+        with pytest.raises(release.mod.Refused,
+                           match="exists here but not on origin") as refused:
+            release.mod._require_publishable("v0.0.2")
+        assert "git tag -d v0.0.2" in str(refused.value)
+        assert "Bump differently" not in str(refused.value)
+
+    def test_a_tag_on_both_sides_is_said_to_be_on_both(self, release):
+        gitrepo.git(release.work, "tag", "v0.0.2")
+        gitrepo.git(release.work, "push", "-q", "origin", "v0.0.2")
+        with pytest.raises(release.mod.Refused, match=(
+                r"already exists on origin and here\. "
+                r"Tags are append-only")) as refused:
+            release.mod._require_publishable("v0.0.2")
+        assert "Bump differently" in str(refused.value)
+
+    def test_a_tag_on_origin_alone_is_append_only(self, release):
+        """Not here any more, as on a machine that never made it."""
+        gitrepo.git(release.work, "tag", "v0.0.2")
+        gitrepo.git(release.work, "push", "-q", "origin", "v0.0.2")
+        gitrepo.git(release.work, "tag", "-d", "v0.0.2")
+        with pytest.raises(release.mod.Refused, match=(
+                r"already exists on origin\. Tags are append-only")):
+            release.mod._require_publishable("v0.0.2")
+
+    def test_the_push_alone_would_not_refuse_a_spent_tag(self, release):
+        """Why the tag is asked about first. To git a tag that is already
+        on origin, pointing where the local one does, is no change: an
+        atomic push takes main and leaves the tag, so a release commit goes
+        out under no new tag and starts no workflow."""
+        gitrepo.git(release.work, "tag", "v0.0.2")
+        gitrepo.git(release.work, "push", "-q", "origin", "v0.0.2")
+        gitrepo.commit(release.work, "chore: another commit")
+        gitrepo.git(release.work, "push", "--atomic", "origin", "main",
+                    "v0.0.2")
+        remote = gitrepo.git(release.origin, "rev-parse", "main")
+        assert remote == gitrepo.git(release.work, "rev-parse", "HEAD")
+
+    def test_an_origin_that_cannot_be_reached_is_an_error_not_an_absent_tag(
+            self, release):
+        nowhere = str(release.work.parent / "nowhere.git")
+        gitrepo.git(release.work, "remote", "set-url", "origin", nowhere)
+        with pytest.raises(release.mod.Refused,
+                           match="git fetch --no-tags origin main failed"):
+            release.mod._require_publishable("v0.0.2")
+        with pytest.raises(release.mod.Refused, match="Could not ask origin"):
+            release.mod._remote_has("v0.0.2")
+
+    def test_no_origin_main_after_the_fetch(self, release):
+        """A remote with no fetch refspec brings main to FETCH_HEAD only."""
+        gitrepo.git(release.work, "config", "--unset-all",
+                    "remote.origin.fetch")
+        gitrepo.git(release.work, "update-ref", "-d",
+                    "refs/remotes/origin/main")
+        with pytest.raises(release.mod.Refused,
+                           match="origin/main is not there after the fetch"):
+            release.mod._require_publishable("v0.0.2")
+
+
+class TestAReleaseReachesOrigin:
+    """main() end to end on a real repository, against a bare origin."""
+
+    @pytest.fixture
+    def release(self, tmp_path, monkeypatch):
+        gitrepo.hermetic(monkeypatch)
+        work, origin = gitrepo.repository(tmp_path, version="0.0.1")
+        (work / "CHANGELOG.md").write_text(
+            "# Changelog\n\n## [Unreleased]\n\n### Changed\n- new\n",
+            encoding="utf-8")
+        monkeypatch.chdir(work)
+        mod = _load_release()
+        monkeypatch.setattr(mod, "_stdin_is_a_terminal", lambda: False)
+        monkeypatch.setattr(mod.release_gate, "head_commit",
+                            lambda: gitrepo.git(work, "rev-parse", "HEAD"))
+        monkeypatch.setattr(mod.release_gate, "passed", lambda commit: True)
+        monkeypatch.setattr(sys, "argv", ["release.py", "patch", "--yes"])
+        return SimpleNamespace(work=work, origin=origin, mod=mod)
+
+    @staticmethod
+    def _remote(origin) -> dict:
+        return {ref: sha for sha, ref in (line.split() for line in
+                                          gitrepo.git(origin,
+                                                      "show-ref").splitlines())}
+
+    def test_main_and_the_tag_arrive_together(self, release, capsys):
+        release.mod.main()
+        head = gitrepo.git(release.work, "rev-parse", "HEAD")
+        assert self._remote(release.origin) == {"refs/heads/main": head,
+                                                "refs/tags/v0.0.2": head}
+        assert gitrepo.git(release.work, "log", "-1", "--format=%s") == \
+            "chore: release v0.0.2"
+        assert gitrepo.git(release.work, "status", "--porcelain") == ""
+        assert PUSH.replace("0.9.4", "0.0.2") in capsys.readouterr().out
+
+    def test_a_declined_push_leaves_a_state_the_next_run_names(
+            self, release, monkeypatch, capsys):
+        """The commit and the tag stay local, and the run after that
+        refuses. It used to bump once more, on top of an unreleased version.
+        """
+        monkeypatch.setattr(release.mod, "_stdin_is_a_terminal", lambda: True)
+        monkeypatch.setattr(builtins, "input", lambda question: "n")
+        monkeypatch.setattr(sys, "argv", ["release.py", "patch"])
+        release.mod.main()
+        first = gitrepo.git(release.work, "rev-parse", "HEAD~1")
+        assert self._remote(release.origin) == {"refs/heads/main": first}
+        assert gitrepo.git(release.work, "rev-parse", "v0.0.2") == \
+            gitrepo.git(release.work, "rev-parse", "HEAD")
+        assert "git push --atomic origin main v0.0.2" in \
+            capsys.readouterr().out
+
+        with pytest.raises(SystemExit,
+                           match="1 commit ahead of origin/main"):
+            release.mod.main()
+        assert gitrepo.git(release.work, "log", "-1", "--format=%s") == \
+            "chore: release v0.0.2"
 
 
 def _load_build():

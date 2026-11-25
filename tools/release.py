@@ -6,11 +6,18 @@ Run tools/release_gate.py on the commit first: this will not tag a commit
 without a pass from it. Release notes go under `## [Unreleased]` as changes
 land, and become the new version's section here.
 
+Nothing is written until every pre-flight check has passed, in this order:
+on `main`; able to hear the answer about the push; a clean tree and index;
+fetched, with `main` level with `origin/main` and the new tag absent here and
+on origin; a passing gate; notes to date. `main` and the tag then leave in
+one atomic push, so a push that is refused leaves both local.
+
 Usage:
     python tools/release.py patch          # 0.3.1 -> 0.3.2
     python tools/release.py minor          # 0.3.1 -> 0.4.0
     python tools/release.py major          # 0.3.1 -> 1.0.0
     python tools/release.py --dry-run patch  # preview without changes
+    python tools/release.py --yes patch    # push without asking
 """
 
 import argparse
@@ -24,6 +31,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import release_gate  # noqa: E402
+
+# Commits named when main and origin/main are not level; the rest are counted.
+MAX_LISTED = 5
+
+
+class Refused(Exception):
+    """A pre-flight refusal. Nothing has been written."""
 
 
 def _current_version() -> str:
@@ -116,6 +130,168 @@ def _run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, check=check)
 
 
+def _git(*args: str, check: bool = True) -> subprocess.CompletedProcess:
+    """git with its output captured, so a refusal can quote it."""
+    try:
+        result = subprocess.run(["git", *args], capture_output=True,
+                                text=True)
+    except OSError as e:
+        raise Refused(f"git {' '.join(args)} could not run: {e}") from None
+    if check and result.returncode != 0:
+        raise Refused(f"git {' '.join(args)} failed: "
+                      f"{result.stderr.strip() or result.returncode}")
+    return result
+
+
+def _commits(count: int) -> str:
+    return f"{count} commit{'s' if count != 1 else ''}"
+
+
+def _require_main() -> None:
+    branch = _git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+    if branch != "main":
+        raise Refused(
+            f"This is on '{branch}', not 'main'. A release is cut from main "
+            f"only, and no flag lifts that: merge there first.")
+
+
+def _stdin_is_a_terminal() -> bool:
+    try:
+        return bool(sys.stdin and sys.stdin.isatty())
+    except (OSError, ValueError):
+        return False
+
+
+def _require_confirmable(yes: bool) -> None:
+    """The push is asked about once the commit and the tag exist.
+
+    A run that cannot hear the answer has to stop before them: unanswered,
+    both stayed behind, local and unpushed.
+    """
+    if not yes and not _stdin_is_a_terminal():
+        raise Refused(
+            "stdin is not a terminal and --yes was not given. The push is "
+            "asked about after the commit and the tag. Run this from a "
+            "terminal, or pass --yes.")
+
+
+def _require_clean_tree() -> None:
+    # Staged content must be checked too: the release commit stages only
+    # src/arduscope/__init__.py and CHANGELOG.md, but a bare `git commit`
+    # sweeps EVERYTHING already staged into the release.
+    unstaged = _git("diff", "--quiet", check=False)
+    staged = _git("diff", "--cached", "--quiet", check=False)
+    for result in (unstaged, staged):
+        if result.returncode not in (0, 1):
+            raise Refused(f"Could not check the tree: "
+                          f"{result.stderr.strip() or result.returncode}")
+    if unstaged.returncode or staged.returncode:
+        raise Refused("Working tree or index is dirty. "
+                      "Commit or stash changes first.")
+
+
+def _remote_has(tag: str) -> bool:
+    """Whether origin has the tag. Failing to ask is not an answer."""
+    result = _git("ls-remote", "--exit-code", "--tags", "origin",
+                  f"refs/tags/{tag}", check=False)
+    if result.returncode == 0:
+        return True
+    if result.returncode == 2:
+        return False
+    raise Refused(f"Could not ask origin about tag {tag}: "
+                  f"{result.stderr.strip() or result.returncode}")
+
+
+def _out_of_step(behind: int, ahead: int) -> str:
+    """Why main and origin/main are not level, naming the commits."""
+    here = _git("log", "--oneline", f"-{MAX_LISTED}",
+                "origin/main..HEAD").stdout.rstrip()
+    there = _git("log", "--oneline", f"-{MAX_LISTED}",
+                 "HEAD..origin/main").stdout.rstrip()
+    if ahead and behind:
+        head = (f"main and origin/main have diverged: {_commits(ahead)} "
+                f"here, {_commits(behind)} on origin")
+    elif ahead:
+        head = f"main is {_commits(ahead)} ahead of origin/main"
+    else:
+        head = f"main is {_commits(behind)} behind origin/main"
+    listed = "\n".join(part for part in (here, there) if part)
+    return (f"{head}:\n{listed}\n"
+            f"A release is tagged on the commit origin/main holds. Push "
+            f"what belongs there and pull what is missing first.")
+
+
+def _require_publishable(tag: str) -> None:
+    """main here is the commit origin has, and the tag is new everywhere.
+
+    origin is asked rather than assumed. A push does not check this by
+    itself: a tag already on origin that matches the local one is no change
+    to git, so main would go out under a release that was made before.
+    """
+    # --no-tags: this must not bring tags here; the local tag check below
+    # is about what this machine made.
+    _git("fetch", "--no-tags", "origin", "main")
+    if _git("rev-parse", "-q", "--verify", "refs/remotes/origin/main",
+            check=False).returncode != 0:
+        raise Refused(
+            "origin/main is not there after the fetch. Is origin the "
+            "repository releases go to, and does it have a main branch?")
+    behind, ahead = (int(count) for count in _git(
+        "rev-list", "--left-right", "--count", "origin/main...HEAD"
+    ).stdout.split())
+    if behind or ahead:
+        raise Refused(_out_of_step(behind, ahead))
+    local = _git("rev-parse", "-q", "--verify", f"refs/tags/{tag}",
+                 check=False).returncode == 0
+    if _remote_has(tag):
+        raise Refused(
+            f"Tag {tag} already exists on origin{' and here' if local else ''}"
+            f". Tags are append-only: a tag on origin is not moved or "
+            f"reused. Bump differently.")
+    if local:
+        raise Refused(
+            f"Tag {tag} exists here but not on origin: an interrupted "
+            f"earlier run, most likely. It is local only, so it may be "
+            f"deleted and this release made again (git tag -d {tag}). A tag "
+            f"on origin may not be: tags are append-only.")
+    print(f"  main is level with origin/main; {tag} is new here and on origin")
+
+
+def _require_gate_pass() -> None:
+    commit = release_gate.head_commit()
+    if not release_gate.passed(commit):
+        raise Refused(f"No passing gate for {commit[:10]}. "
+                      f"Run tools/release_gate.py on this commit first.")
+
+
+def _require_notes() -> None:
+    # The notes have to exist before anything is written: this used to bump
+    # src/arduscope/__init__.py first and only then find [Unreleased] empty,
+    # refusing the release but leaving a dirty version file behind.
+    with open("CHANGELOG.md", encoding="utf-8") as f:
+        problem = _unreleased_problem(f.read())
+    if problem:
+        raise Refused(problem)
+
+
+def _ask(question: str) -> str:
+    """input(), with a closed stdin or Ctrl-C read as "no".
+
+    By now the commit and the tag exist. A traceback here would end the run
+    without the instruction to push them by hand.
+    """
+    try:
+        return input(question).strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return ""
+
+
+def _push_by_hand(tag: str) -> None:
+    print("\n  To push by hand:")
+    print(f"    git push --atomic origin main {tag}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="ArduScope release helper")
     parser.add_argument("part", choices=["major", "minor", "patch"])
@@ -134,46 +310,17 @@ def main() -> None:
         print("  [dry-run] No changes made.")
         return
 
-    # Pre-flight checks. Staged content must be checked too: the
-    # release commit stages only src/arduscope/__init__.py/CHANGELOG.md but a bare
-    # `git commit` sweeps EVERYTHING already staged into the release.
-    unstaged = subprocess.run(
-        ["git", "diff", "--quiet"], capture_output=True
-    )
-    staged = subprocess.run(
-        ["git", "diff", "--cached", "--quiet"], capture_output=True
-    )
-    if unstaged.returncode != 0 or staged.returncode != 0:
-        sys.exit("Working tree or index is dirty. "
-                 "Commit or stash changes first.")
-
-    tag_exists = subprocess.run(
-        ["git", "rev-parse", "-q", "--verify", f"refs/tags/{tag}"],
-        capture_output=True,
-    )
-    if tag_exists.returncode == 0:
-        sys.exit(f"Tag {tag} already exists (interrupted earlier run?). "
-                 f"Delete it or bump differently.")
-
-    branch = subprocess.run(
-        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-        capture_output=True, text=True,
-    ).stdout.strip()
-    if branch != "main":
-        print(f"  Warning: releasing from '{branch}', not 'main'")
-
-    commit = release_gate.head_commit()
-    if not release_gate.passed(commit):
-        sys.exit(f"No passing gate for {commit[:10]}. "
-                 f"Run tools/release_gate.py on this commit first.")
-
-    # The notes have to exist before anything is written: this used to bump
-    # src/arduscope/__init__.py first and only then find [Unreleased] empty, refusing
-    # the release but leaving a dirty version file behind.
-    with open("CHANGELOG.md", encoding="utf-8") as f:
-        problem = _unreleased_problem(f.read())
-    if problem:
-        sys.exit(problem)
+    # Pre-flight checks, the cheapest and most local first. Nothing is
+    # written until every one of them has passed.
+    try:
+        _require_main()
+        _require_confirmable(args.yes)
+        _require_clean_tree()
+        _require_publishable(tag)
+        _require_gate_pass()
+        _require_notes()
+    except Refused as e:
+        sys.exit(str(e))
 
     # 0. Clean dist/
     _clean_dist()
@@ -196,17 +343,25 @@ def main() -> None:
 
     # 4. Push
     print(f"\n  Ready to push. This will trigger the GitHub Release workflow.")
-    if args.yes or input("  Push to origin? [y/N] ").strip().lower() == "y":
-        # Push only THIS tag — `--tags` would push every stray local
-        # tag, and each one triggers the release workflow.
-        _run(["git", "push", "origin", "main", tag])
+    if args.yes or _ask("  Push to origin? [y/N] ") == "y":
+        # main and the tag in one atomic push, or neither: a push main
+        # refuses must not leave the tag behind, since the tag alone starts
+        # the release workflow. Only THIS tag — `--tags` would push every
+        # stray local tag, and each one triggers the workflow.
+        try:
+            _run(["git", "push", "--atomic", "origin", "main", tag])
+        except subprocess.CalledProcessError as e:
+            print(f"\n  Push failed (git exited {e.returncode}). The commit "
+                  f"and the tag are local.")
+            _push_by_hand(tag)
+            sys.exit(1)
         print(f"\n  Pushed. GitHub Actions will build a draft release. When it")
         print(f"  is there, check its Windows package, then publish it:")
         print(f"    python3 tools/win_package_check.py --release {tag}")
         print(f"    gh release edit {tag} --draft=false")
     else:
-        print(f"\n  Skipped push. To push manually:")
-        print(f"    git push origin main {tag}")
+        print(f"\n  Skipped push.")
+        _push_by_hand(tag)
 
 
 if __name__ == "__main__":
