@@ -15,7 +15,8 @@ is refused leaves both local.
 
 The version is read, and rewritten, through tools/version_source.py: the one
 assignment to __version__ in the file, as code. A comment that spells an
-assignment is neither read nor touched.
+assignment is neither read nor touched, and neither is any other byte of the
+file: it is read and written as bytes, so its line endings stay as they are.
 
 Usage:
     python tools/release.py patch          # 0.3.1 -> 0.3.2
@@ -50,15 +51,18 @@ class Refused(Exception):
     """A pre-flight refusal. Nothing has been written."""
 
 
-def _version_text() -> str:
-    with open(version_source.VERSION_FILE, encoding="utf-8") as f:
+def _version_bytes() -> bytes:
+    """The version file as it is on the disk. Bytes, not text: in text mode
+    a read folds CRLF and CR into LF, and a write on Windows unfolds them
+    again, so the file would change outside the one literal."""
+    with open(version_source.VERSION_FILE, "rb") as f:
         return f.read()
 
 
 def _current_version() -> str:
     """What the one assignment to __version__ in the version file says."""
     try:
-        return version_source.source_version(_version_text(),
+        return version_source.source_version(_version_bytes(),
                                              version_source.VERSION_FILE)
     except version_source.VersionSourceError as e:
         sys.exit(f"Cannot read the version from {version_source.VERSION_FILE}:"
@@ -76,15 +80,15 @@ def _bump(version: str, part: str) -> str:
     return f"{major}.{minor}.{patch + 1}"
 
 
-def _bumped_text(new_ver: str) -> str:
-    """The version file with __version__ set to new_ver, and no other
-    character of it changed.
+def _bumped_bytes(new_ver: str) -> bytes:
+    """The version file with __version__ set to new_ver, and no other byte
+    of it changed.
 
     A pre-flight check: when the file does not hold the one assignment to
     rewrite, the release is refused before anything is written.
     """
     try:
-        return version_source.replaced(_version_text(), new_ver,
+        return version_source.replaced(_version_bytes(), new_ver,
                                        version_source.VERSION_FILE)
     except version_source.VersionSourceError as e:
         raise Refused(f"{version_source.VERSION_FILE} cannot carry "
@@ -93,9 +97,9 @@ def _bumped_text(new_ver: str) -> str:
         raise Refused(f"Cannot read {version_source.VERSION_FILE}: {e}") from None
 
 
-def _update_version_file(text: str) -> None:
-    with open(version_source.VERSION_FILE, "w", encoding="utf-8") as f:
-        f.write(text)
+def _update_version_file(source: bytes) -> None:
+    with open(version_source.VERSION_FILE, "wb") as f:
+        f.write(source)
 
 
 def _unreleased_body(content: str) -> str:
@@ -365,7 +369,7 @@ def main() -> None:
         _require_publishable(tag)
         _require_gate_pass()
         _require_notes()
-        bumped = _bumped_text(new_ver)
+        bumped = _bumped_bytes(new_ver)
     except Refused as e:
         sys.exit(str(e))
 

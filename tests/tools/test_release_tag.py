@@ -75,10 +75,13 @@ def _release(work, version: str, *, push=True, annotated=False) -> str:
     return tag
 
 
-def _commit_file(work, text: str, tag: str) -> None:
+def _commit_file(work, text, tag: str) -> None:
     """A commit holding this version file, tagged and pushed, so that only
     what the file says is at issue."""
-    (work / gitrepo.VERSION_FILE).write_text(text, encoding="utf-8")
+    if isinstance(text, bytes):
+        (work / gitrepo.VERSION_FILE).write_bytes(text)
+    else:
+        (work / gitrepo.VERSION_FILE).write_text(text, encoding="utf-8")
     gitrepo.git(work, "add", str(gitrepo.VERSION_FILE))
     gitrepo.git(work, "commit", "-q", "-m", "version file")
     gitrepo.git(work, "tag", tag)
@@ -142,6 +145,31 @@ class TestReadingTheVersion:
         with pytest.raises(crt.TagError, match="leading zero"):
             crt.check("v01.0.0")
 
+    @pytest.mark.parametrize("data", [
+        b'# __version__ = "0.0.0"\r\n__version__ = "0.0.2"\r\n',
+        b'# __version__ = "0.0.0"\r__version__ = "0.0.2"\r',
+        b'a = 1\r\nb = 2\n__version__ = "0.0.2"\r\n',
+    ], ids=["crlf", "cr", "mixed"])
+    def test_line_endings_are_read_as_the_blob_has_them(self, work, data):
+        """git show gives the commit's bytes, and the reader goes by them:
+        a line ends at LF, at CRLF, or at a CR of its own."""
+        _commit_file(work, data, "v0.0.2")
+        assert crt.check("v0.0.2") == "0.0.2"
+
+    @pytest.mark.parametrize("data, message", [
+        (b'\xef\xbb\xbf__version__ = "0.0.2"\n', "byte order mark"),
+        (b'# -*- coding: latin-1 -*-\n# caf\xe9\n__version__ = "0.0.2"\n',
+         "declares its encoding iso-8859-1"),
+    ], ids=["bom", "pep-263"])
+    def test_a_file_python_would_decode_another_way_is_refused(
+            self, work, data, message):
+        """Python reads a BOM or a coding cookie and decodes by it. The
+        version is read as UTF-8, here and where the file is rewritten, so
+        a file that says otherwise is refused rather than read two ways."""
+        _commit_file(work, data, "v0.0.2")
+        with pytest.raises(crt.TagError, match=message):
+            crt.check("v0.0.2")
+
     def test_a_tag_whose_commit_has_no_version_file_is_refused(self, work):
         gitrepo.git(work, "rm", "-q", str(gitrepo.VERSION_FILE))
         gitrepo.git(work, "commit", "-q", "-m", "no version file")
@@ -168,6 +196,14 @@ class TestReadingTheVersion:
     ('__version__ = "0.14.4"\nimport __version__ as v\n', "0.14.4"),
     ('__version__ = "0.14.4"\nfrom foo import __version__ as v\n',
      "0.14.4"),
+    # Line endings: a line ends at LF, at CRLF, or at a CR of its own.
+    (b'a = 1\r\n# __version__ = "0.0.0"\r\n__version__ = "0.14.4"\r\n',
+     "0.14.4"),
+    (b'a = 1\r# __version__ = "0.0.0"\r__version__ = "0.14.4"\r',
+     "0.14.4"),
+    (b'a = 1\r\nb = 2\n__version__ = "0.14.4"\r\n', "0.14.4"),
+    (b'"""A\r\nB\rC"""\n__version__ = "0.14.4"\n', "0.14.4"),
+    (b'# -*- coding: utf-8 -*-\n__version__ = "0.14.4"\n', "0.14.4"),
 ])
 def test_the_one_assignment_is_read_as_code(source, expected):
     assert version_source.source_version(source, "x.py") == expected
@@ -204,6 +240,13 @@ def test_the_one_assignment_is_read_as_code(source, expected):
     ("from . import *\n", r"imports \* at line 1"),
     ("try:\n    from foo import *\nexcept ImportError:\n    pass\n",
      r"imports \* at line 2"),
+    # The encoding is UTF-8 without a byte order mark.
+    (b'\xef\xbb\xbf__version__ = "0.14.4"\n', "byte order mark"),
+    (b'# -*- coding: latin-1 -*-\n# caf\xe9\n__version__ = "0.14.4"\n',
+     "declares its encoding iso-8859-1"),
+    (b'x = "\xff"\n__version__ = "0.14.4"\n', "is not UTF-8"),
+    (b'# -*- coding: no-such-encoding -*-\n__version__ = "0.14.4"\n',
+     "unknown encoding"),
     ("def f(__version__):\n    return __version__\n", "as a parameter"),
     ("f = lambda __version__: __version__\n", "as a parameter"),
     ("try:\n    pass\nexcept NameError as __version__:\n    pass\n",

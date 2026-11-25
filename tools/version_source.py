@@ -14,28 +14,84 @@ __version__ has to be bound exactly once in the module, by a plain
 assignment of a string at module level. Any other binding of the name, an
 augmented assignment or one under an if, an import of it, a tuple target,
 would leave the version setuptools reads, the first static value, different
-from the one the imported module reports. A star import is refused as well:
-it could bind the name with nothing in the file to show it.
+from the one the imported module reports. A star import is
+refused as well: it could bind the name with nothing in the file to show it.
+
+The file is UTF-8 without a byte order mark, and nothing else is taken.
+Python itself goes by a BOM or a PEP 263 cookie; release.py rewrites the
+file as bytes and the tag check reads the tagged commit as bytes, so a file
+that says it is something else would be read one way here and another by
+the module that ships. Line endings are bytes like any other: a release
+changes the span of the one literal, and leaves the rest as it found it.
 """
 
 from __future__ import annotations
 
 import ast
+import codecs
+import io
 import re
+import tokenize
 
 NAME = "__version__"
 VERSION_FILE = "src/arduscope/__init__.py"
 # What a version literal may hold, so that rewriting one cannot write code.
 VERSION = re.compile(r"[0-9]+(?:\.[0-9]+)*")
+BOM = codecs.BOM_UTF8
+# A line of Python source ends at LF, at CRLF, or at a CR of its own.
+LINE_END = re.compile(rb"\r\n|\r|\n")
 
 
 class VersionSourceError(Exception):
     """Why the source does not hold one plain version."""
 
 
-def _tree(source: bytes | str, where: str) -> ast.Module:
+def _bytes(source: bytes | str) -> bytes:
+    """The source as the file holds it: text is taken as UTF-8, the one
+    encoding the file may have."""
+    return source.encode("utf-8") if isinstance(source, str) else source
+
+
+def _utf8(source: bytes, where: str) -> None:
+    """Refuse the file unless it is UTF-8 without a byte order mark.
+
+    A BOM would be skipped by Python, and so by the positions ast reports,
+    which would then not be offsets into these bytes. A coding cookie would
+    have Python decode by another encoding, and is named before anything
+    else: it is the reason the file is what it is.
+    """
+    if source.startswith(BOM):
+        raise VersionSourceError(
+            f"{where} starts with a byte order mark: it has to be UTF-8 "
+            f"without one")
     try:
-        return ast.parse(source)
+        source.decode("utf-8")
+    except UnicodeDecodeError as e:
+        undecodable = f"{where} is not UTF-8: {e}"
+    else:
+        undecodable = ""
+    try:
+        encoding, _ = tokenize.detect_encoding(io.BytesIO(source).readline)
+    except SyntaxError as e:
+        # No cookie could be read: the first lines are not UTF-8, or the
+        # cookie names an encoding Python does not have.
+        raise VersionSourceError(
+            undecodable
+            or f"{where} declares an encoding that cannot be read: {e.msg}"
+        ) from None
+    if encoding != "utf-8":
+        raise VersionSourceError(
+            f"{where} declares its encoding {encoding} (PEP 263): it has to "
+            f"be UTF-8")
+    if undecodable:
+        raise VersionSourceError(undecodable)
+
+
+def _tree(source: bytes | str, where: str) -> ast.Module:
+    data = _bytes(source)
+    _utf8(data, where)
+    try:
+        return ast.parse(data)
     except (SyntaxError, ValueError) as e:
         raise VersionSourceError(f"{where} does not parse: {e}") from None
 
@@ -147,33 +203,42 @@ def source_version(source: bytes | str, where: str) -> str:
 
 
 def _offset(source: bytes, line: int, column: int) -> int:
-    """ast counts lines from one and columns in bytes of the line."""
+    """Where in the source a position ast names is.
+
+    ast counts lines from one and columns in bytes of the line, and ends a
+    line at LF, at CRLF, or at a CR of its own, as the tokenizer does.
+    """
     start = 0
     for _ in range(line - 1):
-        start = source.index(b"\n", start) + 1
+        end = LINE_END.search(source, start)
+        if end is None:
+            raise VersionSourceError(
+                f"ast counts a line {line} that the source does not have")
+        start = end.end()
     return start + column
 
 
-def replaced(source: str, new: str, where: str = VERSION_FILE) -> str:
+def replaced(source: bytes | str, new: str,
+             where: str = VERSION_FILE) -> bytes | str:
     """`source` with the value of the one assignment to __version__ set to
-    `new`, and no other character of it touched.
+    `new`, and no other byte of it touched. Bytes in, bytes out; text in,
+    text out.
 
     Only the span the value's literal occupies is rewritten. A comment that
-    spells an assignment, above or below, stays as it was; so does the
-    quote the assignment uses, when it is a plain one. The result is read
-    back, and refused if it does not say `new`.
+    spells an assignment, above or below, stays as it was, and so do the
+    line endings and the quote the assignment uses, when it is a plain one.
+    The result is read back, and refused if it does not say `new`.
     """
     if not VERSION.fullmatch(new):
         raise VersionSourceError(f"{new!r} is not a version number")
-    data = source.encode("utf-8")
+    data = _bytes(source)
     value = version_assignment(data, where).value
     start = _offset(data, value.lineno, value.col_offset)
     stop = _offset(data, value.end_lineno, value.end_col_offset)
     literal = data[start:stop]
     quote = literal[:1] if literal[:1] in (b'"', b"'") else b'"'
     rewritten = data[:start] + quote + new.encode("ascii") + quote + data[stop:]
-    result = rewritten.decode("utf-8")
-    if source_version(result, where) != new:
+    if source_version(rewritten, where) != new:
         raise VersionSourceError(
             f"{where} does not read {new!r} once the assignment is rewritten")
-    return result
+    return rewritten.decode("utf-8") if isinstance(source, str) else rewritten

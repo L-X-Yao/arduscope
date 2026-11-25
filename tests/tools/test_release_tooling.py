@@ -265,11 +265,13 @@ class _Run:
     """
 
     def __init__(self, tmp_path, monkeypatch, gate=True, notes=True,
-                 version_file='__version__ = "0.9.3"\n', **answers):
+                 version_file=b'__version__ = "0.9.3"\n', **answers):
         self.monkeypatch = monkeypatch
         self.version_file = tmp_path / "src" / "arduscope" / "__init__.py"
         self.version_file.parent.mkdir(parents=True)
-        self.version_file.write_text(version_file, encoding="utf-8")
+        # Bytes, and compared as bytes: a text-mode read would fold CRLF
+        # and CR into LF, and hide a rewrite that did the same.
+        self.version_file.write_bytes(version_source._bytes(version_file))
         self.changelog = tmp_path / "CHANGELOG.md"
         body = "### Changed\n- new\n" if notes else ""
         self.changelog.write_text(
@@ -294,8 +296,8 @@ class _Run:
         monkeypatch.setattr(self.mod.release_gate, "passed", passed)
 
     def _files(self):
-        return (self.version_file.read_text(encoding="utf-8"),
-                self.changelog.read_text(encoding="utf-8"))
+        return (self.version_file.read_bytes(),
+                self.changelog.read_bytes())
 
     @property
     def untouched(self) -> bool:
@@ -328,8 +330,7 @@ class TestMainAsksInOrder:
         run("patch", "--yes", terminal=False)  # headless: --yes, no question
         assert run.trace == CHECKED + [ADD, COMMIT, TAG, PUSH]
         assert not run.untouched
-        assert run.version_file.read_text(
-            encoding="utf-8") == '__version__ = "0.9.4"\n'
+        assert run.version_file.read_bytes() == b'__version__ = "0.9.4"\n'
         assert "## [0.9.4] - " in run.changelog.read_text(encoding="utf-8")
         assert not run.dist.exists()
 
@@ -418,27 +419,56 @@ class TestTheVersionFile:
         """The reader tools/check_release_tag.py reads the tag back with."""
         assert _load_release().version_source is version_source
 
-    @pytest.mark.parametrize("text, expected", [
-        ('# __version__ = "0.13.4"\n__version__ = "0.14.4"\n',
-         '# __version__ = "0.13.4"\n__version__ = "0.14.5"\n'),
-        ('# __version__ = "0.13.4"\n\n__version__ = "0.14.4"\n\n'
-         '"""Docstring: __version__ = "0.13.4" is mentioned."""\n',
-         '# __version__ = "0.13.4"\n\n__version__ = "0.14.5"\n\n'
-         '"""Docstring: __version__ = "0.13.4" is mentioned."""\n'),
-        ("# __version__ = '0.13.4'\n__version__ = '0.14.4'\n",
-         "# __version__ = '0.13.4'\n__version__ = '0.14.5'\n"),
-        ('__version__: str = "0.14.4"\n', '__version__: str = "0.14.5"\n'),
+    @pytest.mark.parametrize("data, expected", [
+        (b'# __version__ = "0.13.4"\n__version__ = "0.14.4"\n',
+         b'# __version__ = "0.13.4"\n__version__ = "0.14.5"\n'),
+        (b'# __version__ = "0.13.4"\n\n__version__ = "0.14.4"\n\n'
+         b'"""Docstring: __version__ = "0.13.4" is mentioned."""\n',
+         b'# __version__ = "0.13.4"\n\n__version__ = "0.14.5"\n\n'
+         b'"""Docstring: __version__ = "0.13.4" is mentioned."""\n'),
+        (b"# __version__ = '0.13.4'\n__version__ = '0.14.4'\n",
+         b"# __version__ = '0.13.4'\n__version__ = '0.14.5'\n"),
+        (b'__version__: str = "0.14.4"\n', b'__version__: str = "0.14.5"\n'),
         # The comment after the assignment was rewritten too.
-        ('__version__ = "0.14.4"\n# __version__ = "0.13.4"\n',
-         '__version__ = "0.14.5"\n# __version__ = "0.13.4"\n'),
-    ])
+        (b'__version__ = "0.14.4"\n# __version__ = "0.13.4"\n',
+         b'__version__ = "0.14.5"\n# __version__ = "0.13.4"\n'),
+        # Line endings are bytes like any other: the file was read, and
+        # written back, in text mode, which folded CRLF and CR into LF.
+        (b'"""Doc."""\r\n# __version__ = "0.13.4"\r\n'
+         b'__version__ = "0.14.4"\r\n\r\nx = 1\r\n',
+         b'"""Doc."""\r\n# __version__ = "0.13.4"\r\n'
+         b'__version__ = "0.14.5"\r\n\r\nx = 1\r\n'),
+        (b'"""Doc."""\r# __version__ = "0.13.4"\r__version__ = "0.14.4"\r'
+         b'\rx = 1\r',
+         b'"""Doc."""\r# __version__ = "0.13.4"\r__version__ = "0.14.5"\r'
+         b'\rx = 1\r'),
+        (b'a = 1\r\nb = 2\n__version__ = "0.14.4"\r\n',
+         b'a = 1\r\nb = 2\n__version__ = "0.14.5"\r\n'),
+    ], ids=["comment-above", "comment-and-docstring", "single-quoted",
+            "annotated", "comment-below", "crlf", "cr", "mixed"])
     def test_patch_bumps_the_assignment_and_leaves_the_rest_alone(
-            self, tmp_path, monkeypatch, capsys, text, expected):
-        run = _Run(tmp_path, monkeypatch, version_file=text)
+            self, tmp_path, monkeypatch, capsys, data, expected):
+        run = _Run(tmp_path, monkeypatch, version_file=data)
         run("patch", "--yes", terminal=False)
         assert self.BUMPED in capsys.readouterr().out
-        assert run.version_file.read_text(encoding="utf-8") == expected
+        assert run.version_file.read_bytes() == expected
         assert run.trace[-4:] == self.RELEASED
+
+    @pytest.mark.parametrize("data, message", [
+        (b'\xef\xbb\xbf__version__ = "0.14.4"\n', "byte order mark"),
+        (b'# -*- coding: latin-1 -*-\n# caf\xe9\n__version__ = "0.14.4"\n',
+         "declares its encoding iso-8859-1"),
+        (b'x = "\xff"\n__version__ = "0.14.4"\n', "is not UTF-8"),
+    ], ids=["bom", "pep-263", "not-utf8"])
+    def test_a_file_that_is_not_utf8_without_a_bom_stops_the_release(
+            self, tmp_path, monkeypatch, data, message):
+        """The tag check reads the tagged commit as UTF-8 without a BOM.
+        The file is rewritten by the same rule, so one that Python would
+        decode another way is refused here first."""
+        run = _Run(tmp_path, monkeypatch, version_file=data)
+        with pytest.raises(SystemExit, match=message):
+            run("patch", "--yes", terminal=False)
+        assert run.trace == [] and run.untouched
 
     def test_a_dry_run_quotes_the_assignment_not_the_comment(
             self, tmp_path, monkeypatch, capsys):
@@ -487,6 +517,41 @@ class TestRewritingTheAssignment:
     ])
     def test_only_the_value_is_rewritten(self, text, expected):
         assert version_source.replaced(text, "0.14.5", "x.py") == expected
+
+    @pytest.mark.parametrize("data, expected", [
+        (b'__version__ = "0.14.4"\n', b'__version__ = "0.14.5"\n'),
+        (b'"""Doc."""\r\n# __version__ = "0.13.4"\r\n'
+         b'__version__ = "0.14.4"\r\n\r\nx = 1\r\n',
+         b'"""Doc."""\r\n# __version__ = "0.13.4"\r\n'
+         b'__version__ = "0.14.5"\r\n\r\nx = 1\r\n'),
+        (b'"""Doc."""\r# __version__ = "0.13.4"\r__version__ = "0.14.4"\r'
+         b'\rx = 1\r',
+         b'"""Doc."""\r# __version__ = "0.13.4"\r__version__ = "0.14.5"\r'
+         b'\rx = 1\r'),
+        (b'"""A\r\nB\rC"""\r\n__version__ = "0.14.4"\r\n',
+         b'"""A\r\nB\rC"""\r\n__version__ = "0.14.5"\r\n'),
+        (b'a = 1\r\nb = 2\n__version__ = "0.14.4"\r\n',
+         b'a = 1\r\nb = 2\n__version__ = "0.14.5"\r\n'),
+    ], ids=["lf", "crlf", "cr", "triple-quoted", "mixed"])
+    def test_bytes_in_bytes_out_and_every_other_byte_kept(self, data,
+                                                          expected):
+        """The line endings and anything else outside the literal are
+        bytes like any other: a CR of its own is a line end to ast as well,
+        so where the literal starts is found the same way."""
+        out = version_source.replaced(data, "0.14.5", "x.py")
+        assert isinstance(out, bytes) and out == expected
+        assert out.replace(b"0.14.5", b"0.14.4") == data
+
+    @pytest.mark.parametrize("data, message", [
+        (b'\xef\xbb\xbf__version__ = "0.14.4"\n', "byte order mark"),
+        (b'# -*- coding: latin-1 -*-\n__version__ = "0.14.4"\n',
+         "declares its encoding iso-8859-1"),
+        (b'x = "\xff"\n__version__ = "0.14.4"\n', "is not UTF-8"),
+    ], ids=["bom", "pep-263", "not-utf8"])
+    def test_a_file_that_is_not_utf8_without_a_bom_is_not_rewritten(
+            self, data, message):
+        with pytest.raises(version_source.VersionSourceError, match=message):
+            version_source.replaced(data, "0.14.5", "x.py")
 
     @pytest.mark.parametrize("new", ['0.14.5"\n__version__ = "0', "a", "",
                                      "1 2", "0.14.5rc1"])
@@ -752,6 +817,34 @@ class TestAReleaseReachesOrigin:
             "chore: release v0.0.2"
         assert gitrepo.git(release.work, "status", "--porcelain") == ""
         assert PUSH.replace("0.9.4", "0.0.2") in capsys.readouterr().out
+
+    @pytest.mark.parametrize("data", [
+        b'"""Doc."""\r\n# __version__ = "0.0.0"\r\n'
+        b'__version__ = "0.0.1"\r\n\r\nx = 1\r\n',
+        b'"""Doc."""\r# __version__ = "0.0.0"\r__version__ = "0.0.1"\r\r'
+        b'x = 1\r',
+        b'a = 1\r\nb = 2\n__version__ = "0.0.1"\r\n',
+    ], ids=["crlf", "cr", "mixed"])
+    def test_both_readers_see_the_same_bytes_whatever_the_line_endings(
+            self, release, data):
+        """release.py rewrites the working file, and must leave every byte
+        but the literal as it found it; the tag check reads the tagged
+        commit back, as git show gives its bytes."""
+        work = release.work
+        (work / gitrepo.VERSION_FILE).write_bytes(data)
+        gitrepo.git(work, "commit", "-q", "-am", "docs: line endings")
+        gitrepo.git(work, "push", "-q", "origin", "main")
+
+        release.mod.main()
+
+        after = data.replace(b'"0.0.1"', b'"0.0.2"')
+        assert (work / gitrepo.VERSION_FILE).read_bytes() == after
+        shown = subprocess.run(
+            ["git", "show",
+             "refs/tags/v0.0.2^{commit}:" + str(gitrepo.VERSION_FILE)],
+            cwd=str(work), capture_output=True, check=True).stdout
+        assert shown == after
+        assert check_release_tag.tagged_version("v0.0.2") == "0.0.2"
 
     def test_a_comment_above_the_assignment_survives_the_release(
             self, release, capsys):
