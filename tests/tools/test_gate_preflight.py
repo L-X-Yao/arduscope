@@ -357,6 +357,17 @@ def _holding(tmp_path, relative: str, pid: int) -> None:
     (directory / "cgroup.procs").write_text(f"{pid}\n", encoding="ascii")
 
 
+def _wide(tmp_path, under: str, breadth: int, each: int) -> None:
+    """`breadth` directories under tmp_path/under, each with `each` of its
+    own: a tree whose size is a product, as a host's hierarchy of slices
+    and scopes is."""
+    for first in range(breadth):
+        (tmp_path / under / f"d{first:03d}").mkdir(parents=True,
+                                                   exist_ok=True)
+        for second in range(each):
+            (tmp_path / under / f"d{first:03d}" / f"d{second:03d}").mkdir()
+
+
 def _machine(tmp_path, cgroup="/run-1.scope", proc="v2", memory_max="max",
              memory_swap_max="max", named=None, mounts=None, where=None,
              other=(), members=(), strangers=()):
@@ -544,6 +555,42 @@ class TestWhereTheCgroupIs:
                 in limits["error"])
         assert "shows /machine/slice" in limits["error"]
 
+    def test_no_cgroup2_mount_is_not_read(self, tmp_path):
+        limits = _read(tmp_path, mounts=[], other=[CGROUP_V1_MOUNT],
+                       memory_max="1", memory_swap_max="0")
+        assert limits["memory_max"] is None
+        assert "no cgroup2 filesystem is mounted (cgroup v1?)" in \
+            limits["error"]
+
+    def test_a_space_in_the_mount_point_is_unescaped(self, tmp_path):
+        """The kernel writes a space in a mount point as \040."""
+        spaced = str(tmp_path / "with space")
+        limits = _read(tmp_path, mounts=[(spaced.replace(" ", "\\040"), "/")],
+                       where=tmp_path / "with space" / "run-1.scope",
+                       memory_max="1", memory_swap_max="0")
+        assert limits["memory_max"] == 1
+
+    def test_an_unreadable_mount_table_is_unreadable(self, tmp_path):
+        named, _ = _machine(tmp_path)
+        limits = gp.cgroup_memory_limits(named, str(tmp_path / "no-table"))
+        assert limits["memory_max"] is None
+        assert "cannot list the cgroup2 mounts" in limits["error"]
+
+    def test_the_table_is_read_the_way_the_kernel_writes_it(self, tmp_path):
+        """Optional fields before the separator, an escaped root, and lines
+        of other filesystems, among them a cgroup v1 one."""
+        table = tmp_path / "mountinfo"
+        table.write_text(
+            "25 1 0:21 / /sys rw,nosuid,nodev,noexec shared:5 - sysfs sysfs rw\n"
+            "30 22 0:26 /with\\040space /sys/fs/cgroup rw shared:4 master:7 - "
+            "cgroup2 cgroup rw\n"
+            "31 22 0:27 / /sys/fs/cgroup/memory rw - cgroup cgroup memory\n"
+            "32 22 0:28 /docker/abc /sys/fs/cgroup rw - cgroup2 cgroup rw\n"
+            "garbled\n", encoding="ascii")
+        assert gp.cgroup2_mounts(str(table)) == [
+            ("/sys/fs/cgroup", "/with space"),
+            ("/sys/fs/cgroup", "/docker/abc")]
+
 
 class TestInheritedFromOutsideTheNamespace:
     """cgroup_namespaces(7), the anomaly it shows. Inside a cgroup namespace,
@@ -623,57 +670,116 @@ class TestInheritedFromOutsideTheNamespace:
         assert limits == {"cgroup": "/run-1.scope", "memory_max": 1,
                           "memory_swap_max": 0}
 
-    def test_the_search_is_bounded(self, tmp_path, monkeypatch):
-        """A hierarchy of thousands of cgroups under an inherited mount is
-        not walked to the end: the limit is left unread, and said so."""
-        monkeypatch.setattr(gp, "MAX_SEARCHED", 2)
+    def _counting_scandir(self, monkeypatch):
+        """os.scandir as gate_preflight calls it, counting every directory
+        it is asked to open and every directory it is shown."""
+        real = os.scandir
+        looked = [0]
+
+        class Opened:
+            def __init__(self, path):
+                looked[0] += 1
+                self.entries = real(path)
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                entry = next(self.entries)
+                looked[0] += entry.is_dir()
+                return entry
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                self.entries.close()
+
+        monkeypatch.setattr(gp.os, "scandir", Opened)
+        return looked
+
+    def test_the_search_looks_at_no_more_than_the_budget(self, tmp_path,
+                                                         monkeypatch):
+        """MAX_SEARCHED used to be compared with the length of a level once
+        the whole level had been listed, and started again for each
+        inherited mount. A level of 4096 directories with 4096 under each
+        is sixteen million paths, listed to be refused. One count now
+        covers every directory opened and every directory found in one,
+        over all the levels and all the mounts, and is kept while they are
+        listed."""
+        monkeypatch.setattr(gp, "MAX_SEARCHED", 16)
+        _wide(tmp_path, "cgroup", 2, 200)  # 2 directories, 200 under each
+        named, table = _machine(
+            tmp_path, cgroup="/",
+            mounts=[(str(tmp_path / "cgroup"), "/../..")],
+            where=tmp_path / "cgroup" / "d000" / "d000",
+            memory_max="1", memory_swap_max="0")
+        looked = self._counting_scandir(monkeypatch)
+
+        limits = gp.cgroup_memory_limits(named, table)
+
+        assert limits["memory_max"] is None
+        assert 0 < looked[0] <= gp.MAX_SEARCHED
+        assert "given up after 16" in limits["error"]
+
+    def test_the_budget_is_kept_while_a_level_is_listed(self, tmp_path,
+                                                        monkeypatch):
+        """Not a whole level listed and then a refusal: the listing stops
+        with the budget, whatever the level's size."""
+        monkeypatch.setattr(gp, "MAX_SEARCHED", 3)
+        _wide(tmp_path, "cgroup", 500, 0)  # one level of 500 directories
+        named, table = _machine(
+            tmp_path, cgroup="/", mounts=[(str(tmp_path / "cgroup"), "/..")],
+            where=tmp_path / "cgroup" / "d000", memory_max="1",
+            memory_swap_max="0")
+        looked = self._counting_scandir(monkeypatch)
+
+        limits = gp.cgroup_memory_limits(named, table)
+
+        assert limits["memory_max"] is None
+        assert looked[0] == gp.MAX_SEARCHED
+        assert "given up after 3" in limits["error"]
+
+    def test_one_budget_for_every_inherited_mount(self, tmp_path,
+                                                  monkeypatch):
+        """The count does not start again at the next mount."""
+        monkeypatch.setattr(gp, "MAX_SEARCHED", 10)
+        for name in ("one", "two"):
+            for i in range(6):
+                (tmp_path / name / f"d{i:03d}").mkdir(parents=True)
+        named, table = _machine(
+            tmp_path, cgroup="/",
+            mounts=[(str(tmp_path / "one"), "/.."),
+                    (str(tmp_path / "two"), "/..")],
+            where=tmp_path / "one" / "d000", memory_max="1",
+            memory_swap_max="0")
+        looked = self._counting_scandir(monkeypatch)
+
+        limits = gp.cgroup_memory_limits(named, table)
+
+        assert limits["memory_max"] is None
+        # Listed in full, that would be two opened and twelve found.
+        assert looked[0] == gp.MAX_SEARCHED
+        assert "given up after 10" in limits["error"]
+
+    def test_the_cgroup_is_found_before_the_budget_is_spent(self, tmp_path,
+                                                            monkeypatch):
+        """The budget is a ceiling, not a quota: a cgroup that is found at
+        once costs the one entry that named it."""
+        monkeypatch.setattr(gp, "MAX_SEARCHED", 4096)
         hierarchy = tmp_path / "cgroup"
-        _holding(tmp_path, "cgroup/a", os.getpid())
-        _holding(tmp_path, "cgroup/b", 1)
-        _holding(tmp_path, "cgroup/c", 1)
+        _holding(tmp_path, "cgroup/init.scope", os.getpid())
         named, table = _machine(tmp_path, cgroup="/",
                                 mounts=[(str(hierarchy), "/..")],
-                                where=hierarchy / "a", memory_max="1",
-                                memory_swap_max="0")
+                                where=hierarchy / "init.scope",
+                                memory_max="1", memory_swap_max="0")
+        looked = self._counting_scandir(monkeypatch)
+
         limits = gp.cgroup_memory_limits(named, table)
-        assert limits["memory_max"] is None
-        assert "no directory holds this process" in limits["error"]
 
-    def test_no_cgroup2_mount_is_not_read(self, tmp_path):
-        limits = _read(tmp_path, mounts=[], other=[CGROUP_V1_MOUNT],
-                       memory_max="1", memory_swap_max="0")
-        assert limits["memory_max"] is None
-        assert "no cgroup2 filesystem is mounted (cgroup v1?)" in \
-            limits["error"]
-
-    def test_a_space_in_the_mount_point_is_unescaped(self, tmp_path):
-        """The kernel writes a space in a mount point as \040."""
-        spaced = str(tmp_path / "with space")
-        limits = _read(tmp_path, mounts=[(spaced.replace(" ", "\\040"), "/")],
-                       where=tmp_path / "with space" / "run-1.scope",
-                       memory_max="1", memory_swap_max="0")
-        assert limits["memory_max"] == 1
-
-    def test_an_unreadable_mount_table_is_unreadable(self, tmp_path):
-        named, _ = _machine(tmp_path)
-        limits = gp.cgroup_memory_limits(named, str(tmp_path / "no-table"))
-        assert limits["memory_max"] is None
-        assert "cannot list the cgroup2 mounts" in limits["error"]
-
-    def test_the_table_is_read_the_way_the_kernel_writes_it(self, tmp_path):
-        """Optional fields before the separator, an escaped root, and lines
-        of other filesystems, among them a cgroup v1 one."""
-        table = tmp_path / "mountinfo"
-        table.write_text(
-            "25 1 0:21 / /sys rw,nosuid,nodev,noexec shared:5 - sysfs sysfs rw\n"
-            "30 22 0:26 /with\\040space /sys/fs/cgroup rw shared:4 master:7 - "
-            "cgroup2 cgroup rw\n"
-            "31 22 0:27 / /sys/fs/cgroup/memory rw - cgroup cgroup memory\n"
-            "32 22 0:28 /docker/abc /sys/fs/cgroup rw - cgroup2 cgroup rw\n"
-            "garbled\n", encoding="ascii")
-        assert gp.cgroup2_mounts(str(table)) == [
-            ("/sys/fs/cgroup", "/with space"),
-            ("/sys/fs/cgroup", "/docker/abc")]
+        assert limits == {"cgroup": "/", "memory_max": 1,
+                          "memory_swap_max": 0}
+        assert looked[0] == 2  # the mount point opened, the one entry
 
 
 class TestTheRecordNamesTheCap:

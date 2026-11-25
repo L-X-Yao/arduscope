@@ -68,8 +68,10 @@ CGROUP_LIMITS = (("memory_max", "memory.max"),
 # A mount root of /.., or of so many of them: the mount was made outside the
 # process's cgroup namespace, and is rooted above the namespace's root.
 OUTSIDE = re.compile(r"(?:/\.\.)+")
-# Directories looked under such a mount for the process's cgroup, before the
-# search is given up and the limit left unread.
+# What may be looked at under such a mount for the process's cgroup: one
+# count for every directory opened and every directory found in it, over
+# all the levels and all the mounts. Once it is spent the search is given
+# up, and the limit left unread.
 MAX_SEARCHED = 4096
 
 # The binaries _launch() in tests/sitl/generate_logs.py flies, under
@@ -182,12 +184,36 @@ def cgroup2_mounts(proc_mounts: str = PROC_MOUNTS) -> list[tuple[str, str]]:
     return mounts
 
 
-def _subdirectories(parent: str) -> list[str]:
-    try:
-        with os.scandir(parent) as entries:
-            return [entry.path for entry in entries if entry.is_dir()]
-    except OSError:
-        return []
+class _Spent(Exception):
+    """The budget is used up: the search ends, under every mount at once."""
+
+
+class _Budget:
+    """What may be looked at under mounts inherited from outside the cgroup
+    namespace.
+
+    One count for every directory opened and every directory found in one,
+    over all the levels and all the mounts; it is kept while they are
+    listed, not once a level has been listed in full. A cgroup's files are
+    passed over without counting: they are a fixed few dozen, and are never
+    opened.
+
+    `left` is what remains. With nothing left no entry is asked for any
+    more, so the directories looked at never pass the budget, not even by
+    the one entry that would have spent it.
+    """
+
+    def __init__(self, left: int):
+        self.left = left
+        self.stopped = False
+
+    def take(self) -> None:
+        """Count one more: a directory opened. With nothing left, the
+        search is stopped."""
+        if self.left <= 0:
+            self.stopped = True
+            raise _Spent
+        self.left -= 1
 
 
 def _holds(directory: str, pid: int) -> bool:
@@ -201,34 +227,51 @@ def _holds(directory: str, pid: int) -> bool:
         return False
 
 
-def _inherited(point: str, levels: int, below: str, pid: int) -> str | None:
-    """The process's cgroup under a mount inherited from outside its cgroup
-    namespace, or None when no directory under the mount holds it.
+def _searched(directory: str, levels: int, below: str, pid: int,
+              budget: _Budget) -> str | None:
+    """The process's cgroup `levels` below `directory`, or None when no
+    directory there holds it.
 
-    Such a mount was made before the namespace was, and its root lies
-    `levels` above the namespace's root: /proc/self/mountinfo shows that
-    root as /.. (cgroup_namespaces(7)), and the directory at the mount
-    point is an ancestor's. /proc/self/cgroup names the process's cgroup
-    from the namespace's root down, `below`, so the levels in between are
-    hidden and have to be looked for. Of the directories `levels` under
-    the mount point, the process's cgroup is under the one where the
-    cgroup.procs of what lies below it names the process.
+    This is for a mount inherited from outside the process's cgroup
+    namespace. Such a mount was made before the namespace was, and its
+    root lies `levels` above the namespace's root: /proc/self/mountinfo
+    shows that root as /.. (cgroup_namespaces(7)), and the directory at
+    the mount point is an ancestor's. /proc/self/cgroup names the
+    process's cgroup from the namespace's root down, `below`, so the
+    levels in between are hidden and have to be looked for: the cgroup is
+    under the one directory `levels` down where the cgroup.procs of what
+    lies below it names the process.
+
+    One directory is opened at a time, and its entries asked for one by
+    one while the budget lasts, so that is what bounds the work: no level
+    is ever listed in full to be counted afterwards.
     """
-    roots = [point]
-    for _ in range(levels):
-        roots = [child for root in roots
-                 for child in _subdirectories(root)]
-        if len(roots) > MAX_SEARCHED:
-            return None
-    for root in roots:
-        directory = root if below == "/" else root + below
-        if _holds(directory, pid):
-            return directory
+    if levels == 0:
+        candidate = directory if below == "/" else directory + below
+        return candidate if _holds(candidate, pid) else None
+    budget.take()  # opening the directory
+    try:
+        with os.scandir(directory) as entries:
+            while budget.left:
+                try:
+                    entry = next(entries)
+                except StopIteration:
+                    return None
+                if not entry.is_dir():
+                    continue
+                budget.left -= 1  # a directory under this one
+                found = _searched(entry.path, levels - 1, below, pid,
+                                  budget)
+                if found is not None:
+                    return found
+    except OSError:
+        return None
+    budget.stopped = True  # directories may remain here, not looked at
     return None
 
 
-def _cgroup_directory(path: str, mounts: list[tuple[str, str]],
-                      pid: int) -> str | None:
+def _cgroup_directory(path: str, mounts: list[tuple[str, str]], pid: int,
+                      budget: _Budget | None = None) -> str | None:
     """Where the process's cgroup is on the filesystem, or None when no
     cgroup2 mount shows it.
 
@@ -237,11 +280,12 @@ def _cgroup_directory(path: str, mounts: list[tuple[str, str]],
     path of its own. In a container the root can be a path, and that
     subtree, not the hierarchy's root, is what sits at the mount point.
     Under a cgroup namespace an inherited mount has a root of /.., which
-    stands for so many levels above the namespace's root: _inherited().
+    stands for so many levels above the namespace's root: _searched().
 
     A mount rooted nearest is taken first: of the mounts that show the
     cgroup, its root is the longest.
     """
+    budget = budget if budget is not None else _Budget(MAX_SEARCHED)
     mounts = [(point, root.rstrip("/") or "/") for point, root in mounts]
     showing = [(point, root) for point, root in mounts
                if root == "/" or path == root or path.startswith(root + "/")]
@@ -252,7 +296,11 @@ def _cgroup_directory(path: str, mounts: list[tuple[str, str]],
         return point + (path if root == "/" else path[len(root):])
     for point, root in mounts:
         if OUTSIDE.fullmatch(root):
-            found = _inherited(point, root.count("/.."), path, pid)
+            try:
+                found = _searched(point, root.count("/.."), path, pid,
+                                  budget)
+            except _Spent:
+                return None
             if found is not None:
                 return found
     return None
@@ -295,13 +343,21 @@ def cgroup_memory_limits(proc_cgroup: str = PROC_CGROUP,
         return {**limits, "error": (
             f"no cgroup2 filesystem is mounted (cgroup v1?), so the limit "
             f"of {path} is not read here")}
-    directory = _cgroup_directory(path, mounts, os.getpid())
+    budget = _Budget(MAX_SEARCHED)
+    directory = _cgroup_directory(path, mounts, os.getpid(), budget)
     if directory is None:
         shown = "; ".join(f"{at} shows {of}" for at, of in mounts)
         outside = [at for at, root in mounts if OUTSIDE.fullmatch(root)]
-        hidden = (f"; under {', '.join(outside)}, whose root is outside "
-                  f"this cgroup namespace, no directory holds this process"
-                  if outside else "")
+        hidden = ""
+        if outside:
+            where = f"under {', '.join(outside)}, whose root is outside this "
+            hidden = (where + f"cgroup namespace, the search for this "
+                      f"process's cgroup was given up after {MAX_SEARCHED} "
+                      f"directories looked at"
+                      if budget.stopped else
+                      where + "cgroup namespace, no directory holds this "
+                      "process")
+            hidden = "; " + hidden
         return {**limits, "error": (
             f"{path} is under none of the mounted cgroup2 filesystems "
             f"({shown}){hidden}, so its limit is not read here")}
