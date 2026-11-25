@@ -9,8 +9,13 @@ land, and become the new version's section here.
 Nothing is written until every pre-flight check has passed, in this order:
 on `main`; able to hear the answer about the push; a clean tree and index;
 fetched, with `main` level with `origin/main` and the new tag absent here and
-on origin; a passing gate; notes to date. `main` and the tag then leave in
-one atomic push, so a push that is refused leaves both local.
+on origin; a passing gate; notes to date; a version file that can carry the
+new version. `main` and the tag then leave in one atomic push, so a push that
+is refused leaves both local.
+
+The version is read, and rewritten, through tools/version_source.py: the one
+assignment to __version__ in the file, as code. A comment that spells an
+assignment is neither read nor touched.
 
 Usage:
     python tools/release.py patch          # 0.3.1 -> 0.3.2
@@ -23,7 +28,6 @@ Usage:
 import argparse
 import datetime
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -31,6 +35,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import release_gate  # noqa: E402
+import version_source  # noqa: E402
 
 # Commits named when main and origin/main are not level; the rest are counted.
 MAX_LISTED = 5
@@ -45,12 +50,21 @@ class Refused(Exception):
     """A pre-flight refusal. Nothing has been written."""
 
 
+def _version_text() -> str:
+    with open(version_source.VERSION_FILE, encoding="utf-8") as f:
+        return f.read()
+
+
 def _current_version() -> str:
-    with open("src/arduscope/__init__.py", encoding="utf-8") as f:
-        m = re.search(r'__version__\s*=\s*"(.+?)"', f.read())
-    if not m:
-        sys.exit("Cannot parse __version__ from src/arduscope/__init__.py")
-    return m.group(1)
+    """What the one assignment to __version__ in the version file says."""
+    try:
+        return version_source.source_version(_version_text(),
+                                             version_source.VERSION_FILE)
+    except version_source.VersionSourceError as e:
+        sys.exit(f"Cannot read the version from {version_source.VERSION_FILE}:"
+                 f" {e}")
+    except OSError as e:
+        sys.exit(f"Cannot read {version_source.VERSION_FILE}: {e}")
 
 
 def _bump(version: str, part: str) -> str:
@@ -62,17 +76,26 @@ def _bump(version: str, part: str) -> str:
     return f"{major}.{minor}.{patch + 1}"
 
 
-def _update_version_file(new_ver: str) -> None:
-    path = "src/arduscope/__init__.py"
-    with open(path, encoding="utf-8") as f:
-        content = f.read()
-    content = re.sub(
-        r'__version__\s*=\s*".+?"',
-        f'__version__ = "{new_ver}"',
-        content,
-    )
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(content)
+def _bumped_text(new_ver: str) -> str:
+    """The version file with __version__ set to new_ver, and no other
+    character of it changed.
+
+    A pre-flight check: when the file does not hold the one assignment to
+    rewrite, the release is refused before anything is written.
+    """
+    try:
+        return version_source.replaced(_version_text(), new_ver,
+                                       version_source.VERSION_FILE)
+    except version_source.VersionSourceError as e:
+        raise Refused(f"{version_source.VERSION_FILE} cannot carry "
+                      f"{new_ver}: {e}") from None
+    except OSError as e:
+        raise Refused(f"Cannot read {version_source.VERSION_FILE}: {e}") from None
+
+
+def _update_version_file(text: str) -> None:
+    with open(version_source.VERSION_FILE, "w", encoding="utf-8") as f:
+        f.write(text)
 
 
 def _unreleased_body(content: str) -> str:
@@ -233,7 +256,7 @@ def _require_one_push_url() -> None:
     could refuse them on another, with nothing here the wiser.
     """
     urls = _git("remote", "get-url", "--push", "--all",
-                "origin").stdout.split()
+                "origin").stdout.splitlines()
     if len(urls) != 1:
         raise Refused(
             f"origin has {len(urls)} push URLs "
@@ -342,6 +365,7 @@ def main() -> None:
         _require_publishable(tag)
         _require_gate_pass()
         _require_notes()
+        bumped = _bumped_text(new_ver)
     except Refused as e:
         sys.exit(str(e))
 
@@ -349,7 +373,7 @@ def main() -> None:
     _clean_dist()
 
     # 1. Bump version
-    _update_version_file(new_ver)
+    _update_version_file(bumped)
     print(f"  Updated src/arduscope/__init__.py -> {new_ver}")
 
     # 2. Date the release notes

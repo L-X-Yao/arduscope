@@ -20,7 +20,7 @@ repeats what a test already believes about git's answers.
 from __future__ import annotations
 
 from tests import _gitrepo as gitrepo
-from tests._repo import REPO_ROOT
+from tests._repo import REPO_ROOT, TOOLS_DIR
 
 import builtins
 import hashlib
@@ -31,6 +31,11 @@ import sys
 from types import SimpleNamespace
 
 import pytest
+
+sys.path.insert(0, str(TOOLS_DIR))
+
+import check_release_tag  # noqa: E402
+import version_source  # noqa: E402
 
 pytestmark = pytest.mark.fast
 
@@ -210,19 +215,22 @@ ORIGIN = [URLS, FETCH, HAS_MAIN, COUNT]
 NEW_TAG = [HAS_TAG, ASKS_TAG]
 PREFLIGHT = TREE + ORIGIN + NEW_TAG
 CHECKED = PREFLIGHT + ["gate"]
+# Any tag: a run whose version file says something else asks about another.
+ANY_TAG = "git rev-parse -q --verify refs/tags/"
+ANY_REMOTE_TAG = "git ls-remote --exit-code --tags origin refs/tags/"
 # git on a clean tree, on main, level with origin/main, the tag new on both.
 LEVEL = {URLS: "git@example.invalid:owner/repo.git", BRANCH: "main",
-         COUNT: "0\t0", HAS_TAG: 1, ASKS_TAG: 2}
+         COUNT: "0\t0", ANY_TAG: 1, ANY_REMOTE_TAG: 2}
 
 
 class _Git:
     """subprocess.run standing in for git.
 
     `answers` maps a fragment of a command to git's answer: a return code
-    (and no output), or a line of output (and return code 0). A command
-    nothing names succeeds silently, as `git add` does. Every command is
-    appended to `trace` in order, and raises under check=True as
-    subprocess.run would.
+    (and no output), or a line of output (and return code 0); where two
+    fragments name one command, the longer answers. A command nothing names
+    succeeds silently, as `git add` does. Every command is appended to
+    `trace` in order, and raises under check=True as subprocess.run would.
     """
 
     def __init__(self, trace, **answers):
@@ -233,11 +241,14 @@ class _Git:
         self.trace.append(" ".join(command))
         text = " ".join(command)
         code, out = 0, ""
-        for fragment, answer in self.answers.items():
-            if fragment in text:
-                code, out = ((answer, "") if isinstance(answer, int)
-                             else (0, answer))
-                break
+        # The longest fragment that names this command answers: a table can
+        # say something about any tag, and something else about one.
+        named = [(fragment, answer) for fragment, answer in
+                 self.answers.items() if fragment in text]
+        if named:
+            answer = max(named, key=lambda item: len(item[0]))[1]
+            code, out = ((answer, "") if isinstance(answer, int)
+                         else (0, answer))
         if kwargs.get("check") and code:
             raise subprocess.CalledProcessError(code, command)
         return SimpleNamespace(returncode=code, stdout=out,
@@ -254,12 +265,11 @@ class _Run:
     """
 
     def __init__(self, tmp_path, monkeypatch, gate=True, notes=True,
-                 **answers):
+                 version_file='__version__ = "0.9.3"\n', **answers):
         self.monkeypatch = monkeypatch
         self.version_file = tmp_path / "src" / "arduscope" / "__init__.py"
         self.version_file.parent.mkdir(parents=True)
-        self.version_file.write_text('__version__ = "0.9.3"\n',
-                                     encoding="utf-8")
+        self.version_file.write_text(version_file, encoding="utf-8")
         self.changelog = tmp_path / "CHANGELOG.md"
         body = "### Changed\n- new\n" if notes else ""
         self.changelog.write_text(
@@ -364,6 +374,16 @@ class TestMainAsksInOrder:
         assert run.trace == asked
         assert run.untouched
 
+    def test_a_push_url_with_a_space_in_it_is_one_url(self, tmp_path,
+                                                      monkeypatch):
+        """git lists one URL a line. Split on whitespace, a path with a
+        space read as two, and the release was refused."""
+        run = _Run(tmp_path, monkeypatch, gate=False,
+                   **{URLS: "/srv/git repos/owner.git"})
+        with pytest.raises(SystemExit, match="No passing gate"):
+            run("--yes", terminal=False)
+        assert run.trace == TREE + ORIGIN + NEW_TAG + ["gate"]
+
     def test_the_gate_is_asked_after_origin(self, tmp_path, monkeypatch):
         run = _Run(tmp_path, monkeypatch, gate=False, notes=False)
         with pytest.raises(SystemExit, match="No passing gate"):
@@ -377,6 +397,106 @@ class TestMainAsksInOrder:
             run()
         assert run.trace == CHECKED
         assert run.untouched
+
+
+class TestTheVersionFile:
+    """What release.py bumps, and what it leaves alone.
+
+    The version file was read, and rewritten, by a regex. With
+    `# __version__ = "0.13.4"` above `__version__ = "0.14.4"` the regex read
+    the comment, so patch chose 0.13.5, and then rewrote every match, the
+    assignment with it. The file agreed with the tag, and the workflow's own
+    check passed a downgrade.
+    """
+
+    BUMPED = "0.14.4 -> 0.14.5 (patch)"
+    RELEASED = ["git add src/arduscope/__init__.py CHANGELOG.md",
+                "git commit -m chore: release v0.14.5", "git tag v0.14.5",
+                "git push --atomic origin main v0.14.5"]
+
+    def test_release_reads_the_version_through_the_shared_module(self):
+        """The reader tools/check_release_tag.py reads the tag back with."""
+        assert _load_release().version_source is version_source
+
+    @pytest.mark.parametrize("text, expected", [
+        ('# __version__ = "0.13.4"\n__version__ = "0.14.4"\n',
+         '# __version__ = "0.13.4"\n__version__ = "0.14.5"\n'),
+        ('# __version__ = "0.13.4"\n\n__version__ = "0.14.4"\n\n'
+         '"""Docstring: __version__ = "0.13.4" is mentioned."""\n',
+         '# __version__ = "0.13.4"\n\n__version__ = "0.14.5"\n\n'
+         '"""Docstring: __version__ = "0.13.4" is mentioned."""\n'),
+        ("# __version__ = '0.13.4'\n__version__ = '0.14.4'\n",
+         "# __version__ = '0.13.4'\n__version__ = '0.14.5'\n"),
+        ('__version__: str = "0.14.4"\n', '__version__: str = "0.14.5"\n'),
+        # The comment after the assignment was rewritten too.
+        ('__version__ = "0.14.4"\n# __version__ = "0.13.4"\n',
+         '__version__ = "0.14.5"\n# __version__ = "0.13.4"\n'),
+    ])
+    def test_patch_bumps_the_assignment_and_leaves_the_rest_alone(
+            self, tmp_path, monkeypatch, capsys, text, expected):
+        run = _Run(tmp_path, monkeypatch, version_file=text)
+        run("patch", "--yes", terminal=False)
+        assert self.BUMPED in capsys.readouterr().out
+        assert run.version_file.read_text(encoding="utf-8") == expected
+        assert run.trace[-4:] == self.RELEASED
+
+    def test_a_dry_run_quotes_the_assignment_not_the_comment(
+            self, tmp_path, monkeypatch, capsys):
+        run = _Run(tmp_path, monkeypatch,
+                   version_file='# __version__ = "0.13.4"\n'
+                                '__version__ = "0.14.4"\n')
+        run("patch", "--dry-run")
+        assert self.BUMPED in capsys.readouterr().out
+        assert run.untouched
+
+    @pytest.mark.parametrize("text, message", [
+        ('__version__ = "0.14.4"\n__version__ = "0.14.5"\n', "2 times"),
+        ('__version__ = "0.14.4"\n__version__ += "rc1"\n', "2 times"),
+        ("from somewhere import __version__\n", "by import"),
+        ('if True:\n    __version__ = "0.14.4"\n',
+         "not by one plain assignment"),
+    ])
+    def test_no_one_plain_assignment_stops_the_release_before_anything(
+            self, tmp_path, monkeypatch, text, message):
+        run = _Run(tmp_path, monkeypatch, version_file=text)
+        with pytest.raises(SystemExit, match=message):
+            run("patch", "--yes", terminal=False)
+        assert run.trace == [] and run.untouched
+
+
+class TestRewritingTheAssignment:
+    """version_source.replaced: the span of the one value, and no more."""
+
+    @pytest.mark.parametrize("text, expected", [
+        ('__version__ = "0.14.4"\n', '__version__ = "0.14.5"\n'),
+        ("__version__ = '0.14.4'\n", "__version__ = '0.14.5'\n"),
+        ('__version__: str = "0.14.4"\n', '__version__: str = "0.14.5"\n'),
+        ('__version__ = "0.14" ".4"\n', '__version__ = "0.14.5"\n'),
+        ('# __version__ = "0.13.4"\n__version__ = "0.14.4"\n'
+         '# __version__ = "0.13.3"\n',
+         '# __version__ = "0.13.4"\n__version__ = "0.14.5"\n'
+         '# __version__ = "0.13.3"\n'),
+        ('__version__ = "0.14.4"  # the comment after it\n',
+         '__version__ = "0.14.5"  # the comment after it\n'),
+        # ast counts columns in bytes of a line, not characters.
+        ('x = "\u00fcn\u00efcode"; __version__ = "0.14.4"\n',
+         'x = "\u00fcn\u00efcode"; __version__ = "0.14.5"\n'),
+    ])
+    def test_only_the_value_is_rewritten(self, text, expected):
+        assert version_source.replaced(text, "0.14.5", "x.py") == expected
+
+    @pytest.mark.parametrize("new", ['0.14.5"\n__version__ = "0', "a", "",
+                                     "1 2", "0.14.5rc1"])
+    def test_what_is_not_a_version_number_is_not_written(self, new):
+        with pytest.raises(version_source.VersionSourceError,
+                           match="is not a version number"):
+            version_source.replaced('__version__ = "0.14.4"\n', new, "x.py")
+
+    def test_a_file_without_the_assignment_cannot_be_rewritten(self):
+        with pytest.raises(version_source.VersionSourceError,
+                           match="does not bind __version__"):
+            version_source.replaced('# __version__ = "0.14.4"\n',
+                                    "0.14.5", "x.py")
 
 
 class TestThePush:
@@ -583,6 +703,17 @@ class TestAgainstOrigin:
                     str(release.origin))
         release.mod._require_publishable("v0.0.2")
 
+    def test_a_push_url_with_a_space_in_it_is_one_url(self, release):
+        """git lists one URL a line: splitting on whitespace made two."""
+        spaced = release.work.parent / "with space" / "origin.git"
+        gitrepo.git(release.work, "remote", "set-url", "--push", "origin",
+                    str(spaced))
+        release.mod._require_publishable("v0.0.2")
+        gitrepo.git(release.work, "remote", "set-url", "--add", "--push",
+                    "origin", str(release.work.parent / "else where.git"))
+        with pytest.raises(release.mod.Refused, match="origin has 2 push URLs"):
+            release.mod._require_publishable("v0.0.2")
+
 
 class TestAReleaseReachesOrigin:
     """main() end to end on a real repository, against a bare origin."""
@@ -618,6 +749,29 @@ class TestAReleaseReachesOrigin:
             "chore: release v0.0.2"
         assert gitrepo.git(release.work, "status", "--porcelain") == ""
         assert PUSH.replace("0.9.4", "0.0.2") in capsys.readouterr().out
+
+    def test_a_comment_above_the_assignment_survives_the_release(
+            self, release, capsys):
+        """End to end on a real repository: the comment is neither read nor
+        rewritten, the tagged commit carries the new version, and the
+        workflow's own check agrees with the tag."""
+        work = release.work
+        (work / gitrepo.VERSION_FILE).write_text(
+            '# __version__ = "0.0.0"\n__version__ = "0.0.1"\n',
+            encoding="utf-8")
+        gitrepo.git(work, "commit", "-q", "-am", "docs: note an old version")
+        gitrepo.git(work, "push", "-q", "origin", "main")
+
+        release.mod.main()
+
+        kept = '# __version__ = "0.0.0"\n__version__ = "0.0.2"\n'
+        assert (work / gitrepo.VERSION_FILE).read_text(
+            encoding="utf-8") == kept
+        tagged = gitrepo.git(work, "show",
+                             "refs/tags/v0.0.2^{commit}:"
+                             + str(gitrepo.VERSION_FILE))
+        assert tagged.splitlines() == kept.splitlines()
+        assert check_release_tag.tagged_version("v0.0.2") == "0.0.2"
 
     def test_a_declined_push_leaves_a_state_the_next_run_names(
             self, release, monkeypatch, capsys):

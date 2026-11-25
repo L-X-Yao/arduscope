@@ -10,7 +10,10 @@ this in its first job, so that nothing is built from such a tag:
     python3 tools/check_release_tag.py [--tag vX.Y.Z] [--main-ref REF]
 
 The tag defaults to GITHUB_REF_NAME and main to the remote-tracking ref
-refs/remotes/origin/main, by its full name. When it passes, `version=X.Y.Z`
+refs/remotes/origin/main, by its full name. The version is read from the
+tagged commit by tools/version_source.py, the reader tools/release.py
+rewrites the version file with: __version__ bound once, by a plain
+assignment of a string at module level. When it passes, `version=X.Y.Z`
 goes to the file named by GITHUB_OUTPUT, for the Windows package name and
 the release notes, and to standard output.
 
@@ -20,11 +23,14 @@ Exit 0 = the tag may be built; 1 = it may not, and why.
 from __future__ import annotations
 
 import argparse
-import ast
 import os
 import re
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import version_source  # noqa: E402
 
 # vX.Y.Z with each number written the one way. 01.14.0 and 1.14.0 are one
 # version to setuptools, which names the wheel and the sdist by the
@@ -34,7 +40,7 @@ TAG = re.compile(rf"v{NUMBER}\.{NUMBER}\.{NUMBER}")
 # By its full name: "origin/main" on its own is also a tag someone could
 # have made, and git takes a tag before a remote-tracking branch.
 MAIN_REF = "refs/remotes/origin/main"
-VERSION_FILE = "src/arduscope/__init__.py"
+VERSION_FILE = version_source.VERSION_FILE
 
 
 class TagError(Exception):
@@ -48,42 +54,6 @@ def tag_version(tag: str) -> str:
         raise TagError(f"tag {tag!r} is not vX.Y.Z with three numbers, none "
                        f"with a leading zero")
     return tag[1:]
-
-
-def version_assignment(source: bytes | str, where: str) -> ast.expr:
-    """The value of the one assignment to __version__ at module level.
-
-    Read as code, with ast. A comment that spells an assignment is not one,
-    and a second assignment is not hidden by the first. None, two, or a
-    value that is not a plain string are refused rather than guessed at.
-    """
-    try:
-        tree = ast.parse(source)
-    except (SyntaxError, ValueError) as e:
-        raise TagError(f"{where} does not parse: {e}") from None
-    values = []
-    for node in tree.body:
-        if isinstance(node, ast.Assign):
-            targets = node.targets
-        elif isinstance(node, ast.AnnAssign):
-            targets = [node.target]
-        else:
-            continue
-        if any(isinstance(target, ast.Name) and target.id == "__version__"
-               for target in targets):
-            values.append(node.value)
-    if len(values) != 1:
-        raise TagError(f"{where} assigns __version__ {len(values)} times at "
-                       f"module level, not once")
-    value = values[0]
-    if not (isinstance(value, ast.Constant) and isinstance(value.value, str)):
-        raise TagError(f"__version__ in {where} is not a plain string")
-    return value
-
-
-def source_version(source: bytes | str, where: str) -> str:
-    """What the one assignment to __version__ in the source says."""
-    return version_assignment(source, where).value
 
 
 def tagged_version(tag: str, path: str = VERSION_FILE) -> str:
@@ -100,7 +70,10 @@ def tagged_version(tag: str, path: str = VERSION_FILE) -> str:
         reason = shown.stderr.decode("utf-8", "replace").strip().splitlines()
         raise TagError(f"could not read {path} from tag {tag}: "
                        f"{reason[-1] if reason else shown.returncode}")
-    return source_version(shown.stdout, f"{tag}:{path}")
+    try:
+        return version_source.source_version(shown.stdout, f"{tag}:{path}")
+    except version_source.VersionSourceError as e:
+        raise TagError(str(e)) from None
 
 
 def on_main(commitish: str, main_ref: str = MAIN_REF) -> bool:

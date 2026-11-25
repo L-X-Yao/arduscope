@@ -24,6 +24,7 @@ import pytest
 sys.path.insert(0, str(TOOLS_DIR))
 
 import check_release_tag as crt  # noqa: E402
+import version_source  # noqa: E402
 
 pytestmark = pytest.mark.fast
 
@@ -103,15 +104,26 @@ class TestReadingTheVersion:
                            '__version__ = "0.0.2"\n', "v0.0.2")
         assert crt.check("v0.0.2") == "0.0.2"
 
-    def test_two_assignments_are_refused(self, work):
-        _commit_file(work, '__version__ = "0.0.2"\n__version__ = "0.0.3"\n',
-                     "v0.0.2")
-        with pytest.raises(crt.TagError, match="assigns __version__ 2 times"):
+    @pytest.mark.parametrize("text", [
+        '__version__ = "0.0.2"\n__version__ = "0.0.3"\n',
+        # Rebound under an if, and by an augmented assignment: the module
+        # reports the later value, setuptools the first one it sees.
+        '__version__ = "0.0.2"\nif True:\n    __version__ = "0.0.3"\n',
+        '__version__ = "0.0.2"\n__version__ += "rc1"\n',
+    ])
+    def test_a_second_binding_of_the_name_is_refused(self, work, text):
+        _commit_file(work, text, "v0.0.2")
+        with pytest.raises(crt.TagError, match="binds __version__ 2 times"):
             crt.check("v0.0.2")
 
-    def test_a_file_with_no_assignment_is_refused(self, work):
-        _commit_file(work, '# __version__ = "0.0.2"\n', "v0.0.2")
-        with pytest.raises(crt.TagError, match="assigns __version__ 0 times"):
+    @pytest.mark.parametrize("text", [
+        "# __version__ = \"0.0.2\"\n",
+        "from somewhere import __version__\n",
+        "__version__, other = \"0.0.2\", 2\n",
+    ])
+    def test_a_file_with_no_plain_assignment_is_refused(self, work, text):
+        _commit_file(work, text, "v0.0.2")
+        with pytest.raises(crt.TagError, match="__version__"):
             crt.check("v0.0.2")
 
     def test_a_leading_zero_is_refused_whatever_the_file_says(self, work):
@@ -135,29 +147,69 @@ class TestReadingTheVersion:
     ('# __version__ = "0.0.0"\n__version__ = "0.14.4"\n', "0.14.4"),
     ('"""A docstring in which __version__ = "0.0.0" is mentioned."""\n'
      '__version__ = "0.14.4"\n', "0.14.4"),
+    ("# a comment that reads, not assigns: print(__version__)\n"
+     '__version__ = "0.14.4"\n', "0.14.4"),
     ('__version__: str = "0.14.4"\n', "0.14.4"),
     ('__version__ = "0.14" ".4"\n', "0.14.4"),  # one string to Python
     ('__version__ = "0.14.4"  # a comment after it\n', "0.14.4"),
+    ('__version__ = "0.14.4"\nprint(__version__)\n', "0.14.4"),  # a use
 ])
 def test_the_one_assignment_is_read_as_code(source, expected):
-    assert crt.source_version(source, "x.py") == expected
+    assert version_source.source_version(source, "x.py") == expected
 
 
 @pytest.mark.parametrize("source, message", [
-    ('__version__ = "0.14.4"\n__version__ = "0.14.5"\n', "2 times"),
-    ("", "0 times"),
-    ('# __version__ = "0.14.4"\n', "0 times"),
-    ('if True:\n    __version__ = "0.14.4"\n', "0 times"),
-    ("__version__ = 1\n", "not a plain string"),
-    ('__version__ = f"0.14.4"\n', "not a plain string"),
-    ('__version__ = "0.14" + ".4"\n', "not a plain string"),
-    ("__version__ = None\n", "not a plain string"),
-    ("__version__: str\n", "not a plain string"),
+    ("", "does not bind __version__"),
+    ('# __version__ = "0.14.4"\n', "does not bind __version__"),
+    ('print(__version__)\n', "does not bind __version__"),
+    # Bound once, but not by a plain assignment of the one name at module
+    # level.
+    ('if True:\n    __version__ = "0.14.4"\n', "not by one plain assignment"),
+    ('try:\n    __version__ = "0.14.4"\nexcept OSError:\n    pass\n',
+     "not by one plain assignment"),
+    ("__version__, other = \"0.14.4\", 2\n", "not by one plain assignment"),
+    ("other, __version__ = 1, \"0.14.4\"\n", "not by one plain assignment"),
+    ("__version__ = other = '0.14.4'\n", "not by one plain assignment"),
+    ('with open("x") as __version__:\n    pass\n',
+     "not by one plain assignment"),
+    ('if (__version__ := "0.14.4"):\n    pass\n',
+     "not by one plain assignment"),
+    ("del __version__\n", "by deletion"),
+    ("from somewhere import __version__\n", "by import"),
+    ("from somewhere import thing as __version__\n", "by import"),
+    ("import somewhere as __version__\n", "by import"),
+    ("def f(__version__):\n    return __version__\n", "as a parameter"),
+    ("f = lambda __version__: __version__\n", "as a parameter"),
+    ("try:\n    pass\nexcept NameError as __version__:\n    pass\n",
+     "as an exception handler's name"),
+    ("class __version__:\n    pass\n", "as a definition"),
+    ("def __version__():\n    pass\n", "as a definition"),
+    ("match x:\n    case __version__:\n        pass\n",
+     "as a match pattern's capture"),
+    # Bound more than once, in this module or in any scope inside it.
+    ('__version__ = "0.14.4"\nif True:\n    __version__ = "0.14.5"\n',
+     "binds __version__ 2 times \\(lines 1, 3\\)"),
+    ('__version__ = "0.14.4"\n__version__ += "rc1"\n',
+     "binds __version__ 2 times \\(lines 1, 2\\)"),
+    ('__version__ = "0.14.4"\nfor __version__ in "12":\n    pass\n',
+     "2 times"),
+    ('__version__ = "0.14.4"\nother, __version__ = 1, "0.14.5"\n', "2 times"),
+    # A plain assignment of something that is not a string.
+    ("__version__ = 1\n", "is not a plain string"),
+    ('__version__ = f"0.14.4"\n', "is not a plain string"),
+    ('__version__ = "0.14" + ".4"\n', "is not a plain string"),
+    ("__version__ = None\n", "is not a plain string"),
+    ("__version__: str\n", "is not a plain string"),
     ("def (:\n", "does not parse"),
 ])
 def test_anything_else_is_refused_rather_than_guessed(source, message):
-    with pytest.raises(crt.TagError, match=message):
-        crt.source_version(source, "x.py")
+    with pytest.raises(version_source.VersionSourceError, match=message):
+        version_source.source_version(source, "x.py")
+
+
+def test_the_tag_check_reads_through_the_shared_module():
+    """The same reader as tools/release.py rewrites with."""
+    assert crt.version_source is version_source
 
 
 class TestTheTaggedCommit:
