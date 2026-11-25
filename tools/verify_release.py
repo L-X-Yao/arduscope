@@ -5,7 +5,9 @@ Checks the release through the GitHub API and the local tag:
 
 - the release is published, not a draft, and immutable;
 - its tag is the one asked for, and points at the local tag's commit;
-- it carries a wheel, an sdist and the Windows zip, all non-empty.
+- that commit is on `origin/main`, which the checkout has to have fetched;
+- it carries a wheel, an sdist and the Windows zip, all non-empty, and no
+  asset that is not from this version.
 
 The Windows package check is a separate, real-Windows step; this script only
 checks the release record and its assets.
@@ -19,10 +21,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 
 DEFAULT_REPO = "L-X-Yao/arduscope"
+MAIN_REF = "origin/main"
 KINDS = (
     ("wheel", ".whl"),
     ("sdist", ".tar.gz"),
@@ -58,9 +62,44 @@ def _local_tag_commit(tag: str) -> str:
     return _run(["git", "rev-parse", "--verify", f"refs/tags/{tag}^{{commit}}"]).strip()
 
 
-def check(release: dict, tag: str, remote_commit: str,
-          local_commit: str) -> list[str]:
-    """Return the failed checks, empty when the release is good."""
+def _on_main(commit: str, main_ref: str = MAIN_REF) -> bool:
+    """Whether origin/main contains the commit.
+
+    merge-base answers 0 or 1. Anything else is not an answer, and says so
+    rather than reading as "not on main".
+    """
+    result = subprocess.run(["git", "merge-base", "--is-ancestor", commit,
+                             main_ref], capture_output=True, text=True)
+    if result.returncode == 0:
+        return True
+    if result.returncode == 1:
+        return False
+    raise RuntimeError(
+        f"could not place {commit[:10]} against {main_ref}: "
+        f"{result.stderr.strip() or result.returncode}")
+
+
+def _names_version(name: str, version: str) -> bool:
+    """Whether the asset name carries the version as a whole.
+
+    0.13.2 is in ardupilot_scope-0.13.2-py3-none-any.whl, in
+    ardupilot_scope-0.13.2.tar.gz (the dot after it is a file extension's)
+    and in arduscope-v0.13.2-win64.zip. It is not in
+    ardupilot_scope-0.13.21-py3-none-any.whl, in ...-0.13.2.1.tar.gz or in
+    ...-10.13.2.tar.gz: a digit or a dotted number on either side makes it
+    another version.
+    """
+    return re.search(rf"(?<![\d.]){re.escape(version)}(?!\.?\d)",
+                     name) is not None
+
+
+def check(release: dict, tag: str, remote_commit: str, local_commit: str, *,
+          on_main: bool) -> list[str]:
+    """Return the failed checks, empty when the release is good.
+
+    on_main says whether origin/main contains the tag commit; it is not
+    optional, since a default would let a caller forget to ask.
+    """
     failed: list[str] = []
     if release.get("draft") is not False:
         failed.append("release is not published (draft is not false)")
@@ -73,11 +112,17 @@ def check(release: dict, tag: str, remote_commit: str,
     if remote_commit != local_commit:
         failed.append(
             f"tag points at {remote_commit}, local tag at {local_commit}")
+    if not on_main:
+        failed.append(f"tag commit {local_commit} is not on {MAIN_REF}")
 
     assets = release.get("assets") or []
     if not assets:
         failed.append("release has no assets")
     names = [a.get("name", "") for a in assets]
+    version = tag.removeprefix("v")
+    for name in names:
+        if not _names_version(name, version):
+            failed.append(f"asset {name!r} does not name version {version}")
     for kind, suffix in KINDS:
         matches = [a for a in assets if a.get("name", "").endswith(suffix)]
         if not matches:
@@ -99,13 +144,15 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         local_commit = _local_tag_commit(args.tag)
+        on_main = _on_main(local_commit)
         release = _release(args.repo, args.tag)
         remote_commit = _tag_commit(args.repo, args.tag)
     except (RuntimeError, OSError, KeyError, json.JSONDecodeError) as e:
         print(f"verify_release: {e}", file=sys.stderr)
         return 1
 
-    failed = check(release, args.tag, remote_commit, local_commit)
+    failed = check(release, args.tag, remote_commit, local_commit,
+                   on_main=on_main)
     if failed:
         for item in failed:
             print(f"FAIL {item}", file=sys.stderr)
@@ -113,6 +160,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"PASS {args.tag} is published and immutable")
     print(f"PASS tag commit {local_commit[:10]}")
+    print(f"PASS tag commit is on {MAIN_REF}")
     for asset in sorted(release["assets"], key=lambda a: a.get("name", "")):
         print(f"PASS {asset['name']} ({asset['size']} bytes)")
     return 0
