@@ -2,7 +2,7 @@
 
 [中文](POSITIONING_zh.md)
 
-**Last updated**: 2026-11-13
+**Last updated**: 2026-11-24
 **Maintainer**: L-X-Yao
 **What this document is for**: what the tool does and does not do is settled against it. To change the positioning, change this file.
 

@@ -274,6 +274,25 @@ The Windows package carries the Python named by `DEFAULT_PYTHON` in
 
 Distribution is GitHub Release only, never PyPI.
 
+## Versioning
+
+`release.py` takes `patch`, `minor` or `major`. A patch is a defect fix; a
+minor release adds a capability or changes behavior; a major release is an
+incompatible change. On 0.x, a minor release may break compatibility, and
+there is no stable-API promise before 1.0.
+
+## Tags and release records
+
+- Only `main` is released, and only through `tools/release.py`. A tag created
+  by hand or by the GitHub UI is an incident, not a release.
+- The tag is `vX.Y.Z`. Its commit must be an ancestor of `origin/main`, and
+  the tag version must equal `__version__` in `src/arduscope/__init__.py`.
+- Tags are append-only. A tag whose release workflow fails before publication
+  stays in place; the fix ships as the next patch version. The failed
+  version's CHANGELOG section stays as the record of the tagged code.
+- `release.py` pushes `main` and the tag atomically; a release never leaves
+  one ref published without the other.
+
 ## Commit messages
 
 Format: `<type>(<scope>): <subject>`
