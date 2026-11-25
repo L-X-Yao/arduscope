@@ -102,16 +102,16 @@ def main():
         [sys.executable, "-m", "build", "--wheel"],
     ))
 
-    # 5. Locale symmetry (quick sanity)
+    # 5. Locale symmetry: exact key set, as GitHub CI checks it
     results.append(_run(
-        "Locale key count",
+        "Locale key symmetry",
         [sys.executable, "-c",
          "import json; "
          "zh = json.load(open('src/arduscope/locales/zh.json', encoding='utf-8')); "
          "en = json.load(open('src/arduscope/locales/en.json', encoding='utf-8')); "
-         "assert len(zh) == len(en), "
-         f"f'zh={{len(zh)}} != en={{len(en)}}'; "
-         "print(f'  {{len(zh)}} keys, symmetric')"],
+         "assert set(zh) == set(en), "
+         "f'key mismatch: zh-only={set(zh) - set(en)}, en-only={set(en) - set(zh)}'; "
+         "print(f'  {len(zh)} keys, symmetric')"],
     ))
 
     # Summary
