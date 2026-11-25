@@ -7,6 +7,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Changed
+- `tools/release.py` releases from `main` only, needs a terminal or `--yes`,
+  and refuses a dirty tree, a `main` that is not level with `origin/main`
+  once fetched, and a tag that already exists here or on origin. `main` and
+  the tag leave in one atomic push, and a closed prompt or a refused push
+  prints the push to run by hand instead of a traceback.
+- The gate preflight fails unless the run is under a finite cgroup v2 memory
+  and swap limit, and the gate record names both.
+- `release.yml` checks the tag before anything is built: its format, its
+  version against the tagged commit, and that the commit is on `origin/main`.
+  `tools/verify_release.py` rejects a tag commit that is not on
+  `origin/main` and an asset that does not name the release version.
+
 ## [0.14.4] - 2026-11-25
 
 ### Fixed
