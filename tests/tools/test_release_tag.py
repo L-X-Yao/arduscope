@@ -276,6 +276,26 @@ def test_anything_else_is_refused_rather_than_guessed(source, message):
         version_source.source_version(source, "x.py")
 
 
+needs_type_parameters = pytest.mark.skipif(
+    sys.version_info < (3, 12),
+    reason="PEP 695 type parameters exist from Python 3.12")
+
+
+@needs_type_parameters
+@pytest.mark.parametrize("source, message", [
+    ('__version__ = "0.14.4"\ndef f[__version__](): ...\n', "2 times"),
+    ("def f[__version__](): ...\n", "as a type parameter"),
+    ("class C[__version__]: ...\n", "as a type parameter"),
+    ("def f[**__version__](): ...\n", "as a type parameter"),
+    ("def f[*__version__](): ...\n", "as a type parameter"),
+    ("type L[__version__] = list[__version__]\n", "as a type parameter"),
+    ("type __version__ = int\n", "not by one plain assignment"),
+])
+def test_a_type_parameter_binds_the_name_too(source, message):
+    with pytest.raises(version_source.VersionSourceError, match=message):
+        version_source.source_version(source, "x.py")
+
+
 def test_the_tag_check_reads_through_the_shared_module():
     """The same reader as tools/release.py rewrites with."""
     assert crt.version_source is version_source

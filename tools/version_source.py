@@ -12,9 +12,9 @@ a tag that is a version older than the one before it.
 
 __version__ has to be bound exactly once in the module, by a plain
 assignment of a string at module level. Any other binding of the name, an
-augmented assignment or one under an if, an import of it, a tuple target,
-would leave the version setuptools reads, the first static value, different
-from the one the imported module reports. A star import is
+augmented assignment or one under an if, an import of it, a tuple target, a
+type parameter, would leave the version setuptools reads, the first static
+value, different from the one the imported module reports. A star import is
 refused as well: it could bind the name with nothing in the file to show it.
 
 The file is UTF-8 without a byte order mark, and nothing else is taken.
@@ -131,6 +131,12 @@ def _bindings(tree: ast.AST) -> list[tuple[ast.AST, str, int]]:
         elif (isinstance(node, getattr(ast, "MatchMapping", ()))
               and node.rest == NAME):
             found.append((node, "as a match pattern's capture", line))
+        elif (isinstance(node, (getattr(ast, "TypeVar", ()),
+                                getattr(ast, "ParamSpec", ()),
+                                getattr(ast, "TypeVarTuple", ())))
+              and node.name == NAME):
+            # PEP 695: def f[__version__]() and the like, from Python 3.12.
+            found.append((node, "as a type parameter", line))
     return found
 
 
