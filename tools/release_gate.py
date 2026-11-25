@@ -172,11 +172,13 @@ def _windows_pins() -> dict[str, str]:
 
 
 def environment(version=metadata.version) -> dict:
-    """The Python and the libraries the gate ran on.
+    """The Python and the libraries the gate ran on, and its memory cap.
 
     The Windows package ships the libraries pinned in win64-requirements.txt.
     A run on other versions checked something a little different, so the
-    record names them.
+    record names them. So does it name the cgroup memory and swap limits the
+    run sat under: the preflight refuses a run without them, so an entry
+    with "error" in it is from a run that never got past it.
     """
     pins = _windows_pins()
 
@@ -189,7 +191,8 @@ def environment(version=metadata.version) -> dict:
     libraries = {name: found(name) for name in sorted(pins)}
     return {"python": platform.python_version(), "libraries": libraries,
             "off_the_windows_pins": [name for name in libraries
-                                     if libraries[name] != pins[name]]}
+                                     if libraries[name] != pins[name]],
+            "cgroup": gate_preflight.cgroup_memory_limits()}
 
 
 def overall(steps: dict[str, dict]) -> str:

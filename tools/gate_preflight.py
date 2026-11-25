@@ -17,6 +17,9 @@ be. A partial run checks only what its steps need: a missing SITL binary
 never blocks a corpus scan, and local_paths.json is required only when a
 step reads it -- snapshots, or a corpus named in the file rather than given
 with --corpus.
+
+The run also has to sit under a finite cgroup memory cap, on cgroup v2: the
+gate's record names the cap it ran under, and a run without one is refused.
 """
 
 from __future__ import annotations
@@ -49,6 +52,16 @@ MIN_FREE_DISK_GB = 10.0
 # 8 GB available the OOM killer can land mid-corpus, which would read as a
 # gate failure rather than a full machine.
 MIN_AVAILABLE_MEM_GB = 8.0
+
+# MemAvailable says what the machine has spare. Only the process's own cgroup
+# says what this run may take before the OOM killer comes for it, and a run
+# without a cap has no such number. cgroup v2 names the cgroup in
+# /proc/self/cgroup as "0::/path", and its limits are files under the
+# cgroup2 mount: a byte count, or "max" for no limit.
+PROC_CGROUP = "/proc/self/cgroup"
+CGROUP_ROOT = "/sys/fs/cgroup"
+CGROUP_LIMITS = (("memory_max", "memory.max"),
+                 ("memory_swap_max", "memory.swap.max"))
 
 # The binaries _launch() in tests/sitl/generate_logs.py flies, under
 # <sitl_dir>/build/sitl/bin/.
@@ -128,6 +141,58 @@ def available_memory_bytes() -> int | None:
     except (OSError, ValueError, IndexError):
         return None
     return None
+
+
+def cgroup_memory_limits(proc_cgroup: str = PROC_CGROUP,
+                         cgroup_root: str = CGROUP_ROOT) -> dict:
+    """The memory caps on this process's own cgroup, or why they are unknown.
+
+    The dict is the gate record's entry as it stands:
+
+        {"cgroup": "/user.slice/user-1000.slice/user@1000.service/"
+                   "app.slice/run-1234.scope",
+         "memory_max": 12884901888, "memory_swap_max": 0}
+
+    A limit that is missing, unreadable or "max" is None and "error" says
+    which and why; nothing here turns an unknown into a number. Only the
+    process's own cgroup is read: a cap on an ancestor does not count, since
+    the documented command puts the limit on the scope the gate runs in.
+    """
+    limits = {"cgroup": None, "memory_max": None, "memory_swap_max": None}
+    # errors="replace": a path that is not ASCII then names no directory
+    # and fails below, as unreadable, rather than raising here.
+    try:
+        with open(proc_cgroup, encoding="ascii", errors="replace") as f:
+            lines = f.read().splitlines()
+    except OSError as e:
+        return {**limits, "error": f"cannot read {proc_cgroup}: {e}"}
+    path = next((line[3:] for line in lines if line.startswith("0::")), None)
+    if path is None:
+        return {**limits, "error": (
+            f"{proc_cgroup} names no cgroup v2 hierarchy (cgroup v1?), so "
+            f"its memory limit is not read here")}
+    limits["cgroup"] = path
+    directory = cgroup_root.rstrip("/") + path
+    for key, name in CGROUP_LIMITS:
+        try:
+            with open(os.path.join(directory, name), encoding="ascii",
+                      errors="replace") as f:
+                value = f.read().strip()
+        except OSError as e:
+            return {**limits,
+                    "error": f"cannot read {name} in {directory}: {e}"}
+        if value == "max":
+            return {**limits, "error": (
+                f"{name} is max in {directory}: no memory cap. Start the "
+                f"gate under one, for example: systemd-run --user --scope "
+                f"-p MemoryMax=12G -p MemorySwapMax=0 -- python3 "
+                f"tools/release_gate.py")}
+        try:
+            limits[key] = int(value)
+        except ValueError:
+            return {**limits, "error": (
+                f"{name} is {value!r} in {directory}, not a byte count")}
+    return limits
 
 
 def sitl_bin_dir(sitl_dir: str, repo_root: str) -> str:
@@ -224,6 +289,16 @@ def run_checks(sitl_dir: str, steps: list[str], corpora: dict[str, str],
         report(available >= MIN_AVAILABLE_MEM_GB * 1024 ** 3, "memory",
                f"{available / 1024 ** 3:.1f} GB available "
                f"(need {MIN_AVAILABLE_MEM_GB:.0f})")
+
+    caps = cgroup_memory_limits()
+    if caps["memory_max"] is None or caps["memory_swap_max"] is None:
+        report(False, "cgroup",
+               caps.get("error") or "a memory limit was not read")
+    else:
+        report(True, "cgroup",
+               f"memory.max {caps['memory_max'] / 1024 ** 3:.1f} GB, "
+               f"memory.swap.max {caps['memory_swap_max'] / 1024 ** 3:.1f} GB "
+               f"in {caps['cgroup']}")
 
     return failures
 

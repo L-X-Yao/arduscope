@@ -1,8 +1,9 @@
 """tools/gate_preflight.py: the checks that stop a doomed gate early.
 
 Every check runs against a fake repository root in tmp_path; the machine
-measurements (git, disk, memory) are stubbed except where a test exists to
-exercise them. No test runs the gate or touches the real corpora.
+measurements (git, disk, memory, the cgroup cap) are stubbed except where a
+test exists to exercise them. No test runs the gate or touches the real
+corpora.
 """
 
 from __future__ import annotations
@@ -25,6 +26,19 @@ pytestmark = pytest.mark.fast
 
 GB = 1024 ** 3
 
+# A run under systemd-run --scope -p MemoryMax=12G -p MemorySwapMax=0.
+CAPPED = {"cgroup": "/user.slice/run-1234.scope", "memory_max": 12 * GB,
+          "memory_swap_max": 0}
+
+
+def _uncapped(**overrides) -> dict:
+    """The entry for a run that sits under no cap, as the reader writes it."""
+    return {"cgroup": "/init.scope", "memory_max": None,
+            "memory_swap_max": None,
+            "error": "memory.max is max in /sys/fs/cgroup/init.scope: no "
+                     "memory cap. Start the gate under one",
+            **overrides}
+
 
 @pytest.fixture
 def repo(tmp_path, monkeypatch):
@@ -37,6 +51,7 @@ def repo(tmp_path, monkeypatch):
     monkeypatch.setattr(gp.shutil, "disk_usage",
                         lambda path: SimpleNamespace(free=100 * GB))
     monkeypatch.setattr(gp, "available_memory_bytes", lambda: 16 * GB)
+    monkeypatch.setattr(gp, "cgroup_memory_limits", lambda: dict(CAPPED))
     monkeypatch.delenv("ARDUSCOPE_LOG_CACHE", raising=False)
     return tmp_path
 
@@ -68,9 +83,14 @@ class TestChecks:
         _sitl_binaries(repo)
         assert _run(repo, steps=gp.STEPS, from_config=True) == []
         out = capsys.readouterr().out
-        assert out.count("PASS ") == 6  # tree, local_paths, sitl, corpus,
-        # disk, memory
+        assert out.count("PASS ") == 7  # tree, local_paths, sitl, corpus,
+        # disk, memory, cgroup
         assert "FAIL" not in out
+
+    def test_the_cap_is_checked_whatever_the_steps(self, repo, monkeypatch):
+        """It is not a step's need but the run's: a partial run gets it too."""
+        monkeypatch.setattr(gp, "cgroup_memory_limits", _uncapped)
+        assert "cgroup" in _run(repo, steps=("sitl",))
 
     def test_a_missing_sitl_binary_fails(self, repo, capsys):
         failures = _run(repo, steps=("sitl",), sitl_dir=str(repo / "ardupilot"))
@@ -217,6 +237,7 @@ class TestDisk:
                                     100 * GB)))
         monkeypatch.setattr(gp, "_tree_state", lambda root: (False, "clean"))
         monkeypatch.setattr(gp, "available_memory_bytes", lambda: 16 * GB)
+        monkeypatch.setattr(gp, "cgroup_memory_limits", lambda: dict(CAPPED))
         return repo
 
     def test_the_cache_disk_counts_when_it_is_elsewhere(self, tmp_path,
@@ -277,6 +298,157 @@ class TestTheTreeCheck:
         assert not gp.tree_dirty(str(tmp_path))
         (tmp_path / "stray.txt").write_text("x", encoding="utf-8")
         assert gp.tree_dirty(str(tmp_path))
+
+
+class TestCgroupCap:
+    """The rule is that the gate runs under a memory cap. Nothing refused a
+    run without one, and a record could not say what its run sat under."""
+
+    def test_a_finite_cap_passes_and_is_named(self, repo, capsys):
+        assert _run(repo) == []
+        assert ("PASS cgroup: memory.max 12.0 GB, memory.swap.max 0.0 GB "
+                "in /user.slice/run-1234.scope") in capsys.readouterr().out
+
+    def test_no_cap_fails(self, repo, monkeypatch, capsys):
+        """memory.max is max: there is no limit to run under."""
+        monkeypatch.setattr(gp, "cgroup_memory_limits", _uncapped)
+        assert _run(repo) == ["cgroup"]
+        assert "FAIL cgroup: memory.max is max" in capsys.readouterr().out
+
+    def test_unlimited_swap_fails_under_a_memory_cap(self, repo, monkeypatch):
+        """MemoryMax alone leaves the swap unlimited: the cap covers both."""
+        half = _uncapped(memory_max=12 * GB, memory_swap_max=None,
+                         error="memory.swap.max is max in /run-1234.scope")
+        monkeypatch.setattr(gp, "cgroup_memory_limits", lambda: half)
+        assert _run(repo, steps=("ci_local",)) == ["cgroup"]
+
+    def test_an_unreadable_limit_fails(self, repo, monkeypatch, capsys):
+        unreadable = _uncapped(error="cannot read memory.max in "
+                                     "/sys/fs/cgroup/run-1.scope: "
+                                     "[Errno 13] Permission denied")
+        monkeypatch.setattr(gp, "cgroup_memory_limits", lambda: unreadable)
+        assert _run(repo) == ["cgroup"]
+        assert "cannot read memory.max" in capsys.readouterr().out
+
+    def test_a_limit_left_unread_fails_even_when_nothing_says_why(
+            self, repo, monkeypatch, capsys):
+        """The limits decide, not the message that comes with them."""
+        silent = {"cgroup": "/run-1.scope", "memory_max": 12 * GB,
+                  "memory_swap_max": None}
+        monkeypatch.setattr(gp, "cgroup_memory_limits", lambda: silent)
+        assert _run(repo) == ["cgroup"]
+        assert "FAIL cgroup: a memory limit was not read" in \
+            capsys.readouterr().out
+
+
+class TestCgroupReader:
+    """cgroup_memory_limits on files laid out the way cgroup v2 writes them.
+    Nothing here reads this machine's own cgroup."""
+
+    def _machine(self, tmp_path, cgroup="/run-1.scope", proc="v2",
+                 memory_max="max", memory_swap_max="max", named=None):
+        """A cgroup2 root with one cgroup's two files. proc "v2" names the
+        cgroup on cgroup v2, "v1" on v1 only, None writes no file. A limit of
+        None leaves its file out; named is what the proc file calls it when
+        that differs from where it is."""
+        root = tmp_path / "cgroup"
+        directory = root / cgroup.strip("/")
+        directory.mkdir(parents=True)
+        for name, value in (("memory.max", memory_max),
+                            ("memory.swap.max", memory_swap_max)):
+            if value is not None:
+                (directory / name).write_text(value + "\n", encoding="ascii")
+        path = tmp_path / "self.cgroup"
+        if proc == "v2":
+            # A cgroup v1 line comes first, as under systemd: the reader has
+            # to take the "0::" one.
+            path.write_text(f"11:cpu,cpuacct:{named or cgroup}\n"
+                            f"0::{named or cgroup}\n", encoding="ascii")
+        elif proc == "v1":
+            path.write_text("12:memory:/user.slice/1000.slice\n",
+                            encoding="ascii")
+        return str(path), str(root)
+
+    def _read(self, tmp_path, **kwargs) -> dict:
+        named, root = self._machine(tmp_path, **kwargs)
+        return gp.cgroup_memory_limits(named, root)
+
+    def test_byte_counts_are_read(self, tmp_path):
+        assert self._read(tmp_path, memory_max="12884901888",
+                          memory_swap_max="0") == {
+            "cgroup": "/run-1.scope", "memory_max": 12884901888,
+            "memory_swap_max": 0}
+
+    def test_max_is_no_limit(self, tmp_path):
+        limits = self._read(tmp_path, memory_max="max", memory_swap_max="0")
+        assert limits["memory_max"] is None and "error" in limits
+        assert ("memory.max is max in "
+                + str(tmp_path / "cgroup" / "run-1.scope")
+                + ": no memory cap") in limits["error"]
+        assert "MemorySwapMax" in limits["error"]  # the way out is named
+
+    def test_an_unlimited_swap_keeps_the_memory_limit(self, tmp_path):
+        limits = self._read(tmp_path, memory_max="12884901888",
+                            memory_swap_max="max")
+        assert limits["memory_max"] == 12884901888
+        assert limits["memory_swap_max"] is None
+        assert "memory.swap.max is max" in limits["error"]
+
+    def test_a_missing_file_is_unreadable(self, tmp_path):
+        limits = self._read(tmp_path, memory_max="12884901888",
+                            memory_swap_max=None)
+        assert limits["memory_max"] == 12884901888
+        assert limits["memory_swap_max"] is None
+        assert ("cannot read memory.swap.max in "
+                + str(tmp_path / "cgroup" / "run-1.scope")) in limits["error"]
+
+    def test_a_cgroup_missing_under_the_root_is_unreadable(self, tmp_path):
+        """A container can name a cgroup by its path on the host."""
+        limits = self._read(tmp_path, named="/system.slice/docker-1.scope",
+                            memory_max="1", memory_swap_max="0")
+        assert limits["cgroup"] == "/system.slice/docker-1.scope"
+        assert limits["memory_max"] is None
+        assert "cannot read memory.max in" in limits["error"]
+
+    def test_a_v1_hierarchy_is_not_read(self, tmp_path):
+        limits = self._read(tmp_path, proc="v1", memory_max="1",
+                            memory_swap_max="0")
+        assert limits["memory_max"] is None and limits["cgroup"] is None
+        assert "no cgroup v2 hierarchy" in limits["error"]
+
+    def test_a_missing_proc_file_is_unreadable(self, tmp_path):
+        limits = self._read(tmp_path, proc=None, memory_max="1",
+                            memory_swap_max="0")
+        assert limits["memory_max"] is None
+        assert "cannot read" in limits["error"]
+
+    def test_something_other_than_bytes_is_unreadable(self, tmp_path):
+        limits = self._read(tmp_path, memory_max="12 GB", memory_swap_max="0")
+        assert limits["memory_max"] is None
+        assert "'12 GB'" in limits["error"] and "not a byte count" in \
+            limits["error"]
+
+    def test_the_root_is_joined_without_a_double_slash(self, tmp_path):
+        """The cgroup at the root of the mount names itself with one slash."""
+        named, root = self._machine(tmp_path, cgroup="/", memory_max="1",
+                                    memory_swap_max="0")
+        limits = gp.cgroup_memory_limits(named, root.rstrip("/"))
+        assert limits == {"cgroup": "/", "memory_max": 1, "memory_swap_max": 0}
+
+
+class TestTheRecordNamesTheCap:
+    """environment() is what the gate writes into its result."""
+
+    def test_the_entry_is_the_readers_entry(self, monkeypatch):
+        monkeypatch.setattr(gp, "cgroup_memory_limits", lambda: dict(CAPPED))
+        assert gate.environment(version=lambda name: None)["cgroup"] == CAPPED
+
+    def test_a_run_without_a_cap_says_so_in_the_record(self, monkeypatch):
+        """The preflight stops such a run first; were one recorded anyway,
+        the entry would not pretend to a limit."""
+        monkeypatch.setattr(gp, "cgroup_memory_limits", _uncapped)
+        entry = gate.environment(version=lambda name: None)["cgroup"]
+        assert entry["memory_max"] is None and "no memory cap" in entry["error"]
 
 
 class TestWiring:

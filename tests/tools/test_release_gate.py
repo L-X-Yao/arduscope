@@ -204,6 +204,17 @@ class TestRunGate:
         assert gate.run_gate(self._args()) == 0
         assert gate.passed("abc")
 
+    def test_the_record_names_the_memory_cap(self, dirs, monkeypatch):
+        """The cap the run sat under is written with the commit it passed."""
+        capped = {"cgroup": "/user.slice/run-1234.scope",
+                  "memory_max": 12 * 1024 ** 3, "memory_swap_max": 0}
+        self._fake(monkeypatch)
+        monkeypatch.setattr(gate_preflight, "cgroup_memory_limits",
+                            lambda: dict(capped))
+        assert gate.run_gate(self._args()) == 0
+        record = json.loads(Path(gate.result_path("abc")).read_text("utf-8"))
+        assert record["environment"]["cgroup"] == capped
+
     def test_a_corpus_override_reaches_the_preflight(self, dirs, monkeypatch):
         seen = {}
         self._fake(monkeypatch)
