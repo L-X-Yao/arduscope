@@ -126,6 +126,15 @@ class TestReadingTheVersion:
         with pytest.raises(crt.TagError, match="__version__"):
             crt.check("v0.0.2")
 
+    def test_a_star_import_is_refused_before_the_tag_is_trusted(
+            self, work):
+        """What a star import binds is decided at run time: the reader
+        cannot see whether __version__ is among it."""
+        _commit_file(work, '__version__ = "0.0.2"\nfrom foo import *\n',
+                     "v0.0.2")
+        with pytest.raises(crt.TagError, match=r"imports \* at line 2"):
+            crt.check("v0.0.2")
+
     def test_a_leading_zero_is_refused_whatever_the_file_says(self, work):
         """Name and file agree, and both are refused: 01.0.0 is 1.0.0 to
         setuptools, so the wheel would not carry the tag's version."""
@@ -153,6 +162,12 @@ class TestReadingTheVersion:
     ('__version__ = "0.14" ".4"\n', "0.14.4"),  # one string to Python
     ('__version__ = "0.14.4"  # a comment after it\n', "0.14.4"),
     ('__version__ = "0.14.4"\nprint(__version__)\n', "0.14.4"),  # a use
+    # Imports that bind nothing this file names.
+    ('__version__ = "0.14.4"\nimport foo\n', "0.14.4"),
+    ('import foo\nfrom foo import bar\n__version__ = "0.14.4"\n', "0.14.4"),
+    ('__version__ = "0.14.4"\nimport __version__ as v\n', "0.14.4"),
+    ('__version__ = "0.14.4"\nfrom foo import __version__ as v\n',
+     "0.14.4"),
 ])
 def test_the_one_assignment_is_read_as_code(source, expected):
     assert version_source.source_version(source, "x.py") == expected
@@ -178,6 +193,17 @@ def test_the_one_assignment_is_read_as_code(source, expected):
     ("from somewhere import __version__\n", "by import"),
     ("from somewhere import thing as __version__\n", "by import"),
     ("import somewhere as __version__\n", "by import"),
+    # An import that names no other name binds the one it names.
+    ("import __version__\n", "by import"),
+    ("import __version__.sub\n", "by import"),
+    ('__version__ = "0.14.4"\nimport __version__\n', "2 times"),
+    # A star import can bind anything, and does not say what.
+    ('__version__ = "0.14.4"\nfrom foo import *\n',
+     r"imports \* at line 2"),
+    ("from foo import *\n", r"imports \* at line 1"),
+    ("from . import *\n", r"imports \* at line 1"),
+    ("try:\n    from foo import *\nexcept ImportError:\n    pass\n",
+     r"imports \* at line 2"),
     ("def f(__version__):\n    return __version__\n", "as a parameter"),
     ("f = lambda __version__: __version__\n", "as a parameter"),
     ("try:\n    pass\nexcept NameError as __version__:\n    pass\n",

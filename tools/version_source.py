@@ -12,9 +12,10 @@ a tag that is a version older than the one before it.
 
 __version__ has to be bound exactly once in the module, by a plain
 assignment of a string at module level. Any other binding of the name, an
-augmented assignment or one under an if, an import that brings the name in,
-a tuple target, would leave the version setuptools reads, the first static
-value, different from the one the imported module reports.
+augmented assignment or one under an if, an import of it, a tuple target,
+would leave the version setuptools reads, the first static value, different
+from the one the imported module reports. A star import is refused as well:
+it could bind the name with nothing in the file to show it.
 """
 
 from __future__ import annotations
@@ -52,8 +53,10 @@ def _bindings(tree: ast.AST) -> list[tuple[ast.AST, str, int]]:
             elif isinstance(node.ctx, ast.Del):
                 found.append((node, "by deletion", line))
         elif isinstance(node, ast.Import):
+            # import a.b binds a, import a.b as c binds c.
             found += [(alias, "by import", line) for alias in node.names
-                      if alias.asname == NAME]
+                      if (alias.asname or alias.name.partition(".")[0])
+                      == NAME]
         elif isinstance(node, ast.ImportFrom):
             found += [(alias, "by import", line) for alias in node.names
                       if (alias.asname or alias.name) == NAME]
@@ -87,20 +90,38 @@ def _target(statement: ast.stmt) -> ast.expr | None:
     return None
 
 
+def _star_import(tree: ast.AST) -> int:
+    """The line of the first star import in the module, or 0 when there is
+    none. What a star import binds is settled when the module runs, so the
+    name could be among it with nothing here the wiser."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and any(
+                alias.name == "*" for alias in node.names):
+            return node.lineno
+    return 0
+
+
 def version_assignment(source: bytes | str, where: str) -> ast.stmt:
     """The one assignment of a string to __version__ at module level.
 
-    Refused, rather than guessed at: no binding at all; more than one, be
-    the second an assignment under an if or an augmented one; the one
-    binding made by anything but a plain assignment; a value that is not a
-    string.
+    Refused, rather than guessed at: a star import, which could bind the
+    name unseen; no binding at all; more than one, be the second an
+    assignment under an if, an augmented one or an import of the name; the
+    one binding made by anything but a plain assignment; a value that is
+    not a string.
     """
     tree = _tree(source, where)
+    star = _star_import(tree)
+    if star:
+        raise VersionSourceError(
+            f"{where} imports * at line {star}: what that binds is not to "
+            f"be seen here, {NAME} included")
     bindings = _bindings(tree)
     if not bindings:
         raise VersionSourceError(f"{where} does not bind {NAME}")
     if len(bindings) > 1:
-        lines = ", ".join(str(line) for _, _, line in bindings)
+        lines = ", ".join(sorted({str(line) for _, _, line in bindings},
+                                 key=int))
         raise VersionSourceError(
             f"{where} binds {NAME} {len(bindings)} times (lines {lines}), "
             f"not once")

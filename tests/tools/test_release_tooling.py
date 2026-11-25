@@ -455,6 +455,9 @@ class TestTheVersionFile:
         ("from somewhere import __version__\n", "by import"),
         ('if True:\n    __version__ = "0.14.4"\n',
          "not by one plain assignment"),
+        ('__version__ = "0.14.4"\nimport __version__\n', "2 times"),
+        ('__version__ = "0.14.4"\nfrom foo import *\n',
+         r"imports \* at line 2"),
     ])
     def test_no_one_plain_assignment_stops_the_release_before_anything(
             self, tmp_path, monkeypatch, text, message):
