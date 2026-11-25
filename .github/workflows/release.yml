@@ -10,18 +10,16 @@ permissions:
   contents: read
 
 jobs:
-  ci:
-    uses: ./.github/workflows/ci.yml
-
-  build:
-    needs: ci
+  # The tag is checked before anything runs that builds, the reusable CI
+  # included. A malformed tag, one whose commit is not on main, or one whose
+  # version is not the tagged commit's ends the run here, with no wheel, no
+  # zip and no draft. The version it confirms is passed on to build.
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: write
-
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
     steps:
-      # All of the history, and every branch: the tag check places the tagged
+      # All of the history, and every branch: the check places the tagged
       # commit against origin/main.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -30,12 +28,23 @@ jobs:
       - name: Fetch main
         run: git fetch origin main
 
-      # A malformed tag, one whose commit is not on main, or one whose version
-      # is not the tagged commit's stops here: nothing is built and no draft
-      # is made. The step also names the version for the package and the notes.
       - name: Check the release tag
-        id: version
+        id: tag
         run: python3 tools/check_release_tag.py
+
+  ci:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: [validate, ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
@@ -57,7 +66,7 @@ jobs:
       - name: Build standalone Windows package
         run: >-
           python build_windows_package.py
-          --output arduscope-v${{ steps.version.outputs.version }}-win64.zip
+          --output arduscope-v${{ needs.validate.outputs.version }}-win64.zip
 
       - name: Generate release notes from CHANGELOG
         id: notes
@@ -65,7 +74,7 @@ jobs:
           python -c "
           import re, sys
           text = open('CHANGELOG.md').read()
-          ver = '${{ steps.version.outputs.version }}'
+          ver = '${{ needs.validate.outputs.version }}'
           pattern = rf'## \[{re.escape(ver)}\].*?\n(.*?)(?=\n## |\Z)'
           m = re.search(pattern, text, re.DOTALL)
           if m:

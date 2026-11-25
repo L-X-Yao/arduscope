@@ -17,6 +17,7 @@ import os
 import re
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -29,6 +30,7 @@ pytestmark = pytest.mark.fast
 
 @pytest.mark.parametrize("tag, version", [
     ("v0.14.4", "0.14.4"), ("v1.0.0", "1.0.0"), ("v0.0.1", "0.0.1"),
+    ("v10.100.1000", "10.100.1000"),
 ])
 def test_a_release_tag_names_its_version(tag, version):
     assert crt.tag_version(tag) == version
@@ -42,6 +44,10 @@ def test_a_release_tag_names_its_version(tag, version):
     "V0.14.4",  # an upper-case v
     "v0.14.4\n",  # a trailing newline, which a bare $ lets through
     "v0.14.4 ", " v0.14.4", "v0.14.a", "vv0.14.4", "",
+    # Another way of writing the same number. setuptools normalises it on
+    # the wheel and the sdist; the tag, which names the Windows package,
+    # would keep the zero.
+    "v01.14.0", "v0.014.4", "v0.14.04", "v00.0.0",
 ])
 def test_any_other_tag_is_not_a_release(tag):
     with pytest.raises(crt.TagError, match="not vX.Y.Z"):
@@ -68,6 +74,92 @@ def _release(work, version: str, *, push=True, annotated=False) -> str:
     return tag
 
 
+def _commit_file(work, text: str, tag: str) -> None:
+    """A commit holding this version file, tagged and pushed, so that only
+    what the file says is at issue."""
+    (work / gitrepo.VERSION_FILE).write_text(text, encoding="utf-8")
+    gitrepo.git(work, "add", str(gitrepo.VERSION_FILE))
+    gitrepo.git(work, "commit", "-q", "-m", "version file")
+    gitrepo.git(work, "tag", tag)
+    gitrepo.git(work, "push", "-q", "origin", "main")
+
+
+class TestReadingTheVersion:
+    """__version__ comes from the tagged commit, and is read as code."""
+
+    def test_the_working_tree_is_not_consulted(self, work):
+        """The workflow happens to have the tagged commit checked out. Run
+        from any other tree, the file on disk can say anything."""
+        gitrepo.git(work, "tag", "v0.0.2")  # on a commit that says 0.0.1
+        gitrepo.write_version(work, "0.0.2")  # uncommitted
+        with pytest.raises(crt.TagError, match=(
+                r"tag v0\.0\.2 releases 0\.0\.2, but "
+                r"src/arduscope/__init__\.py in the tagged commit says "
+                r"0\.0\.1")):
+            crt.check("v0.0.2")
+
+    def test_a_comment_that_spells_an_assignment_is_not_one(self, work):
+        _commit_file(work, '# __version__ = "0.0.0"\n'
+                           '__version__ = "0.0.2"\n', "v0.0.2")
+        assert crt.check("v0.0.2") == "0.0.2"
+
+    def test_two_assignments_are_refused(self, work):
+        _commit_file(work, '__version__ = "0.0.2"\n__version__ = "0.0.3"\n',
+                     "v0.0.2")
+        with pytest.raises(crt.TagError, match="assigns __version__ 2 times"):
+            crt.check("v0.0.2")
+
+    def test_a_file_with_no_assignment_is_refused(self, work):
+        _commit_file(work, '# __version__ = "0.0.2"\n', "v0.0.2")
+        with pytest.raises(crt.TagError, match="assigns __version__ 0 times"):
+            crt.check("v0.0.2")
+
+    def test_a_leading_zero_is_refused_whatever_the_file_says(self, work):
+        """Name and file agree, and both are refused: 01.0.0 is 1.0.0 to
+        setuptools, so the wheel would not carry the tag's version."""
+        _commit_file(work, '__version__ = "01.0.0"\n', "v01.0.0")
+        with pytest.raises(crt.TagError, match="leading zero"):
+            crt.check("v01.0.0")
+
+    def test_a_tag_whose_commit_has_no_version_file_is_refused(self, work):
+        gitrepo.git(work, "rm", "-q", str(gitrepo.VERSION_FILE))
+        gitrepo.git(work, "commit", "-q", "-m", "no version file")
+        gitrepo.git(work, "tag", "v0.0.2")
+        with pytest.raises(crt.TagError, match=(
+                r"could not read src/arduscope/__init__\.py from tag v0\.0\.2")):
+            crt.check("v0.0.2")
+
+
+@pytest.mark.parametrize("source, expected", [
+    (b'__version__ = "0.14.4"\n', "0.14.4"),
+    ('# __version__ = "0.0.0"\n__version__ = "0.14.4"\n', "0.14.4"),
+    ('"""A docstring in which __version__ = "0.0.0" is mentioned."""\n'
+     '__version__ = "0.14.4"\n', "0.14.4"),
+    ('__version__: str = "0.14.4"\n', "0.14.4"),
+    ('__version__ = "0.14" ".4"\n', "0.14.4"),  # one string to Python
+    ('__version__ = "0.14.4"  # a comment after it\n', "0.14.4"),
+])
+def test_the_one_assignment_is_read_as_code(source, expected):
+    assert crt.source_version(source, "x.py") == expected
+
+
+@pytest.mark.parametrize("source, message", [
+    ('__version__ = "0.14.4"\n__version__ = "0.14.5"\n', "2 times"),
+    ("", "0 times"),
+    ('# __version__ = "0.14.4"\n', "0 times"),
+    ('if True:\n    __version__ = "0.14.4"\n', "0 times"),
+    ("__version__ = 1\n", "not a plain string"),
+    ('__version__ = f"0.14.4"\n', "not a plain string"),
+    ('__version__ = "0.14" + ".4"\n', "not a plain string"),
+    ("__version__ = None\n", "not a plain string"),
+    ("__version__: str\n", "not a plain string"),
+    ("def (:\n", "does not parse"),
+])
+def test_anything_else_is_refused_rather_than_guessed(source, message):
+    with pytest.raises(crt.TagError, match=message):
+        crt.source_version(source, "x.py")
+
+
 class TestTheTaggedCommit:
     """The tag has to agree with the commit it points at, and that commit
     has to be on main."""
@@ -83,14 +175,14 @@ class TestTheTaggedCommit:
         _release(work, "0.0.2")
         gitrepo.git(work, "tag", "v0.0.3")
         with pytest.raises(crt.TagError, match=(
-                r"tag v0.0.3 releases 0\.0\.3, but "
-                r"src/arduscope/__init__\.py says 0\.0\.2")):
+                r"tag v0\.0\.3 releases 0\.0\.3, but "
+                r"src/arduscope/__init__\.py in the tagged commit says "
+                r"0\.0\.2")):
             crt.check("v0.0.3")
 
     def test_a_tag_on_an_unpushed_commit_fails(self, work):
-        """Level with origin is the release's own rule; this one is the
-        workflow's, and a tag made from a clone that never pushed meets it
-        here."""
+        """The workflow's own rule, as release.py's is for the run that made
+        the tag: a tag pushed from a clone that never pushed main."""
         tag = _release(work, "0.0.2", push=False)
         with pytest.raises(crt.TagError, match="not on origin/main"):
             crt.check(tag)
@@ -107,8 +199,9 @@ class TestTheTaggedCommit:
             self, work):
         """The working tree can say 0.0.2 without any tag naming it."""
         gitrepo.write_version(work, "0.0.2")
-        with pytest.raises(crt.TagError, match="could not place "
-                                               r"refs/tags/v0\.0\.2"):
+        with pytest.raises(crt.TagError, match="could not read "
+                                               r"src/arduscope/__init__\.py "
+                                               r"from tag v0\.0\.2"):
             crt.check("v0.0.2")
 
     def test_no_origin_main_here_is_an_error_not_a_verdict(self, work):
@@ -118,20 +211,52 @@ class TestTheTaggedCommit:
         with pytest.raises(crt.TagError, match="could not place"):
             crt.check(tag)
 
-    def test_a_version_file_with_no_version_fails(self, work, tmp_path):
-        (work / gitrepo.VERSION_FILE).write_text("# nothing\n",
-                                                 encoding="utf-8")
-        with pytest.raises(crt.TagError, match="no __version__"):
-            crt.check("v0.0.2")
-
-    def test_a_missing_version_file_fails(self, work, monkeypatch):
-        monkeypatch.chdir(work.parent)
-        with pytest.raises(OSError):
-            crt.check("v0.0.2")
-
     def test_a_malformed_tag_is_refused_before_git_is_asked(self, work):
         with pytest.raises(crt.TagError, match="not vX.Y.Z"):
             crt.check("v0.14")
+
+
+class TestMainByItsFullName:
+    """git takes refs/tags/<name> before refs/remotes/<name>. Asked for
+    "origin/main", a tag of that name answers for the branch."""
+
+    def test_main_is_a_remote_tracking_ref_by_its_full_name(self):
+        assert crt.MAIN_REF == "refs/remotes/origin/main"
+
+    def test_a_local_tag_named_origin_main_cannot_vouch_for_an_off_main_tag(
+            self, work):
+        tag = _release(work, "0.0.2", push=False)
+        gitrepo.git(work, "tag", "origin/main", tag)
+        with pytest.raises(crt.TagError, match="not on origin/main"):
+            crt.check(tag)
+
+    def test_the_ancestry_question_names_the_full_ref(self, work, monkeypatch):
+        tag = _release(work, "0.0.2")
+        asked = []
+
+        def git(command, **kwargs):
+            asked.append(command)
+            if command[1] == "show":
+                return SimpleNamespace(
+                    returncode=0,
+                    stdout=(work / gitrepo.VERSION_FILE).read_bytes(),
+                    stderr=b"")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr(crt.subprocess, "run", git)
+        assert crt.check(tag) == "0.0.2"
+        assert asked == [
+            ["git", "show",
+             "refs/tags/v0.0.2^{commit}:src/arduscope/__init__.py"],
+            ["git", "merge-base", "--is-ancestor",
+             "refs/tags/v0.0.2^{commit}", "refs/remotes/origin/main"],
+        ]
+
+    def test_a_main_that_is_not_a_full_ref_name_is_refused(self, work):
+        tag = _release(work, "0.0.2")
+        with pytest.raises(crt.TagError, match="not a full ref name"):
+            crt.check(tag, "origin/main")
+        assert crt.main(["--tag", tag, "--main-ref", "origin/main"]) == 1
 
 
 class TestTheStepOutput:
@@ -165,7 +290,7 @@ class TestMain:
         assert crt.main(["--tag", tag]) == 0
         assert output.read_text(encoding="utf-8") == "version=0.0.2\n"
 
-    @pytest.mark.parametrize("tag", ["v0.14", "0.0.2", "v0.0.3"])
+    @pytest.mark.parametrize("tag", ["v0.14", "v01.0.2", "0.0.2", "v0.0.3"])
     def test_a_tag_that_cannot_be_built_fails(self, work, monkeypatch, capsys,
                                               tag):
         _release(work, "0.0.2")
@@ -188,39 +313,71 @@ class TestMain:
         assert not output.exists()
 
 
-class TestTheWorkflowStep:
-    """release.yml reads: the check cannot be dropped from it, or moved
-    behind the build, unnoticed."""
+class TestTheWorkflow:
+    """release.yml reads: the check has its own job, ahead of everything
+    that builds, and cannot be dropped from it or moved behind the build
+    unnoticed."""
 
     WORKFLOW = (TOOLS_DIR.parent / ".github" / "workflows" / "release.yml"
                 ).read_text()
 
-    def test_the_tag_is_checked_before_anything_is_built(self):
-        """A malformed tag, one off main, or one whose version is not the
-        tagged commit's stops here: no wheel, no zip, no draft."""
+    @classmethod
+    def job(cls, name: str, until: str) -> str:
+        return cls.WORKFLOW.split(f"\n  {name}:", 1)[1].split(f"\n  {until}:",
+                                                              1)[0]
+
+    def test_the_tag_is_checked_in_the_first_job(self):
+        """Before the reusable CI, which builds a wheel, and before build,
+        which makes the zip and the draft."""
         workflow = self.WORKFLOW
         checked = workflow.index("tools/check_release_tag.py")
-        for later in ("python -m build", "build_windows_package.py",
+        jobs = workflow.index("\njobs:")
+        validate = workflow.index("\n  validate:")
+        ci = workflow.index("\n  ci:")
+        build = workflow.index("\n  build:")
+        assert jobs < validate < checked < ci < build
+        for built in ("python -m build", "build_windows_package.py",
                       "softprops/action-gh-release"):
-            assert checked < workflow.index(later), later
+            assert build < workflow.index(built), built
+
+    def test_nothing_in_the_validating_job_builds(self):
+        """Not even the reusable CI, which builds a wheel of its own."""
+        validate = self.job("validate", "ci")
+        for built in ("pip install", "python -m build",
+                      "build_windows_package.py", "setup-python",
+                      "uses: ./.github/workflows"):
+            assert built not in validate, built
+        assert "permissions" not in validate  # the workflow's read is enough
 
     def test_the_check_sees_main(self):
         """It places the tagged commit against origin/main, which takes the
         whole history and a fetch of main, before it runs."""
-        build_job = self.WORKFLOW.split("\n  build:", 1)[1]
-        checkout, _ = build_job.split("tools/check_release_tag.py", 1)
+        validate = self.job("validate", "ci")
+        checkout, _ = validate.split("tools/check_release_tag.py", 1)
         assert re.search(r"fetch-depth: 0$", checkout, re.M)
         assert "git fetch origin main" in checkout
 
-    def test_the_version_the_later_steps_read_comes_from_the_check(self):
-        """The zip and the notes read steps.version.outputs.version. Only
-        the check writes it now: it strips the v once it has agreed with
-        the tag, and writes nothing when it has not."""
+    def test_the_version_leaves_the_validating_job_as_its_output(self):
+        validate = self.job("validate", "ci")
         assert re.search(
-            r"id: version\n\s+run: python3 tools/check_release_tag.py",
-            self.WORKFLOW)
-        assert self.WORKFLOW.count("id: version\n") == 1
+            r"^    outputs:\n      version: \$\{\{ steps\.tag\.outputs\.version \}\}$",
+            validate, re.M)
+        assert re.search(r"^        id: tag\n        run: python3 "
+                         r"tools/check_release_tag.py$", validate, re.M)
+
+    def test_both_later_jobs_need_it(self):
+        assert re.search(r"^    needs: validate$", self.job("ci", "build"),
+                         re.M)
+        assert re.search(r"^    needs: \[validate, ci\]$",
+                         self.job("build", "\0"), re.M)
+
+    def test_build_reads_the_version_it_confirmed(self):
+        """The zip and the notes take the version from the validating job:
+        a step of build's own no longer strips it off the tag."""
+        build = self.job("build", "\0")
+        assert build.count("${{ needs.validate.outputs.version }}") == 2
         assert "GITHUB_REF#" not in self.WORKFLOW
+        assert "steps.version.outputs" not in self.WORKFLOW
 
 
 class TestAsAProcess:
@@ -243,7 +400,10 @@ class TestAsAProcess:
 
     def test_a_bad_tag_exits_one_with_the_reason_on_stderr(self, work):
         _release(work, "0.0.2")
+        gitrepo.git(work, "tag", "v0.0.3")  # on the commit that says 0.0.2
         done = self._run(work, "--tag", "v0.0.3")
         assert done.returncode == 1
         assert done.stdout == "" and not (work / "output").exists()
-        assert "FAIL tag v0.0.3 releases 0.0.3" in done.stderr
+        assert ("FAIL tag v0.0.3 releases 0.0.3, but "
+                "src/arduscope/__init__.py in the tagged commit says 0.0.2"
+                in done.stderr)
