@@ -350,11 +350,19 @@ CGROUP_V1_MOUNT = ("31 22 0:27 / /sys/fs/cgroup/memory rw,nosuid,nodev "
                    "- cgroup cgroup memory")
 
 
+def _holding(tmp_path, relative: str, pid: int) -> None:
+    """A cgroup directory under tmp_path whose cgroup.procs names pid."""
+    directory = tmp_path / relative
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "cgroup.procs").write_text(f"{pid}\n", encoding="ascii")
+
+
 def _machine(tmp_path, cgroup="/run-1.scope", proc="v2", memory_max="max",
              memory_swap_max="max", named=None, mounts=None, where=None,
-             other=()):
+             other=(), members=(), strangers=()):
     """A mount table and a proc file naming a cgroup, with the cgroup's two
-    files somewhere under tmp_path. Returns the two files' paths.
+    files somewhere under tmp_path. Returns the paths of the proc file and
+    of the table.
 
     mounts is [(mount point, mount root)] as the table lists them, the
     default being one cgroup2 mount at <tmp>/cgroup over the whole
@@ -363,11 +371,19 @@ def _machine(tmp_path, cgroup="/run-1.scope", proc="v2", memory_max="max",
     "v1" on v1 only, None writes no file. A limit of None leaves its file
     out; `named` is what the proc file calls the cgroup when that differs
     from where it is. `other` lists more lines of the table.
+
+    `members` are cgroups, by their path under tmp_path, whose cgroup.procs
+    names the process running the test, as the reader's own does;
+    `strangers` are ones that hold someone else.
     """
     hierarchy = tmp_path / "cgroup"
     places = mounts if mounts is not None else [(str(hierarchy), "/")]
     directory = where if where is not None else hierarchy / cgroup.strip("/")
-    directory.mkdir(parents=True)
+    directory.mkdir(parents=True, exist_ok=True)
+    for relative in members:
+        _holding(tmp_path, relative, os.getpid())
+    for relative in strangers:
+        _holding(tmp_path, relative, 1)
     for name, value in (("memory.max", memory_max),
                         ("memory.swap.max", memory_swap_max)):
         if value is not None:
@@ -489,6 +505,21 @@ class TestWhereTheCgroupIs:
             "cgroup": "/system.slice/docker-1.scope/run-1.scope",
             "memory_max": 1, "memory_swap_max": 0}
 
+    def test_a_mount_root_with_a_trailing_slash_joins_the_same_way(
+            self, tmp_path):
+        """/machine/ is /machine: the path under it was being cut one
+        character short, /machine/run giving /cgrun."""
+        mounts = [("/cg", "/machine/")]
+        assert gp._cgroup_directory("/machine/run", mounts, 1) == "/cg/run"
+        assert gp._cgroup_directory("/machine", mounts, 1) == "/cg"
+        hierarchy = tmp_path / "cgroup"
+        limits = _read(tmp_path, cgroup="/machine/run-1.scope",
+                       mounts=[(str(hierarchy), "/machine/")],
+                       where=hierarchy / "run-1.scope",
+                       memory_max="1", memory_swap_max="0")
+        assert limits == {"cgroup": "/machine/run-1.scope", "memory_max": 1,
+                          "memory_swap_max": 0}
+
     def test_the_mount_rooted_nearest_takes_precedence(self, tmp_path):
         """Of two mounts that both show the cgroup, the one rooted nearer."""
         cgroup = tmp_path / "cgroup"
@@ -512,6 +543,101 @@ class TestWhereTheCgroupIs:
         assert ("/elsewhere/run-1.scope is under none of the mounted cgroup2 "
                 in limits["error"])
         assert "shows /machine/slice" in limits["error"]
+
+
+class TestInheritedFromOutsideTheNamespace:
+    """cgroup_namespaces(7), the anomaly it shows. Inside a cgroup namespace,
+    /proc/self/cgroup names the process's cgroup from the namespace's root
+    down, "/" for the root itself. A cgroup2 mount made before the namespace
+    was shows its root as /.., one .. for each level it lies above the
+    namespace's root, and the directory at the mount point is an ancestor's.
+    The process's cgroup is below it under a name the proc file no longer
+    gives, and is told by its cgroup.procs."""
+
+    def test_the_cgroup_holding_the_process_is_found_one_level_down(
+            self, tmp_path):
+        """The man page's session: /proc/self/cgroup says "/" and mountinfo
+        says "/.. /sys/fs/cgroup"."""
+        hierarchy = tmp_path / "cgroup"
+        limits = _read(tmp_path, cgroup="/",
+                       mounts=[(str(hierarchy), "/..")],
+                       where=hierarchy / "init.scope",
+                       members=["cgroup/init.scope"],
+                       strangers=["cgroup/other.scope",
+                                  "cgroup/system.slice"],
+                       memory_max="12884901888", memory_swap_max="0")
+        assert limits == {"cgroup": "/", "memory_max": 12884901888,
+                          "memory_swap_max": 0}
+
+    def test_a_cgroup_below_the_namespace_root_is_found_through_the_levels(
+            self, tmp_path):
+        """Two levels outside, and a sibling that holds the same relative
+        path but not this process."""
+        hierarchy = tmp_path / "cgroup"
+        limits = _read(
+            tmp_path, cgroup="/app.slice/run-1.scope",
+            mounts=[(str(hierarchy), "/../..")],
+            where=hierarchy / "user.slice" / "user-1000.slice" / "app.slice"
+            / "run-1.scope",
+            members=["cgroup/user.slice/user-1000.slice/app.slice/"
+                     "run-1.scope"],
+            strangers=["cgroup/system.slice/app.slice/run-1.scope"],
+            memory_max="1", memory_swap_max="0")
+        assert limits == {"cgroup": "/app.slice/run-1.scope",
+                          "memory_max": 1, "memory_swap_max": 0}
+
+    def test_when_no_directory_under_the_mount_holds_the_process(
+            self, tmp_path):
+        hierarchy = tmp_path / "cgroup"
+        limits = _read(tmp_path, cgroup="/", mounts=[(str(hierarchy), "/..")],
+                       where=hierarchy / "init.scope",
+                       strangers=["cgroup/other.scope"],
+                       memory_max="1", memory_swap_max="0")
+        assert limits["memory_max"] is None
+        error = limits["error"]
+        assert ("/ is under none of the mounted cgroup2 filesystems" in error
+                and f"under {hierarchy}, whose root is outside this cgroup "
+                "namespace, no directory holds this process" in error)
+
+    def test_a_mount_rooted_beside_the_namespace_is_not_searched(
+            self, tmp_path):
+        """../other is an ancestor's other child: the process's cgroup is
+        not under it, whatever its cgroup.procs say."""
+        hierarchy = tmp_path / "cgroup"
+        limits = _read(tmp_path, cgroup="/",
+                       mounts=[(str(hierarchy), "/../other")],
+                       where=hierarchy / "run-1.scope",
+                       members=["cgroup/run-1.scope"],
+                       memory_max="1", memory_swap_max="0")
+        assert limits["memory_max"] is None
+
+    def test_a_mount_of_the_namespace_itself_is_preferred(self, tmp_path):
+        """A mount rooted in the namespace answers first: the search under
+        an inherited one is not made."""
+        hierarchy = tmp_path / "cgroup"
+        limits = _read(
+            tmp_path, cgroup="/run-1.scope",
+            mounts=[(str(hierarchy), "/.."), (str(hierarchy / "own"), "/")],
+            where=hierarchy / "own" / "run-1.scope",
+            memory_max="1", memory_swap_max="0")
+        assert limits == {"cgroup": "/run-1.scope", "memory_max": 1,
+                          "memory_swap_max": 0}
+
+    def test_the_search_is_bounded(self, tmp_path, monkeypatch):
+        """A hierarchy of thousands of cgroups under an inherited mount is
+        not walked to the end: the limit is left unread, and said so."""
+        monkeypatch.setattr(gp, "MAX_SEARCHED", 2)
+        hierarchy = tmp_path / "cgroup"
+        _holding(tmp_path, "cgroup/a", os.getpid())
+        _holding(tmp_path, "cgroup/b", 1)
+        _holding(tmp_path, "cgroup/c", 1)
+        named, table = _machine(tmp_path, cgroup="/",
+                                mounts=[(str(hierarchy), "/..")],
+                                where=hierarchy / "a", memory_max="1",
+                                memory_swap_max="0")
+        limits = gp.cgroup_memory_limits(named, table)
+        assert limits["memory_max"] is None
+        assert "no directory holds this process" in limits["error"]
 
     def test_no_cgroup2_mount_is_not_read(self, tmp_path):
         limits = _read(tmp_path, mounts=[], other=[CGROUP_V1_MOUNT],

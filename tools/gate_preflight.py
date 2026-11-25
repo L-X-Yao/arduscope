@@ -65,6 +65,12 @@ PROC_CGROUP = "/proc/self/cgroup"
 PROC_MOUNTS = "/proc/self/mountinfo"
 CGROUP_LIMITS = (("memory_max", "memory.max"),
                  ("memory_swap_max", "memory.swap.max"))
+# A mount root of /.., or of so many of them: the mount was made outside the
+# process's cgroup namespace, and is rooted above the namespace's root.
+OUTSIDE = re.compile(r"(?:/\.\.)+")
+# Directories looked under such a mount for the process's cgroup, before the
+# search is given up and the limit left unread.
+MAX_SEARCHED = 4096
 
 # The binaries _launch() in tests/sitl/generate_logs.py flies, under
 # <sitl_dir>/build/sitl/bin/.
@@ -176,8 +182,53 @@ def cgroup2_mounts(proc_mounts: str = PROC_MOUNTS) -> list[tuple[str, str]]:
     return mounts
 
 
-def _cgroup_directory(path: str,
-                      mounts: list[tuple[str, str]]) -> str | None:
+def _subdirectories(parent: str) -> list[str]:
+    try:
+        with os.scandir(parent) as entries:
+            return [entry.path for entry in entries if entry.is_dir()]
+    except OSError:
+        return []
+
+
+def _holds(directory: str, pid: int) -> bool:
+    """Whether the cgroup's cgroup.procs names the process. A process is
+    in one cgroup of a hierarchy, so that tells which one is its own."""
+    try:
+        with open(os.path.join(directory, "cgroup.procs"), encoding="ascii",
+                  errors="replace") as f:
+            return str(pid) in f.read().split()
+    except OSError:
+        return False
+
+
+def _inherited(point: str, levels: int, below: str, pid: int) -> str | None:
+    """The process's cgroup under a mount inherited from outside its cgroup
+    namespace, or None when no directory under the mount holds it.
+
+    Such a mount was made before the namespace was, and its root lies
+    `levels` above the namespace's root: /proc/self/mountinfo shows that
+    root as /.. (cgroup_namespaces(7)), and the directory at the mount
+    point is an ancestor's. /proc/self/cgroup names the process's cgroup
+    from the namespace's root down, `below`, so the levels in between are
+    hidden and have to be looked for. Of the directories `levels` under
+    the mount point, the process's cgroup is under the one where the
+    cgroup.procs of what lies below it names the process.
+    """
+    roots = [point]
+    for _ in range(levels):
+        roots = [child for root in roots
+                 for child in _subdirectories(root)]
+        if len(roots) > MAX_SEARCHED:
+            return None
+    for root in roots:
+        directory = root if below == "/" else root + below
+        if _holds(directory, pid):
+            return directory
+    return None
+
+
+def _cgroup_directory(path: str, mounts: list[tuple[str, str]],
+                      pid: int) -> str | None:
     """Where the process's cgroup is on the filesystem, or None when no
     cgroup2 mount shows it.
 
@@ -185,15 +236,26 @@ def _cgroup_directory(path: str,
     is / on a workstation, where systemd-run --scope lands in a scope of a
     path of its own. In a container the root can be a path, and that
     subtree, not the hierarchy's root, is what sits at the mount point.
+    Under a cgroup namespace an inherited mount has a root of /.., which
+    stands for so many levels above the namespace's root: _inherited().
+
+    A mount rooted nearest is taken first: of the mounts that show the
+    cgroup, its root is the longest.
     """
+    mounts = [(point, root.rstrip("/") or "/") for point, root in mounts]
     showing = [(point, root) for point, root in mounts
-               if path == root or path.startswith(root.rstrip("/") + "/")]
-    if not showing:
-        return None
-    point, root = max(showing, key=lambda mount: len(mount[1]))
-    # Under a root of / the path keeps its leading slash, and names the
-    # cgroup under the mount point; under any other root it is shortened.
-    return point + (path if root == "/" else path[len(root):])
+               if root == "/" or path == root or path.startswith(root + "/")]
+    if showing:
+        point, root = max(showing, key=lambda mount: len(mount[1]))
+        # Under a root of / the path keeps its leading slash, and names the
+        # cgroup under the mount point; under any other root it is shortened.
+        return point + (path if root == "/" else path[len(root):])
+    for point, root in mounts:
+        if OUTSIDE.fullmatch(root):
+            found = _inherited(point, root.count("/.."), path, pid)
+            if found is not None:
+                return found
+    return None
 
 
 def cgroup_memory_limits(proc_cgroup: str = PROC_CGROUP,
@@ -233,12 +295,16 @@ def cgroup_memory_limits(proc_cgroup: str = PROC_CGROUP,
         return {**limits, "error": (
             f"no cgroup2 filesystem is mounted (cgroup v1?), so the limit "
             f"of {path} is not read here")}
-    directory = _cgroup_directory(path, mounts)
+    directory = _cgroup_directory(path, mounts, os.getpid())
     if directory is None:
         shown = "; ".join(f"{at} shows {of}" for at, of in mounts)
+        outside = [at for at, root in mounts if OUTSIDE.fullmatch(root)]
+        hidden = (f"; under {', '.join(outside)}, whose root is outside "
+                  f"this cgroup namespace, no directory holds this process"
+                  if outside else "")
         return {**limits, "error": (
             f"{path} is under none of the mounted cgroup2 filesystems "
-            f"({shown}), so its limit is not read here")}
+            f"({shown}){hidden}, so its limit is not read here")}
     for key, name in CGROUP_LIMITS:
         try:
             with open(os.path.join(directory, name), encoding="ascii",
