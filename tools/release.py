@@ -34,6 +34,11 @@ import release_gate  # noqa: E402
 
 # Commits named when main and origin/main are not level; the rest are counted.
 MAX_LISTED = 5
+# origin/main by its full name. "origin/main" on its own is also a tag
+# someone could have made, and git takes a tag before a remote-tracking
+# branch: a tag named that way, on a commit main has not pushed, reads as
+# level with origin. Messages still say origin/main.
+MAIN = "refs/remotes/origin/main"
 
 
 class Refused(Exception):
@@ -205,9 +210,9 @@ def _remote_has(tag: str) -> bool:
 def _out_of_step(behind: int, ahead: int) -> str:
     """Why main and origin/main are not level, naming the commits."""
     here = _git("log", "--oneline", f"-{MAX_LISTED}",
-                "origin/main..HEAD").stdout.rstrip()
+                f"{MAIN}..HEAD").stdout.rstrip()
     there = _git("log", "--oneline", f"-{MAX_LISTED}",
-                 "HEAD..origin/main").stdout.rstrip()
+                 f"HEAD..{MAIN}").stdout.rstrip()
     if ahead and behind:
         head = (f"main and origin/main have diverged: {_commits(ahead)} "
                 f"here, {_commits(behind)} on origin")
@@ -221,6 +226,23 @@ def _out_of_step(behind: int, ahead: int) -> str:
             f"what belongs there and pull what is missing first.")
 
 
+def _require_one_push_url() -> None:
+    """An atomic push is atomic for each push URL on its own.
+
+    An origin with several would take main and the tag on one of them and
+    could refuse them on another, with nothing here the wiser.
+    """
+    urls = _git("remote", "get-url", "--push", "--all",
+                "origin").stdout.split()
+    if len(urls) != 1:
+        raise Refused(
+            f"origin has {len(urls)} push URLs "
+            f"({', '.join(urls) or 'none'}). An atomic push is atomic for "
+            f"each one on its own, so main and the tag could land on one and "
+            f"not on another. Release from a clone whose origin pushes to "
+            f"one place.")
+
+
 def _require_publishable(tag: str) -> None:
     """main here is the commit origin has, and the tag is new everywhere.
 
@@ -228,16 +250,17 @@ def _require_publishable(tag: str) -> None:
     itself: a tag already on origin that matches the local one is no change
     to git, so main would go out under a release that was made before.
     """
+    _require_one_push_url()
     # --no-tags: this must not bring tags here; the local tag check below
     # is about what this machine made.
     _git("fetch", "--no-tags", "origin", "main")
-    if _git("rev-parse", "-q", "--verify", "refs/remotes/origin/main",
+    if _git("rev-parse", "-q", "--verify", MAIN,
             check=False).returncode != 0:
         raise Refused(
             "origin/main is not there after the fetch. Is origin the "
             "repository releases go to, and does it have a main branch?")
     behind, ahead = (int(count) for count in _git(
-        "rev-list", "--left-right", "--count", "origin/main...HEAD"
+        "rev-list", "--left-right", "--count", f"{MAIN}...HEAD"
     ).stdout.split())
     if behind or ahead:
         raise Refused(_out_of_step(behind, ahead))

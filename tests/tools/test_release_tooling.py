@@ -193,23 +193,26 @@ def _clean_repo(command, **kwargs):
 BRANCH = "git rev-parse --abbrev-ref HEAD"
 UNSTAGED = "git diff --quiet"
 STAGED = "git diff --cached --quiet"
+URLS = "git remote get-url --push --all origin"
 FETCH = "git fetch --no-tags origin main"
 HAS_MAIN = "git rev-parse -q --verify refs/remotes/origin/main"
-COUNT = "git rev-list --left-right --count origin/main...HEAD"
+COUNT = "git rev-list --left-right --count refs/remotes/origin/main...HEAD"
 HAS_TAG = "git rev-parse -q --verify refs/tags/v0.9.4"
 ASKS_TAG = "git ls-remote --exit-code --tags origin refs/tags/v0.9.4"
-LISTED = ["git log --oneline -5 origin/main..HEAD",
-          "git log --oneline -5 HEAD..origin/main"]
+LISTED = ["git log --oneline -5 refs/remotes/origin/main..HEAD",
+          "git log --oneline -5 HEAD..refs/remotes/origin/main"]
 ADD = "git add src/arduscope/__init__.py CHANGELOG.md"
 COMMIT = "git commit -m chore: release v0.9.4"
 TAG = "git tag v0.9.4"
 PUSH = "git push --atomic origin main v0.9.4"
 TREE = [BRANCH, UNSTAGED, STAGED]
-ORIGIN = [FETCH, HAS_MAIN, COUNT]
+ORIGIN = [URLS, FETCH, HAS_MAIN, COUNT]
 NEW_TAG = [HAS_TAG, ASKS_TAG]
-CHECKED = TREE + ORIGIN + NEW_TAG + ["gate"]
+PREFLIGHT = TREE + ORIGIN + NEW_TAG
+CHECKED = PREFLIGHT + ["gate"]
 # git on a clean tree, on main, level with origin/main, the tag new on both.
-LEVEL = {BRANCH: "main", COUNT: "0\t0", HAS_TAG: 1, ASKS_TAG: 2}
+LEVEL = {URLS: "git@example.invalid:owner/repo.git", BRANCH: "main",
+         COUNT: "0\t0", HAS_TAG: 1, ASKS_TAG: 2}
 
 
 class _Git:
@@ -331,12 +334,14 @@ class TestMainAsksInOrder:
         # A dirty tree, unstaged or staged.
         ({UNSTAGED: 1}, (), True, "is dirty", TREE),
         ({STAGED: 1}, (), True, "is dirty", TREE),
-        # origin cannot be reached.
+        # origin cannot be reached, or is more than one place to push to.
+        ({URLS: "git@a/repo.git\ngit@b/repo.git"}, (), True,
+         "origin has 2 push URLs", TREE + [URLS]),
         ({FETCH: 128}, (), True, "git fetch --no-tags origin main failed",
-         TREE + [FETCH]),
+         TREE + [URLS, FETCH]),
         # No origin/main after the fetch.
         ({HAS_MAIN: 1}, (), True, "origin/main is not there after the fetch",
-         TREE + [FETCH, HAS_MAIN]),
+         TREE + [URLS, FETCH, HAS_MAIN]),
         # Not level with origin/main: ahead, behind, both.
         ({COUNT: "0\t1"}, (), True, "1 commit ahead of origin/main",
          TREE + ORIGIN + LISTED),
@@ -345,10 +350,10 @@ class TestMainAsksInOrder:
         ({COUNT: "1\t1"}, (), True, "have diverged", TREE + ORIGIN + LISTED),
         # The tag is already spent: here only, on origin, or origin cannot
         # say.
-        ({HAS_TAG: 0}, (), True, "exists here but not on origin", CHECKED[:8]),
+        ({HAS_TAG: 0}, (), True, "exists here but not on origin", PREFLIGHT),
         ({ASKS_TAG: 0}, (), True,
-         "already exists on origin. Tags are append-only", CHECKED[:8]),
-        ({ASKS_TAG: 128}, (), True, "Could not ask origin", CHECKED[:8]),
+         "already exists on origin. Tags are append-only", PREFLIGHT),
+        ({ASKS_TAG: 128}, (), True, "Could not ask origin", PREFLIGHT),
     ])
     def test_a_refusal_writes_nothing_and_stops_at_its_check(
             self, tmp_path, monkeypatch, answers, argv, terminal, message,
@@ -546,6 +551,37 @@ class TestAgainstOrigin:
         with pytest.raises(release.mod.Refused,
                            match="origin/main is not there after the fetch"):
             release.mod._require_publishable("v0.0.2")
+
+    def test_a_local_tag_named_origin_main_cannot_make_an_ahead_main_look_level(
+            self, release):
+        """git takes refs/tags/<name> before refs/remotes/<name>. A tag of
+        that name, on the unpushed commit, is what the short name reads as:
+        level, with nothing to push."""
+        gitrepo.commit(release.work, "chore: local work")
+        gitrepo.git(release.work, "tag", "origin/main")
+        with pytest.raises(release.mod.Refused, match=(
+                r"1 commit ahead of origin/main:\n[0-9a-f]+ chore: local work")):
+            release.mod._require_publishable("v0.0.2")
+
+    def test_an_origin_with_two_push_urls_is_refused_before_it_is_asked(
+            self, release):
+        """An atomic push is atomic for each URL on its own: main and the tag
+        could land on one and not on the other."""
+        for name in ("second", "third"):
+            gitrepo.git(release.work, "remote", "set-url", "--add", "--push",
+                        "origin", str(release.work.parent / f"{name}.git"))
+        with pytest.raises(release.mod.Refused,
+                           match="origin has 2 push URLs") as refused:
+            release.mod._require_publishable("v0.0.2")
+        assert "second.git" in str(refused.value)
+        assert "third.git" in str(refused.value)
+
+    def test_an_origin_with_one_push_url_of_its_own_passes(self, release):
+        """A push URL of its own is not a second place: with one set, the
+        fetch URL stops counting as somewhere to push to."""
+        gitrepo.git(release.work, "remote", "set-url", "--push", "origin",
+                    str(release.origin))
+        release.mod._require_publishable("v0.0.2")
 
 
 class TestAReleaseReachesOrigin:
