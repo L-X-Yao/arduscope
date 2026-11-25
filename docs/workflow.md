@@ -97,7 +97,8 @@ records who reviewed the diff. The logs and gate corpora are not shared.
    count is a lead, not evidence.
 6. The release follows [CONTRIBUTING.md](../CONTRIBUTING.md) Releasing. The
    maintainer decides the topic and the release; the integrator asks once per
-   batch.
+   batch. Push the gated commit to `origin/main` first: `release.py` tags only
+   a `main` level with `origin/main`, and needs a terminal or `--yes`.
 
 ## Memory cap
 
@@ -109,8 +110,10 @@ systemd-run --user --scope -p MemoryMax=12G -p MemorySwapMax=0 -- \
 ```
 
 A run whose cgroup `memory.max` is `max` does not satisfy the rule. The
-preflight checks that the machine has at least 8 GB available; it does not yet
-read the cgroup limit. Until it does, the cap is a manual precondition.
+preflight reads the process's own cgroup through the cgroup2 mount named in
+`/proc/self/mountinfo`, and fails on `max`, a missing or unreadable limit,
+cgroup v1, or a mount it cannot place. It writes the same reading into the
+gate record, so the record names the cap the run sat under.
 
 ## Local data
 
@@ -132,8 +135,9 @@ deleted. Before deleting anything else, back up the accepted baselines,
 `tools/gate_preflight.py` checks, in seconds: a clean working tree; the SITL
 binaries (`arducopter` and `arduplane`) and the corpus folders the requested
 steps need; `local_paths.json` when a step reads it (snapshots, or corpora
-taken from the file rather than a `--corpus` override); 10 GB of free disk
-and 8 GB of available memory. `tools/release_gate.py` runs it at the top of
+taken from the file rather than a `--corpus` override); 10 GB of free disk,
+8 GB of available memory, and a finite cgroup v2 memory and swap cap.
+`tools/release_gate.py` runs it at the top of
 `run_gate()`, so a full run and a `--steps corpus` partial each check only
 what they use; it also runs standalone. The pinned virtual environment stays
 a manual check. A missing item fails here, not twenty minutes into the gate.

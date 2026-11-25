@@ -194,17 +194,22 @@ Version is in `src/arduscope/__init__.py`. Notes go under `## [Unreleased]` in
 `CHANGELOG.md` as changes land.
 
 ```
-python3 tools/release_gate.py    # about 30 min, needs the logs and SITL
-python3 tools/release.py patch   # 0.3.1 -> 0.3.2
-python3 tools/release.py minor   # 0.3.1 -> 0.4.0
+python3 tools/release_gate.py    # about 30 min, under the cgroup cap
+# push the gated commit to origin/main
+python3 tools/release.py patch   # 0.3.1 -> 0.3.2, terminal
+python3 tools/release.py minor   # 0.3.1 -> 0.4.0, terminal
 python3 tools/win_package_check.py --release vX.Y.Z
 gh release edit vX.Y.Z --draft=false
 python3 tools/verify_release.py vX.Y.Z  # published, immutable, three assets
 ```
 
-`release.py` refuses a commit without a pass from the gate, then bumps the
-version, dates the notes, commits, tags `vX.Y.Z` and pushes. The tag push
-triggers `.github/workflows/release.yml`, which runs CI, builds wheel, sdist and
+`release.py` refuses a commit without a pass from the gate, a branch other
+than `main`, a local `main` not level with `origin/main`, a dirty tree, an
+origin with more than one push URL, a tag already here or on origin, and a
+non-terminal run without `--yes`. It bumps the one `__version__` assignment,
+dates the notes, commits, tags `vX.Y.Z` and pushes `main` and the tag
+atomically. The tag push triggers `.github/workflows/release.yml`, which runs
+CI, builds wheel, sdist and
 the Windows zip, and creates a draft GitHub Release. `win_package_check.py`
 checks the draft's zip on real Windows, from WSL, and the draft is published
 only after it passes. A published release is immutable (repository setting):

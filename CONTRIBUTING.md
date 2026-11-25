@@ -251,15 +251,22 @@ so a rebuild waits for it. Anything else that flies should take it too.
 ## Releasing
 
 1. Write the notes under `## [Unreleased]` in `CHANGELOG.md` as changes land.
-2. Run `python3 tools/release_gate.py` on the commit to release. It takes about
-   half an hour, and needs the logs and SITL. If corpus results moved it stops
+2. Run `python3 tools/release_gate.py` under the cgroup cap in
+   [docs/workflow.md](docs/workflow.md#memory-cap) on the commit to release. It
+   takes about half an hour, and needs the logs and SITL. If corpus results
+   moved it stops
    at review: read the diff, then run it with `--accept "why they are right"`.
    Run it with the library versions pinned in `win64-requirements.txt`, the
    ones the Windows package ships: its record lists the Python and library
    versions it ran on, and it names any library off those pins.
-3. Run `python3 tools/release.py patch`. It refuses a commit without a pass,
-   dates the notes, tags and pushes. The tag starts `release.yml`, which
-   creates the release as a draft.
+3. Push the gated commit to `origin/main`, then run
+   `python3 tools/release.py patch` from `main`, in a terminal (or add
+   `--yes` for a headless run). It refuses a commit without a pass, a branch
+   other than `main`, a local `main` that is not level with `origin/main`, an
+   origin with more than one push URL, an existing tag here or on origin, a
+   dirty tree, and a non-terminal run without `--yes`. It dates the notes,
+   commits, tags and pushes `main` and the tag atomically. The tag starts
+   `release.yml`, which creates the release as a draft.
 4. Run `python3 tools/win_package_check.py --release vX.Y.Z` on the draft's
    package. Linux will delete an open file, so only this finds a leaked handle.
 5. When it passes, publish the draft: `gh release edit vX.Y.Z --draft=false`.
@@ -290,8 +297,9 @@ there is no stable-API promise before 1.0.
 - Tags are append-only. A tag whose release workflow fails before publication
   stays in place; the fix ships as the next patch version. The failed
   version's CHANGELOG section stays as the record of the tagged code.
-- `release.py` pushes `main` and the tag atomically; a release never leaves
-  one ref published without the other.
+- `release.py` runs from `main` level with `origin/main`, with a terminal or
+  `--yes`, and an origin with one push URL. It pushes `main` and the tag
+  atomically; a release never leaves one ref published without the other.
 
 ## Commit messages
 
