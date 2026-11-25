@@ -11,16 +11,19 @@ releases are not published.
 
 ### Changed
 - `tools/release.py` releases from `main` only, needs a terminal or `--yes`,
-  and refuses a dirty tree, a `main` that is not level with `origin/main`
-  once fetched, and a tag that already exists here or on origin. `main` and
-  the tag leave in one atomic push, and a closed prompt or a refused push
-  prints the push to run by hand instead of a traceback.
+  and refuses a dirty tree, an `origin` with more than one push URL, a
+  `main` that is not level with `origin/main` once fetched, and a tag that
+  already exists here or on origin. `main` and the tag leave in one atomic
+  push, and a closed prompt or a refused push prints the push to run by hand
+  instead of a traceback.
 - The gate preflight fails unless the run is under a finite cgroup v2 memory
-  and swap limit, and the gate record names both.
-- `release.yml` checks the tag before anything is built: its format, its
-  version against the tagged commit, and that the commit is on `origin/main`.
-  `tools/verify_release.py` rejects a tag commit that is not on
-  `origin/main` and an asset that does not name the release version.
+  and swap limit, read once and found through the mount table, and the gate
+  record names the same reading.
+- `release.yml` checks the tag in a job of its own, before the CI and the
+  build run: `vX.Y.Z` with no leading zero, a version equal to the one in
+  the tagged commit, and a commit on `origin/main`. `tools/verify_release.py`
+  asks the repository's own `main` whether it holds the tag commit, and
+  accepts exactly the three assets of that version, by name.
 
 ## [0.14.4] - 2026-11-25
 
