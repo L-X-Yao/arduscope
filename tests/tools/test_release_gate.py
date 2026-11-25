@@ -204,16 +204,29 @@ class TestRunGate:
         assert gate.run_gate(self._args()) == 0
         assert gate.passed("abc")
 
-    def test_the_record_names_the_memory_cap(self, dirs, monkeypatch):
-        """The cap the run sat under is written with the commit it passed."""
+    def test_a_pass_record_names_the_cap_read_once(self, dirs, monkeypatch):
+        """What a good run writes: the one reading of the caps, the same
+        dict handed to the preflight and to the record. That a second,
+        unchecked reading is never taken is shown in test_gate_preflight.py,
+        with the preflight running for real."""
         capped = {"cgroup": "/user.slice/run-1234.scope",
                   "memory_max": 12 * 1024 ** 3, "memory_swap_max": 0}
+        readings = []
         self._fake(monkeypatch)
-        monkeypatch.setattr(gate_preflight, "cgroup_memory_limits",
-                            lambda: dict(capped))
+
+        def read():
+            readings.append(1)
+            return dict(capped)
+
+        handed = {}
+        monkeypatch.setattr(gate_preflight, "cgroup_memory_limits", read)
+        monkeypatch.setattr(gate_preflight, "run_checks",
+                            lambda **kw: handed.update(kw) or [])
         assert gate.run_gate(self._args()) == 0
         record = json.loads(Path(gate.result_path("abc")).read_text("utf-8"))
+        assert readings == [1]
         assert record["environment"]["cgroup"] == capped
+        assert handed["caps"] == capped
 
     def test_a_corpus_override_reaches_the_preflight(self, dirs, monkeypatch):
         seen = {}
