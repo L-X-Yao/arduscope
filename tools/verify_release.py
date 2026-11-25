@@ -5,9 +5,9 @@ Checks the release through the GitHub API and the local tag:
 
 - the release is published, not a draft, and immutable;
 - its tag is the one asked for, and points at the local tag's commit;
-- that commit is on `origin/main`, which the checkout has to have fetched;
-- it carries a wheel, an sdist and the Windows zip, all non-empty, and no
-  asset that is not from this version.
+- that commit is on the main of the repository asked about;
+- it carries the wheel, the sdist and the Windows zip, each by name and
+  non-empty, and nothing else.
 
 The Windows package check is a separate, real-Windows step; this script only
 checks the release record and its assets.
@@ -21,16 +21,18 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import subprocess
 import sys
 
 DEFAULT_REPO = "L-X-Yao/arduscope"
-MAIN_REF = "origin/main"
-KINDS = (
-    ("wheel", ".whl"),
-    ("sdist", ".tar.gz"),
-    ("windows", "win64.zip"),
+MAIN_BRANCH = "main"
+# A release's three assets by name. Anything else is not of this release:
+# not an extra file, and not a wheel for 0.13.2rc1 or 0.13.2.post1, which
+# carry the version as a substring.
+ASSETS = (
+    ("wheel", "ardupilot_scope-{version}-py3-none-any.whl"),
+    ("sdist", "ardupilot_scope-{version}.tar.gz"),
+    ("windows", "arduscope-v{version}-win64.zip"),
 )
 
 
@@ -62,43 +64,35 @@ def _local_tag_commit(tag: str) -> str:
     return _run(["git", "rev-parse", "--verify", f"refs/tags/{tag}^{{commit}}"]).strip()
 
 
-def _on_main(commit: str, main_ref: str = MAIN_REF) -> bool:
-    """Whether origin/main contains the commit.
+def _on_main(repo: str, commit: str) -> bool:
+    """Whether the repository's main contains the commit, asked of GitHub.
 
-    merge-base answers 0 or 1. Anything else is not an answer, and says so
-    rather than reading as "not on main".
+    repos/<repo>/compare/<commit>...main takes the commit as the base and
+    main as the head: "ahead" means main has it behind its tip, and
+    "identical" that it is the tip. Anything else, the repository not
+    having the commit included, is not a yes.
+
+    The repository asked about with --repo is the one that answers. A local
+    origin/main belongs to whatever repository was cloned, which with a fork
+    is another one.
     """
-    result = subprocess.run(["git", "merge-base", "--is-ancestor", commit,
-                             main_ref], capture_output=True, text=True)
-    if result.returncode == 0:
-        return True
-    if result.returncode == 1:
-        return False
-    raise RuntimeError(
-        f"could not place {commit[:10]} against {main_ref}: "
-        f"{result.stderr.strip() or result.returncode}")
+    compare = json.loads(_run(["gh", "api",
+                               f"repos/{repo}/compare/{commit}...{MAIN_BRANCH}"]))
+    return compare.get("status") in ("ahead", "identical")
 
 
-def _names_version(name: str, version: str) -> bool:
-    """Whether the asset name carries the version as a whole.
-
-    0.13.2 is in ardupilot_scope-0.13.2-py3-none-any.whl, in
-    ardupilot_scope-0.13.2.tar.gz (the dot after it is a file extension's)
-    and in arduscope-v0.13.2-win64.zip. It is not in
-    ardupilot_scope-0.13.21-py3-none-any.whl, in ...-0.13.2.1.tar.gz or in
-    ...-10.13.2.tar.gz: a digit or a dotted number on either side makes it
-    another version.
-    """
-    return re.search(rf"(?<![\d.]){re.escape(version)}(?!\.?\d)",
-                     name) is not None
+def expected_assets(version: str) -> dict[str, str]:
+    """Asset name by kind for this version."""
+    return {template.format(version=version): kind for kind, template in ASSETS}
 
 
 def check(release: dict, tag: str, remote_commit: str, local_commit: str, *,
           on_main: bool) -> list[str]:
     """Return the failed checks, empty when the release is good.
 
-    on_main says whether origin/main contains the tag commit; it is not
-    optional, since a default would let a caller forget to ask.
+    on_main says whether main of the repository asked about contains the tag
+    commit; it is not optional, since a default would let a caller forget
+    to ask.
     """
     failed: list[str] = []
     if release.get("draft") is not False:
@@ -113,23 +107,24 @@ def check(release: dict, tag: str, remote_commit: str, local_commit: str, *,
         failed.append(
             f"tag points at {remote_commit}, local tag at {local_commit}")
     if not on_main:
-        failed.append(f"tag commit {local_commit} is not on {MAIN_REF}")
+        failed.append(f"tag commit {local_commit} is not on main")
 
     assets = release.get("assets") or []
     if not assets:
         failed.append("release has no assets")
+    expected = expected_assets(tag.removeprefix("v"))
     names = [a.get("name", "") for a in assets]
-    version = tag.removeprefix("v")
-    for name in names:
-        if not _names_version(name, version):
-            failed.append(f"asset {name!r} does not name version {version}")
-    for kind, suffix in KINDS:
-        matches = [a for a in assets if a.get("name", "").endswith(suffix)]
-        if not matches:
-            failed.append(f"no {kind} asset ({suffix})")
-        for asset in matches:
-            if not asset.get("size"):
-                failed.append(f"{kind} asset is empty: {asset.get('name')}")
+    for name, kind in expected.items():
+        if name not in names:
+            failed.append(f"no {kind} asset ({name})")
+    for asset in assets:
+        name = asset.get("name", "")
+        kind = expected.get(name)
+        if kind is None:
+            failed.append(f"asset {name!r} is not one of v"
+                          f"{tag.removeprefix('v')}'s three")
+        elif not asset.get("size"):
+            failed.append(f"{kind} asset is empty: {name}")
     if len(names) != len(set(names)):
         failed.append("release has duplicate asset names")
     return failed
@@ -144,7 +139,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         local_commit = _local_tag_commit(args.tag)
-        on_main = _on_main(local_commit)
+        on_main = _on_main(args.repo, local_commit)
         release = _release(args.repo, args.tag)
         remote_commit = _tag_commit(args.repo, args.tag)
     except (RuntimeError, OSError, KeyError, json.JSONDecodeError) as e:
@@ -160,9 +155,10 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"PASS {args.tag} is published and immutable")
     print(f"PASS tag commit {local_commit[:10]}")
-    print(f"PASS tag commit is on {MAIN_REF}")
-    for asset in sorted(release["assets"], key=lambda a: a.get("name", "")):
-        print(f"PASS {asset['name']} ({asset['size']} bytes)")
+    print(f"PASS tag commit is on main of {args.repo}")
+    for name in expected_assets(args.tag.removeprefix("v")):
+        asset = next(a for a in release["assets"] if a["name"] == name)
+        print(f"PASS {name} ({asset['size']} bytes)")
     return 0
 
 
