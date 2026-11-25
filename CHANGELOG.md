@@ -13,15 +13,18 @@ releases are not published.
 - `tools/release.py` releases from `main` only, needs a terminal or `--yes`,
   and refuses a dirty tree, an `origin` with more than one push URL, a
   `main` that is not level with `origin/main` once fetched, and a tag that
-  already exists here or on origin. `main` and the tag leave in one atomic
-  push, and a closed prompt or a refused push prints the push to run by hand
-  instead of a traceback.
+  already exists here or on origin. It bumps the one assignment to
+  `__version__` in the version file, read as code, and leaves the rest of
+  the file as it is. `main` and the tag leave in one atomic push, and a
+  closed prompt or a refused push prints the push to run by hand instead of
+  a traceback.
 - The gate preflight fails unless the run is under a finite cgroup v2 memory
   and swap limit, read once and found through the mount table, and the gate
   record names the same reading.
 - `release.yml` checks the tag in a job of its own, before the CI and the
-  build run: `vX.Y.Z` with no leading zero, a version equal to the one in
-  the tagged commit, and a commit on `origin/main`. `tools/verify_release.py`
+  build run: `vX.Y.Z` with no leading zero, a version equal to the one
+  assignment to `__version__` in the tagged commit, which binds the name
+  nowhere else, and a commit on `origin/main`. `tools/verify_release.py`
   asks the repository's own `main` whether it holds the tag commit, and
   accepts exactly the three assets of that version, by name.
 
