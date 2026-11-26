@@ -323,6 +323,10 @@ class LogReader:
         # Relative-time parameter values let analyzers use the configuration
         # in force at a sample, not a post-flight change left in params.
         self.param_history: dict[str, list[tuple[float, float]]] = {}
+        # Per name, whether param_history is in timestamp order. Binary
+        # search needs that; a log whose PARM lines are not falls back to
+        # the reverse scan. Checked once per name.
+        self._param_history_ordered: dict[str, bool] = {}
         self.mode_list: list[ModeChange] = []
         self.errors: list[ErrorEvent] = []
         self.events: list[Event] = []
@@ -817,23 +821,41 @@ class LogReader:
         """Get a parameter value from the log, with default fallback."""
         return self.params.get(name, default)
 
+    def _history_is_ordered(self, name: str) -> bool:
+        """Whether this parameter's history is in timestamp order."""
+        ordered = self._param_history_ordered.get(name)
+        if ordered is None:
+            history = self.param_history[name]
+            ordered = all(changed_at <= next_at for
+                          (changed_at, _), (next_at, _) in
+                          zip(history, history[1:]))
+            self._param_history_ordered[name] = ordered
+        return ordered
+
     def get_param_at(self, name: str, timestamp: float,
                      default: float = 0.0) -> float:
         """Get the value in force at a timestamp relative to log start.
 
         PARM records can include changes made after flight. Before the first
         record, use that first value: it is the earliest state the log proves.
-        The history is in log order, so the last change at or before the
-        timestamp is found by binary search.
+        In a normal log the history is in time order and binary search finds
+        the last change at or before the timestamp. A log whose PARM lines
+        are out of order keeps the reverse scan, which answers by file order
+        as it always did.
         """
         history = self.param_history.get(name)
         if not history:
             return self.get_param(name, default)
-        index = bisect.bisect_right(
-            history, timestamp, key=lambda item: item[0]) - 1
-        if index < 0:
-            return history[0][1]
-        return history[index][1]
+        if self._history_is_ordered(name):
+            index = bisect.bisect_right(
+                history, timestamp, key=lambda item: item[0]) - 1
+            if index < 0:
+                return history[0][1]
+            return history[index][1]
+        for changed_at, value in reversed(history):
+            if changed_at <= timestamp:
+                return value
+        return history[0][1]
 
     def has_message(self, msg_type: str) -> bool:
         """Check if a message type exists in the log."""
@@ -1002,6 +1024,7 @@ class LogReader:
                 data = pickle.load(f)  # noqa: S301
             self.params = data["params"]
             self.param_history = data["param_history"]
+            self._param_history_ordered.clear()
             self.mode_list = data["mode_list"]
             self.errors = data["errors"]
             self.events = data["events"]

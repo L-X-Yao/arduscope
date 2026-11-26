@@ -91,6 +91,27 @@ class TestParsing:
             assert (reader.get_param_at("INS_HNTCH_ENABLE", timestamp)
                     == linear(timestamp))
 
+    def test_out_of_order_parameter_history_keeps_the_linear_rule(
+            self, tmp_path):
+        """A log whose PARM lines go backwards in time is not sorted, so
+        binary search cannot answer it; the reverse scan must still."""
+        log = binlog.BinLog()
+        log.write("MSG", 1_000_000, "ArduCopter V4.6.3 (abc12345)")
+        log.write("MODE", 1_000_000, 0, 0, 0)
+        log.write("PARM", 2_000_000, "INS_HNTCH_ENABLE", 1.0, 0.0)
+        log.write("PARM", 6_000_000, "INS_HNTCH_ENABLE", 5.0, 0.0)
+        log.write("PARM", 4_000_000, "INS_HNTCH_ENABLE", 3.0, 0.0)
+        log.write("ATT", 7_000_000, 0, 0, 0, 0, 0, 0, 0)
+        reader = LogReader(log.save(tmp_path / "param_backwards.bin"))
+        history = reader.param_history["INS_HNTCH_ENABLE"]
+
+        assert history[0][0] < history[1][0] > history[2][0]
+        for timestamp in [-1.0, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0]:
+            expected = next((value for changed_at, value in reversed(history)
+                             if changed_at <= timestamp), history[0][1])
+            assert (reader.get_param_at("INS_HNTCH_ENABLE", timestamp)
+                    == expected)
+
     def test_timestamp_requested_as_a_field_is_not_doubled(self, copter_log):
         """`_timestamp` is always filled by the reader. When a caller also
         lists it among the fields, it must stay one column, one value per
