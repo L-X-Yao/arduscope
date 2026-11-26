@@ -29,6 +29,7 @@ Usage:
 import argparse
 import datetime
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -49,6 +50,12 @@ MAIN = "refs/remotes/origin/main"
 
 class Refused(Exception):
     """A pre-flight refusal. Nothing has been written."""
+
+
+# The one shape release.py can bump. The version file is read as code and
+# may hold any string; a pre-release or build suffix has no numeric bump
+# rule, and int() on it would end in a traceback after the checks.
+_CANONICAL_VERSION = re.compile(r"^\d+\.\d+\.\d+$")
 
 
 def _version_bytes() -> bytes:
@@ -72,6 +79,11 @@ def _current_version() -> str:
 
 
 def _bump(version: str, part: str) -> str:
+    """The next version, or Refused when the current one is not X.Y.Z."""
+    if not _CANONICAL_VERSION.fullmatch(version):
+        raise Refused(
+            f"{version_source.VERSION_FILE} holds {version!r}, which is not "
+            f"X.Y.Z; release.py has no rule to bump it")
     major, minor, patch = (int(x) for x in version.split("."))
     if part == "major":
         return f"{major + 1}.0.0"
@@ -351,7 +363,10 @@ def main() -> None:
     args = parser.parse_args()
 
     old_ver = _current_version()
-    new_ver = _bump(old_ver, args.part)
+    try:
+        new_ver = _bump(old_ver, args.part)
+    except Refused as e:
+        sys.exit(str(e))
     tag = f"v{new_ver}"
 
     print(f"\n  {old_ver} -> {new_ver} ({args.part})\n")
