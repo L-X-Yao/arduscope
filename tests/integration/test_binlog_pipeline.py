@@ -120,6 +120,8 @@ class TestParsing:
         data = reader._read_msg_type("ATT", ["_timestamp", "Roll"])
 
         assert len(data["_timestamp"]) == len(data["Roll"]) > 0
+        assert data["_timestamp"][0] == pytest.approx(0.0)
+        assert data["_timestamp"][-1] > 0.0
 
     def test_preloaded_values(self, copter_log):
         reader = LogReader(copter_log, preload_types=["ATT", "BAT"])
