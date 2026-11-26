@@ -67,6 +67,39 @@ class TestParsing:
         assert reader.get_param_at("INS_HNTCH_ENABLE", 2.0) == 1.0
         assert reader.get_param_at("MISSING", 2.0, 7.0) == 7.0
 
+    def test_parameter_lookup_matches_the_linear_rule(self, tmp_path):
+        """The binary search must answer what the reverse scan answered,
+        including repeated timestamps and both ends of the history."""
+        log = binlog.BinLog()
+        log.write("MSG", 1_000_000, "ArduCopter V4.6.3 (abc12345)")
+        log.write("MODE", 1_000_000, 0, 0, 0)
+        for stamp, value in [(1_000_000, 0.0), (2_000_000, 1.0),
+                             (2_000_000, 2.0), (4_000_000, 3.0),
+                             (7_500_000, 4.0)]:
+            log.write("PARM", stamp, "INS_HNTCH_ENABLE", value, 0.0)
+        log.write("ATT", 8_000_000, 0, 0, 0, 0, 0, 0, 0)
+        reader = LogReader(log.save(tmp_path / "param_changes.bin"))
+        history = reader.param_history["INS_HNTCH_ENABLE"]
+
+        def linear(timestamp):
+            for changed_at, value in reversed(history):
+                if changed_at <= timestamp:
+                    return value
+            return history[0][1]
+
+        for timestamp in [-1.0, 0.0, 0.5, 1.0, 2.0, 3.0, 6.5, 7.0]:
+            assert (reader.get_param_at("INS_HNTCH_ENABLE", timestamp)
+                    == linear(timestamp))
+
+    def test_timestamp_requested_as_a_field_is_not_doubled(self, copter_log):
+        """`_timestamp` is always filled by the reader. When a caller also
+        lists it among the fields, it must stay one column, one value per
+        message, not the timestamp appended twice."""
+        reader = LogReader(copter_log)
+        data = reader._read_msg_type("ATT", ["_timestamp", "Roll"])
+
+        assert len(data["_timestamp"]) == len(data["Roll"]) > 0
+
     def test_preloaded_values(self, copter_log):
         reader = LogReader(copter_log, preload_types=["ATT", "BAT"])
         att = reader.get_messages_as_arrays("ATT", ["Yaw", "DesYaw"])

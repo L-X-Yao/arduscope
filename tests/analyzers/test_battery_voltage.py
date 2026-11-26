@@ -181,6 +181,9 @@ def test_flat_subvolt_sensor_is_not_a_battery_critical(analyzer):
 
 @pytest.mark.parametrize("analyzer", ANALYZERS)
 def test_telemetry_gaps_do_not_join_low_voltage_segments(analyzer):
+    """The two 12 V points at the end keep the reference at 12 V, so the
+    case is not short-circuited by config_critical and reaches the gap
+    rule; they are not redundant input."""
     ts = np.array([0, 1, 2, 3, 14, 15, 16, 17, 28, 29, 30, 31, 32, 33], dtype=float)
     volt = np.array([9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 12, 12], dtype=float)
     reader = _reader(ts, volt)

@@ -83,6 +83,29 @@ def test_near_ground_single_spike_is_not_critical():
     assert _run(values).status == "good"
 
 
+def test_short_armed_window_does_not_grade_ground_vibration():
+    """50 armed rows used to fall back to the whole log, so a sustained
+    ground vibration after disarming set a critical."""
+    values = np.full(N, 2.0)
+    values[50:] = 35.0
+    timestamps = np.linspace(0.0, 300.0, N)
+    reader = SyntheticReader(messages={"VIBE": {
+        "_timestamp": timestamps,
+        "IMU": np.zeros(N),
+        "VibeX": values,
+        "VibeY": np.zeros(N),
+        "VibeZ": np.zeros(N),
+        "Clip0": np.zeros(N),
+        "Clip1": np.zeros(N),
+        "Clip2": np.zeros(N),
+    }}, params={"INS_HNTCH_ENABLE": 1},
+       armed_intervals=[(0.0, float(timestamps[49]))])
+
+    result = VibrationAnalyzer(reader, Thresholds(), _vehicle()).analyze()
+
+    assert result.status == "good"
+
+
 def test_axis_detail_keeps_avg_p99_and_max():
     values = np.full(N, 2.0)
     values[-1] = 56.0

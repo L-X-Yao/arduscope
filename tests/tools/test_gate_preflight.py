@@ -704,9 +704,9 @@ class TestInheritedFromOutsideTheNamespace:
         the whole level had been listed, and started again for each
         inherited mount. A level of 4096 directories with 4096 under each
         is sixteen million paths, listed to be refused. One count now
-        covers every directory opened and every directory found in one,
-        over all the levels and all the mounts, and is kept while they are
-        listed."""
+        covers every entry asked for in a directory and every directory
+        opened, over all the levels and all the mounts, and is kept while
+        they are listed."""
         monkeypatch.setattr(gp, "MAX_SEARCHED", 16)
         _wide(tmp_path, "cgroup", 2, 200)  # 2 directories, 200 under each
         named, table = _machine(
@@ -721,6 +721,25 @@ class TestInheritedFromOutsideTheNamespace:
         assert limits["memory_max"] is None
         assert 0 < looked[0] <= gp.MAX_SEARCHED
         assert "given up after 16" in limits["error"]
+
+    def test_files_are_counted_against_the_budget(self, tmp_path,
+                                                  monkeypatch):
+        """A level made of files used to be walked for free; the budget
+        must bound every entry asked for, not only the directories."""
+        monkeypatch.setattr(gp, "MAX_SEARCHED", 3)
+        root = tmp_path / "cgroup"
+        root.mkdir()
+        for i in range(50):
+            (root / f"f{i:03d}").write_text("x", encoding="ascii")
+        named, table = _machine(
+            tmp_path, cgroup="/run-1.scope",
+            mounts=[(str(root), "/..")], where=root, memory_max="1",
+            memory_swap_max="0")
+
+        limits = gp.cgroup_memory_limits(named, table)
+
+        assert limits["memory_max"] is None
+        assert "given up after 3 entries looked at" in limits["error"]
 
     def test_the_budget_is_kept_while_a_level_is_listed(self, tmp_path,
                                                         monkeypatch):

@@ -454,6 +454,18 @@ class TestTheVersionFile:
         assert run.version_file.read_bytes() == expected
         assert run.trace[-4:] == self.RELEASED
 
+    @pytest.mark.parametrize("version", ["0.15.0rc1", "1.2", "1.2.3.4"])
+    def test_a_version_that_is_not_xyz_is_refused_before_any_write(
+            self, tmp_path, monkeypatch, version):
+        run = _Run(tmp_path, monkeypatch,
+                   version_file=f'__version__ = "{version}"\n'.encode())
+
+        with pytest.raises(SystemExit, match="not X.Y.Z"):
+            run("patch", "--yes", terminal=False)
+
+        assert run.untouched
+        assert not run.trace
+
     @pytest.mark.parametrize("data, message", [
         (b'\xef\xbb\xbf__version__ = "0.14.4"\n', "byte order mark"),
         (b'# -*- coding: latin-1 -*-\n# caf\xe9\n__version__ = "0.14.4"\n',
