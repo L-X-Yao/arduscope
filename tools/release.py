@@ -52,10 +52,13 @@ class Refused(Exception):
     """A pre-flight refusal. Nothing has been written."""
 
 
-# The one shape release.py can bump. The version file is read as code and
-# may hold any string; a pre-release or build suffix has no numeric bump
-# rule, and int() on it would end in a traceback after the checks.
-_CANONICAL_VERSION = re.compile(r"^\d+\.\d+\.\d+$")
+# The one shape release.py can bump, written as tools/check_release_tag.py
+# writes the tag: three numbers, none with a leading zero. The version file
+# is read as code and may hold any string; a pre-release or build suffix has
+# no numeric bump rule, and int() on it would end in a traceback after the
+# checks.
+_NUMBER = r"(?:0|[1-9][0-9]*)"
+_CANONICAL_VERSION = re.compile(rf"^{_NUMBER}\.{_NUMBER}\.{_NUMBER}$")
 
 
 def _version_bytes() -> bytes:

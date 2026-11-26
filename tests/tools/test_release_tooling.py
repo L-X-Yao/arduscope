@@ -454,7 +454,8 @@ class TestTheVersionFile:
         assert run.version_file.read_bytes() == expected
         assert run.trace[-4:] == self.RELEASED
 
-    @pytest.mark.parametrize("version", ["0.15.0rc1", "1.2", "1.2.3.4"])
+    @pytest.mark.parametrize("version", ["0.15.0rc1", "1.2", "1.2.3.4",
+                                         "01.2.3", "1.02.3", "1.2.03"])
     def test_a_version_that_is_not_xyz_is_refused_before_any_write(
             self, tmp_path, monkeypatch, version):
         run = _Run(tmp_path, monkeypatch,
