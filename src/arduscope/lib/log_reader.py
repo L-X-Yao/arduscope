@@ -7,6 +7,7 @@ Single-pass architecture:
   - get_messages_as_arrays() returns from cache (zero I/O after init)
 """
 
+import bisect
 import hashlib
 import os
 import pickle  # noqa: S403 - cache is self-generated from local .BIN files
@@ -775,6 +776,10 @@ class LogReader:
     def _read_msg_type(self, msg_type: str,
                        fields: list[str]) -> dict[str, np.ndarray]:
         """Single-pass read of all instances of msg_type from the file."""
+        # The timestamp column is filled from each message below; asking
+        # for it as an ordinary field would reset that column and append
+        # to it twice per message, leaving it twice as long as the others.
+        fields = [f for f in fields if f != '_timestamp']
         first_ts = self.time_range[0] if self.time_range[0] != 0.0 else None
         if first_ts is None:
             with _open_log(self.filepath) as mlog:
@@ -818,14 +823,17 @@ class LogReader:
 
         PARM records can include changes made after flight. Before the first
         record, use that first value: it is the earliest state the log proves.
+        The history is in log order, so the last change at or before the
+        timestamp is found by binary search.
         """
         history = self.param_history.get(name)
         if not history:
             return self.get_param(name, default)
-        for changed_at, value in reversed(history):
-            if changed_at <= timestamp:
-                return value
-        return history[0][1]
+        index = bisect.bisect_right(
+            history, timestamp, key=lambda item: item[0]) - 1
+        if index < 0:
+            return history[0][1]
+        return history[index][1]
 
     def has_message(self, msg_type: str) -> bool:
         """Check if a message type exists in the log."""
