@@ -132,6 +132,15 @@ them readable, on the current gate baseline.
   this. A quantile reference would report a real deep discharge that was
   armed below the pack's full voltage as a configuration warning instead,
   so the second-highest value stays.
+- **The motor floor and balance rules are Copter-hover shaped.** They grade
+  a lift motor's share of time at the spin floor over rows where any lift
+  motor works. A QuadPlane in takeoff, landing or a VTOL transition puts
+  one motor at the floor while the others work, so a normal flight can
+  read as saturation. In one FS20 power-test log the flagged channel's
+  floor time is a 12.3 s QLAND run and a 2.0 s takeoff run, not forward
+  cruise; excluding fixed-wing rows only moves the VTOL-only share up
+  (one reliability flight went from warning to critical). The rule needs
+  a stable-VTOL definition and labeled VTOL logs before it changes.
 - **The share of false criticals is now estimated, from a small sample.** A
   read of 50 critical cards across 43 logs on 2026-11-24 found 23 of the 49
   decided cards false (46.9% crude; 45.1% when weighted by each analyzer's
