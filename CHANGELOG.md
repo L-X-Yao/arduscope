@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
-## [Unreleased]
+## [0.14.5] - 2026-11-26
 
 ### Changed
 - `tools/release.py` releases from `main` only, needs a terminal or `--yes`,
