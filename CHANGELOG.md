@@ -27,6 +27,19 @@ releases are not published.
   nowhere else, and a commit on `origin/main`. `tools/verify_release.py`
   asks the repository's own `main` whether it holds the tag commit, and
   accepts exactly the three assets of that version, by name.
+- The gate preflight's search budget counts every directory entry it asks
+  for, files included, not only the directories it opens.
+- Parameter history lookup by timestamp is a binary search, not a reverse
+  scan.
+
+### Fixed
+- Armed-window narrowing no longer falls back to the whole log when a short
+  flight leaves few armed samples, so ground vibration cannot set a
+  vibration or EKF verdict.
+- A `_timestamp` field requested alongside other fields no longer doubles
+  that column in `_read_msg_type`.
+- `release.py` refuses a version that is not `X.Y.Z` before writing
+  anything, naming the version file, instead of failing with a traceback.
 
 ## [0.14.4] - 2026-11-25
 

@@ -1,6 +1,6 @@
 # Known limitations
 
-What ArduScope does not do, or does not get right, as of 2026-11-23, and what
+What ArduScope does not do, or does not get right, as of 2026-11-26, and what
 to do about each. What was found and fixed is in [CHANGELOG.md](../CHANGELOG.md).
 Figures are from the two log corpora the release gate scans: 561 logs, 560 of
 them readable, on the current gate baseline.
@@ -126,6 +126,12 @@ them readable, on the current gate baseline.
   notch filter disabled, a critical-level maximum remains a conservative
   warning. A sustained or crash-level condition still crosses the unchanged
   15/30 thresholds.
+- **The pack-validation reference is the second-highest armed voltage
+  sample.** One spurious high sample cannot make an implausible pack look
+  valid; two or more simultaneous bad samples can. No real log has shown
+  this. A quantile reference would report a real deep discharge that was
+  armed below the pack's full voltage as a configuration warning instead,
+  so the second-highest value stays.
 - **The share of false criticals is now estimated, from a small sample.** A
   read of 50 critical cards across 43 logs on 2026-11-24 found 23 of the 49
   decided cards false (46.9% crude; 45.1% when weighted by each analyzer's
