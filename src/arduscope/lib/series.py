@@ -4,10 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 
-VIBE_ARMED_FLOOR = 100
-EKF_ARMED_FLOOR = 10
-
-
 def armed_mask(reader, ts, *, empty_is_all: bool = True) -> np.ndarray:
     """True on samples inside an armed interval.
 
@@ -24,11 +20,17 @@ def armed_mask(reader, ts, *, empty_is_all: bool = True) -> np.ndarray:
     return mask
 
 
-def armed_rows(reader, ts, rows, floor: int,
-               *, empty_is_all: bool = True) -> np.ndarray:
-    """Narrow rows to armed time, but only when more than floor remain."""
-    narrowed = rows & armed_mask(reader, ts, empty_is_all=empty_is_all)
-    return narrowed if int(np.sum(narrowed)) > floor else rows
+def armed_rows(reader, ts, rows) -> np.ndarray:
+    """Narrow rows to armed time, unless no row falls inside a window.
+
+    A short armed window used to fall back to the whole log once 100 or
+    fewer rows remained, so ground samples could set a vibration or EKF
+    verdict. The only fallback now is an absence of armed evidence: when
+    the log has intervals but none of the rows falls inside them, there is
+    nothing to narrow to and the rows are returned whole.
+    """
+    narrowed = rows & armed_mask(reader, ts)
+    return narrowed if narrowed.any() else rows
 
 
 def lttb_downsample(x: np.ndarray, y: np.ndarray,

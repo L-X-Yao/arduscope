@@ -20,7 +20,7 @@ from arduscope.lib.ekf_failsafe import (
     ekf_failsafe_replay, over_threshold, sustained, vehicle_kind,
     window_touches_armed)
 from arduscope.lib.ekf_lanes import primary_lane_rows
-from arduscope.lib.series import EKF_ARMED_FLOOR, armed_rows
+from arduscope.lib.series import armed_rows
 from arduscope.lib.i18n import t as _t
 from arduscope.lib.np_helpers import safe_nanmax
 from . import AnalysisResult, BaseAnalyzer
@@ -123,7 +123,7 @@ class EKFAnalyzer(BaseAnalyzer):
             stat_mask = primary_lane_rows(core_ids, kf4["PI"])
         primary_mask = stat_mask
 
-        stat_mask = armed_rows(self.reader, t, stat_mask, EKF_ARMED_FLOOR)
+        stat_mask = armed_rows(self.reader, t, stat_mask)
 
         sv_stat = sv[stat_mask]
         sp_stat = sp[stat_mask]

@@ -13,12 +13,7 @@ import numpy as np
 from arduscope.lib.log_metadata import extract_flight_time, extract_identity
 from arduscope.lib.hover import hover_thrust
 from arduscope.lib.ekf_lanes import primary_lane_rows
-from arduscope.lib.series import (
-    EKF_ARMED_FLOOR,
-    VIBE_ARMED_FLOOR,
-    armed_rows,
-    lttb_downsample,
-)
+from arduscope.lib.series import armed_rows, lttb_downsample
 from arduscope.lib.log_reader import LogReader
 from arduscope.lib.np_helpers import safe_nanmax
 from arduscope.lib.thresholds import Thresholds
@@ -104,8 +99,7 @@ def extract_metrics(reader: LogReader,
         ])
         if len(vibe["_timestamp"]) > 0:
             rows = armed_rows(reader, vibe["_timestamp"],
-                               _lowest_instance_rows(vibe["IMU"]),
-                               VIBE_ARMED_FLOOR)
+                               _lowest_instance_rows(vibe["IMU"]))
             metrics["max_vibe"] = safe_nanmax(
                 vibe["VibeX"][rows], vibe["VibeY"][rows], vibe["VibeZ"][rows],
             )
@@ -130,8 +124,7 @@ def extract_metrics(reader: LogReader,
         ])
         if len(kf4["_timestamp"]) > 0:
             rows = armed_rows(reader, kf4["_timestamp"],
-                               primary_lane_rows(kf4["C"], kf4["PI"]),
-                               EKF_ARMED_FLOOR)
+                               primary_lane_rows(kf4["C"], kf4["PI"]))
             metrics["max_ekf_var"] = safe_nanmax(
                 kf4["SV"][rows], kf4["SP"][rows],
                 kf4["SH"][rows], kf4["SM"][rows],

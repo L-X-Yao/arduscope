@@ -17,7 +17,7 @@ import plotly.graph_objects as go
 
 from arduscope.lib.fft_helpers import do_fft, find_flight_window, find_peaks
 from arduscope.lib.i18n import t
-from arduscope.lib.series import VIBE_ARMED_FLOOR, armed_rows
+from arduscope.lib.series import armed_rows
 
 from arduscope.lib.suggestions import ParamSuggestion
 
@@ -97,8 +97,7 @@ class VibrationAnalyzer(BaseAnalyzer):
             ]
 
         # Filter vibe levels to armed intervals (exclude ground shocks).
-        mask = armed_rows(self.reader, ts, np.ones(len(ts), dtype=bool),
-                          VIBE_ARMED_FLOOR)
+        mask = armed_rows(self.reader, ts, np.ones(len(ts), dtype=bool))
         if np.sum(mask) < len(mask):
             ts = ts[mask]
             vibe_x = vibe_x[mask]
