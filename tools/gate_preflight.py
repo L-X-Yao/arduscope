@@ -192,15 +192,14 @@ class _Budget:
     """What may be looked at under mounts inherited from outside the cgroup
     namespace.
 
-    One count for every directory opened and every directory found in one,
-    over all the levels and all the mounts; it is kept while they are
-    listed, not once a level has been listed in full. A cgroup's files are
-    passed over without counting: they are a fixed few dozen, and are never
-    opened.
+    One count for every entry asked for in a directory, file or directory,
+    and for every directory opened, over all the levels and all the mounts;
+    it is kept while they are listed, not once a level has been listed in
+    full. A level made of files is therefore not walked for free.
 
     `left` is what remains. With nothing left no entry is asked for any
-    more, so the directories looked at never pass the budget, not even by
-    the one entry that would have spent it.
+    more, so the entries looked at never pass the budget, not even by the
+    one entry that would have spent it.
     """
 
     def __init__(self, left: int):
@@ -257,16 +256,16 @@ def _searched(directory: str, levels: int, below: str, pid: int,
                     entry = next(entries)
                 except StopIteration:
                     return None
+                budget.left -= 1  # an entry under this one, file or not
                 if not entry.is_dir():
                     continue
-                budget.left -= 1  # a directory under this one
                 found = _searched(entry.path, levels - 1, below, pid,
                                   budget)
                 if found is not None:
                     return found
     except OSError:
         return None
-    budget.stopped = True  # directories may remain here, not looked at
+    budget.stopped = True  # entries may remain here, not looked at
     return None
 
 
@@ -353,7 +352,7 @@ def cgroup_memory_limits(proc_cgroup: str = PROC_CGROUP,
             where = f"under {', '.join(outside)}, whose root is outside this "
             hidden = (where + f"cgroup namespace, the search for this "
                       f"process's cgroup was given up after {MAX_SEARCHED} "
-                      f"directories looked at"
+                      f"entries looked at"
                       if budget.stopped else
                       where + "cgroup namespace, no directory holds this "
                       "process")
