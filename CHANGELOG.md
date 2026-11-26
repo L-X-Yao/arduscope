@@ -29,8 +29,9 @@ releases are not published.
   accepts exactly the three assets of that version, by name.
 - The gate preflight's search budget counts every directory entry it asks
   for, files included, not only the directories it opens.
-- Parameter history lookup by timestamp is a binary search, not a reverse
-  scan.
+- Parameter history lookup by timestamp is a binary search when the
+  history is in time order; a log whose PARM lines are out of order keeps
+  the reverse scan.
 
 ### Fixed
 - Armed-window narrowing no longer falls back to the whole log when a short
@@ -38,8 +39,9 @@ releases are not published.
   vibration or EKF verdict.
 - A `_timestamp` field requested alongside other fields no longer doubles
   that column in `_read_msg_type`.
-- `release.py` refuses a version that is not `X.Y.Z` before writing
-  anything, naming the version file, instead of failing with a traceback.
+- `release.py` refuses a version that is not `X.Y.Z` with no leading zero
+  before writing anything, naming the version file, instead of failing
+  with a traceback.
 
 ## [0.14.4] - 2026-11-25
 
