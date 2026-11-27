@@ -117,13 +117,13 @@ gate record, so the record names the cap the run sat under.
 
 ## Local data
 
-The gate and the demo reports write outside git. Sizes on 2026-11-21:
+The gate and the demo reports write outside git. Sizes on 2026-11-27:
 
 | Path | Size | Rebuildable | Keep |
 |---|---|---|---|
-| `.log_cache/` | 60 GB | Yes, by the next gate | Delete only when disk is tight; the next gate rebuilds it |
-| `reports/` | 591 MB | No for historical reports | `reports/release-gate/accepted/` (4.4 MB), the latest gate record and `reports/fleet.db` |
-| `tests/sitl/logs/` | 842 MB | Yes, by `generate_logs.py` | The eight scenario logs; the `cl_*` files are closed-loop evidence |
+| `.log_cache/` | 28 GB | Yes, by the next gate | Delete only when disk is tight; the next gate rebuilds it |
+| `reports/` | 667 MB | No for historical reports | `reports/release-gate/accepted/` (4.4 MB), the latest gate record and `reports/fleet.db` |
+| `tests/sitl/logs/` | 1004 MB | Yes, by `generate_logs.py` | The eight scenario logs; the `cl_*` files are closed-loop evidence |
 | `local_paths.json` | Small | No | Back it up privately; it names the real logs |
 
 A partial gate result (`*.partial.json`) is not authoritative and may be
