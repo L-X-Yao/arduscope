@@ -218,9 +218,9 @@ ArduScope is for **ArduPilot tuning engineers**. Strictness is a feature, not a 
 
 [docs/known_limitations.md](docs/known_limitations.md) lists what ArduScope does not do or does not get right. Three to know before acting on a report:
 
-- A critical is common: 390 of the 560 corpus logs carry one, and its share of false alarms has not been measured.
-- Suggested parameters were flown in SITL, 12 rules of 20, and none on an aircraft. Go through a `.param` file before loading it.
-- A damaged log is read as far as it goes, and the report does not say it is damaged.
+- A critical is common: 293 of the 560 corpus logs carry one, and its share of false alarms has not been measured.
+- Suggested parameters were flown in SITL, 18 rules of 20, and none on an aircraft. Go through a `.param` file before loading it.
+- A damaged log is read as far as it goes, and readable damage is reported with its byte count and first offset.
 
 ## Project structure
 
