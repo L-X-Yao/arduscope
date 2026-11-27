@@ -23,11 +23,20 @@ from pymavlink import mavutil
 from pymavlink.DFReader import DFReader
 
 # Disk cache directory for parsed log data. Test-only feature; override
-# with ARDUSCOPE_LOG_CACHE to share one cache between checkouts.
-_CACHE_DIR = os.environ.get(
-    "ARDUSCOPE_LOG_CACHE",
-    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                 ".log_cache"))
+# with ARDUSCOPE_LOG_CACHE to share one cache between checkouts. A source
+# checkout keeps it at the repository root; an installed package uses the
+# user cache rather than writing inside site-packages.
+def _default_cache_dir(module_file: str) -> str:
+    package_dir = os.path.dirname(os.path.dirname(os.path.abspath(module_file)))
+    repo_dir = os.path.dirname(os.path.dirname(package_dir))
+    if os.path.isfile(os.path.join(repo_dir, "pyproject.toml")):
+        return os.path.join(repo_dir, ".log_cache")
+    return os.path.join(os.path.expanduser("~"), ".cache", "arduscope",
+                        "log_cache")
+
+
+_CACHE_DIR = os.environ.get("ARDUSCOPE_LOG_CACHE",
+                            _default_cache_dir(__file__))
 
 # Bump whenever parsing changes what ends up in the cache. Part of the
 # cache key, so a stale entry can never mask a parser regression.

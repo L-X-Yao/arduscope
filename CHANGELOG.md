@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 made in a private repository: their entries are kept here, and their tags and
 releases are not published.
 
+## [Unreleased]
+
+### Fixed
+- The parse cache defaults to `.log_cache/` at the repository root again.
+  Moving the packages under `src/` left it under `src/arduscope/`, so test
+  and gate runs wrote tens of gigabytes inside the package tree. An
+  installed package now uses the user cache instead of writing into
+  `site-packages`.
+
 ## [0.14.5] - 2026-11-26
 
 ### Changed
