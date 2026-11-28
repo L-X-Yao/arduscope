@@ -117,18 +117,20 @@ gate record, so the record names the cap the run sat under.
 
 ## Local data
 
-The gate and the demo reports write outside git. Sizes on 2026-11-27:
+The gate and the demo reports write outside git. Sizes on 2026-11-28:
 
 | Path | Size | Rebuildable | Keep |
 |---|---|---|---|
-| `.log_cache/` | 28 GB | Yes, by the next gate | Delete only when disk is tight; the next gate rebuilds it |
-| `reports/` | 667 MB | No for historical reports | `reports/release-gate/accepted/` (4.4 MB), the latest gate record and `reports/fleet.db` |
+| `.log_cache/` | 17 GB after `ci_local`; about 28 GB after a gate | Yes, by the next gate | Delete only when disk is tight; the next gate rebuilds it |
+| `reports/` | 183 MB | No for historical reports | `reports/release-gate/accepted/` (4.4 MB), the latest full gate's folder and record, and `reports/fleet.db` |
 | `tests/sitl/logs/` | 1004 MB | Yes, by `generate_logs.py` | The eight scenario logs; the `cl_*` files are closed-loop evidence |
+| `探索鹰的日志/` | 7.6 GB | No | The local flight corpus; keep it and its private backup |
 | `local_paths.json` | Small | No | Back it up privately; it names the real logs |
 
 A partial gate result (`*.partial.json`) is not authoritative and may be
-deleted. Before deleting anything else, back up the accepted baselines,
-`local_paths.json` and `fleet.db`.
+deleted. Older gate report folders may be deleted once their JSON records
+exist; the records stay. Before deleting anything else, back up the accepted
+baselines, `local_paths.json` and `fleet.db`.
 
 ## Before the gate
 
